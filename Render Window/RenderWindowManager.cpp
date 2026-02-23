@@ -10,11 +10,39 @@
 #include "IconFontCppHeaders\IconsMaterialDesign.h"
 #include "ToolbarOSDLayer.h"
 #include "RenderWindowFlyCamera.h"
+#include <Psapi.h>
 
 namespace cse
 {
 	namespace renderWindow
 	{
+		namespace
+		{
+			constexpr size_t kActiveRefCacheBaseReserve = 500;
+			constexpr size_t kActiveRefCacheTrimThreshold = 15000;
+			constexpr SIZE_T kProcessWorkingSetSoftLimitMB = 1300;
+
+			SIZE_T GetProcessWorkingSetMB()
+			{
+				auto Psapi = GetModuleHandleA("psapi.dll");
+				if (!Psapi)
+					Psapi = LoadLibraryA("psapi.dll");
+
+				if (!Psapi)
+					return 0;
+
+				using GetProcessMemoryInfoT = BOOL(WINAPI*)(HANDLE, PPROCESS_MEMORY_COUNTERS, DWORD);
+				auto GetProcessMemoryInfoPtr = reinterpret_cast<GetProcessMemoryInfoT>(GetProcAddress(Psapi, "GetProcessMemoryInfo"));
+				if (!GetProcessMemoryInfoPtr)
+					return 0;
+
+				PROCESS_MEMORY_COUNTERS MemCounters = {};
+				if (!GetProcessMemoryInfoPtr(GetCurrentProcess(), &MemCounters, sizeof(MemCounters)))
+					return 0;
+
+				return MemCounters.WorkingSetSize / (1024 * 1024);
+			}
+		}
 		IRenderWindowSceneGraphModifier::RenderData::RenderData(NiNode* SceneGraph, NiNode* ExtraNode) :
 			SceneGraph(SceneGraph),
 			ExtraNode(ExtraNode),
@@ -1167,7 +1195,7 @@ namespace cse
 			MouseInputManager = new input::RenderWindowMouseManager();
 			DeferredExecutor = new RenderWindowDeferredExecutor();
 			ColorMaskManager = new ReferenceColorMaskManager();
-			ActiveRefCache.reserve(500);
+			ActiveRefCache.reserve(kActiveRefCacheBaseReserve);
 			RenderingScene = false;
 			MouseInClientArea = false;
 			LastActiveCell = nullptr;
@@ -1982,15 +2010,19 @@ namespace cse
 			{
 				LastActiveCell = *TESRenderWindow::ActiveCell;
 
+				const auto WorkingSetMB = GetProcessWorkingSetMB();
+				const bool HighMemoryPressure = WorkingSetMB >= kProcessWorkingSetSoftLimitMB;
+
 				// Cell transitions in dense worldspaces can accumulate large temporary undo/caches
 				// and eventually trigger OOM crashes in the 32-bit editor process.
-				if (_RENDERUNDO)
+				// Apply cleanup only under memory pressure to preserve normal undo behavior.
+				if (HighMemoryPressure && _RENDERUNDO)
 					_RENDERUNDO->Clear();
 
-				if (ActiveRefCache.capacity() > 20000)
+				if (ActiveRefCache.capacity() > kActiveRefCacheTrimThreshold)
 				{
 					TESObjectREFRArrayT().swap(ActiveRefCache);
-					ActiveRefCache.reserve(500);
+					ActiveRefCache.reserve(kActiveRefCacheBaseReserve);
 				}
 			}
 
