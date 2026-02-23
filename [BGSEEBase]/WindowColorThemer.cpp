@@ -2,6 +2,10 @@
 #include "UIManager.h"
 #include "Console.h"
 
+#ifndef WM_DPICHANGED
+#define WM_DPICHANGED 0x02E0
+#endif
+
 namespace bgsee
 {
 	const std::unordered_map<std::string, bgsee::WindowColorThemer::ThemeType> WindowColorThemer::WindowClassThemeTypes
@@ -353,6 +357,23 @@ namespace bgsee
 			}
 			}
 
+			break;
+		}
+		case WM_THEMECHANGED:
+		case WM_SETTINGCHANGE:
+		case WM_DPICHANGED:
+		{
+			const auto ThemeDataMatch = ActiveThemedWindows.find(hWnd);
+			if (ThemeDataMatch == ActiveThemedWindows.end())
+				break;
+
+			auto& ThemeData = ThemeDataMatch->second;
+			if (IsEnabled())
+				ThemeData.HandleThemeInit(hWnd, Colors);
+			else
+				ThemeData.HandleThemeDeinit(hWnd);
+
+			InvalidateRect(hWnd, nullptr, TRUE);
 			break;
 		}
 		case WM_DESTROY:

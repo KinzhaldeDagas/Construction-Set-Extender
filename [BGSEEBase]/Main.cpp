@@ -7,6 +7,40 @@
 
 namespace bgsee
 {
+	static void ConfigureWindows10PlusDpiAwareness()
+	{
+		auto User32 = GetModuleHandle("user32.dll");
+		if (User32)
+		{
+			using SetProcessDpiAwarenessContextT = BOOL(WINAPI*)(HANDLE);
+			auto SetProcessDpiAwarenessContextPtr = reinterpret_cast<SetProcessDpiAwarenessContextT>(
+				GetProcAddress(User32, "SetProcessDpiAwarenessContext"));
+
+			if (SetProcessDpiAwarenessContextPtr)
+			{
+				// Try PMv2 first (Windows 10+), then gracefully fall back.
+				if (SetProcessDpiAwarenessContextPtr(reinterpret_cast<HANDLE>(-4)))
+					return;
+
+				SetProcessDpiAwarenessContextPtr(reinterpret_cast<HANDLE>(-3));
+				return;
+			}
+		}
+
+		auto Shcore = LoadLibraryA("shcore.dll");
+		if (Shcore)
+		{
+			using SetProcessDpiAwarenessT = HRESULT(WINAPI*)(int);
+			auto SetProcessDpiAwarenessPtr = reinterpret_cast<SetProcessDpiAwarenessT>(
+				GetProcAddress(Shcore, "SetProcessDpiAwareness"));
+
+			if (SetProcessDpiAwarenessPtr)
+				SetProcessDpiAwarenessPtr(2); // PROCESS_PER_MONITOR_DPI_AWARE
+
+			FreeLibrary(Shcore);
+		}
+	}
+
 	Daemon*		Daemon::Singleton = nullptr;
 
 	Daemon::Daemon() :
@@ -691,6 +725,8 @@ namespace bgsee
 		ScriptExtenderCurrentVersion = Params.SECurrentVersion;
 
 		ExtenderModuleHandle = (HINSTANCE)GetModuleHandle(ExtenderDLLPath.c_str());
+
+		ConfigureWindows10PlusDpiAwareness();
 
 		script::CodaScriptBackgrounder::RegisterINISettings(Params.INISettings);
 		script::CodaScriptExecutive::RegisterINISettings(Params.INISettings);
