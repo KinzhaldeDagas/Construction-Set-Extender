@@ -2131,9 +2131,18 @@ namespace cse
 								GetClassName(WindowAtPoint, Buffer, sizeof(Buffer));
 								GetWindowText(WindowAtPoint, (LPSTR)ControlText, sizeof(ControlText));
 
+								const LONG_PTR ButtonType = (WindowStyle & BS_TYPEMASK);
+								const bool IsToggleButton =
+									ButtonType == BS_CHECKBOX ||
+									ButtonType == BS_AUTOCHECKBOX ||
+									ButtonType == BS_3STATE ||
+									ButtonType == BS_AUTO3STATE ||
+									ButtonType == BS_RADIOBUTTON ||
+									ButtonType == BS_AUTORADIOBUTTON;
+
 								if ((!_stricmp("Button", Buffer) &&
 									CtrlID != kFaceGenControl_PreviewCtrl &&
-									(WindowStyle & BS_AUTOCHECKBOX) == false &&
+									!IsToggleButton &&
 									CtrlID > 5 && strlen(ControlText) > 3) ||
 									!_stricmp("ComboBox", Buffer))
 								{
