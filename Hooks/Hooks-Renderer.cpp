@@ -728,6 +728,12 @@ namespace cse
 		{
 			if (TESLODTextureGenerator::GeneratorState == TESLODTextureGenerator::kState_NotInUse)
 				SetForegroundWindow(*TESRenderWindow::WindowHandle);
+
+			// The editor appends landscape paint operations to the render-window undo chain
+			// indefinitely. Frequent texture painting in the viewport can push the process
+			// past the 32-bit address space limit and crash.
+			if (*TESRenderWindow::LandscapeEditFlag && _RENDERUNDO)
+				_RENDERUNDO->Clear();
 		}
 
 		#define _hhName		ActivateRenderWindowPostLandTextureChange
