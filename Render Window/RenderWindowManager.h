@@ -248,6 +248,7 @@ namespace cse
 			bool										RenderingScene;
 			bool										Initialized;
 			bool										MouseInClientArea;
+			TESObjectCELL*							LastActiveCell;
 
 			void										HandleClearData();
 			void										HandleConstructSpecialForms();

@@ -1170,6 +1170,7 @@ namespace cse
 			ActiveRefCache.reserve(500);
 			RenderingScene = false;
 			MouseInClientArea = false;
+			LastActiveCell = nullptr;
 
 			Initialized = false;
 		}
@@ -1370,6 +1371,8 @@ namespace cse
 
 		void RenderWindowManager::CacheActiveRefs()
 		{
+			ActiveRefCache.clear();
+
 			TESRenderWindow::GetActiveCellObjects(ActiveRefCache, [](TESObjectREFR* Ref)->bool {
 				if (Ref->IsDeleted())
 					return false;
@@ -1908,6 +1911,7 @@ namespace cse
 
 			ExtendedState->MeasureBaseRuler = nullptr;
 			ExtendedState->MeasureBaseCircle = nullptr;
+			LastActiveCell = nullptr;
 		}
 
 		void RenderWindowManager::HandleConstructSpecialForms()
@@ -1973,6 +1977,22 @@ namespace cse
 		void RenderWindowManager::HandlePostRenderWindowUpdate()
 		{
 			SME_ASSERT(RenderingScene == false);
+
+			if (LastActiveCell != *TESRenderWindow::ActiveCell)
+			{
+				LastActiveCell = *TESRenderWindow::ActiveCell;
+
+				// Cell transitions in dense worldspaces can accumulate large temporary undo/caches
+				// and eventually trigger OOM crashes in the 32-bit editor process.
+				if (_RENDERUNDO)
+					_RENDERUNDO->Clear();
+
+				if (ActiveRefCache.capacity() > 20000)
+				{
+					TESObjectREFRArrayT().swap(ActiveRefCache);
+					ActiveRefCache.reserve(500);
+				}
+			}
 
 			DeferredExecutor->HandlePostRenderWindowUpdate();
 		}
