@@ -149,8 +149,10 @@ namespace cse
 					Vector3 OutRotation(Rotation.x, Rotation.y, Rotation.z);
 					OutRotation.Scale(REFR_DEG2RAD);
 
+					Vector3 OutPosition(Position.x, Position.y, Position.z);
+
 					TESObjectREFR* NewRef = _DATAHANDLER->PlaceObjectRef(Base,
-																		&(Vector3(Position.x, Position.y, Position.z)),
+																		&OutPosition,
 																		&OutRotation,
 																		ParentCell, ParentWorldspace, nullptr);
 					if (NewRef)
@@ -786,7 +788,8 @@ namespace cse
 						TESObjectLAND* Land = Cell->GetLand();
 						if (Land)
 						{
-							TESLandTexture* Texture = Land->GetLandTextureAt(&Vector3(XCoord, YCoord, 0.f));
+							Vector3 Coordinates(XCoord, YCoord, 0.f);
+							TESLandTexture* Texture = Land->GetLandTextureAt(&Coordinates);
 							if (Texture)
 								Result->SetFormID(Texture->formID);
 						}

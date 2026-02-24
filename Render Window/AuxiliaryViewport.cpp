@@ -363,7 +363,7 @@ namespace cse
 	void AuxiliaryViewport::SyncWithPrimaryCamera()
 	{
 		UInt32 RefCountBuffer = ViewportCamera->m_uiRefCount;
-		NiAVObject* ParentBuffer = ViewportCamera->m_parent;
+		NiAVObject* ParentBuffer = static_cast<NiAVObject*>(ViewportCamera->m_parent);
 
 		memcpy(ViewportCamera, _PRIMARYRENDERER->primaryCamera, sizeof(NiCamera));
 
