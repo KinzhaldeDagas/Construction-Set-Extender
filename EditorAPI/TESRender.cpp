@@ -557,9 +557,10 @@ TESPathGridPoint* TESRender::PickPathGridPointAtCoords(int X, int Y)
 			NiAVObject* Pick = TESRenderWindow::PickBuffer->pickRecords.data[0]->picked;
 			if (Pick && Pick->m_parent)
 			{
-				if (Pick->m_parent->m_extraDataListLen)
+				NiAVObject* Parent = NI_CAST(Pick->m_parent, NiAVObject);
+				if (Parent)
 				{
-					NiIntegerExtraData* xData = NI_CAST(Pick->m_parent->m_extraDataList[0], NiIntegerExtraData);
+					NiIntegerExtraData* xData = NI_CAST(GetExtraData(Parent, "INDEX"), NiIntegerExtraData);
 					if (xData)
 						Result = (TESPathGridPoint*)xData->m_iValue;
 				}
