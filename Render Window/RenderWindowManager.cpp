@@ -253,7 +253,7 @@ namespace cse
 					if (ReferenceVisibilityManager::IsCulled(Itr) == false)
 					{
 						NiNode* Node = Itr->GetNiNode();
-						Node->SetCulled(true);
+						Node->m_flags |= NiAVObject::kFlag_AppCulled;
 						CulledRefBuffer.push_back(Node);
 					}
 				}
@@ -264,7 +264,7 @@ namespace cse
 		{
 			// reset the culled state
 			for (auto Itr : CulledRefBuffer)
-				Itr->SetCulled(false);
+				Itr->m_flags &= ~NiAVObject::kFlag_AppCulled;
 
 			CulledRefBuffer.clear();
 		}
@@ -308,7 +308,7 @@ namespace cse
 		bool ReferenceVisibilityManager::IsCulled(TESObjectREFR* Ref)
 		{
 			NiNode* Node = Ref->GetNiNode();
-			if (Node == nullptr || Node->IsCulled())
+			if (Node == nullptr || (Node->m_flags & NiAVObject::kFlag_AppCulled))
 				return true;
 			else
 				return false;
