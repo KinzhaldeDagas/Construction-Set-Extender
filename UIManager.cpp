@@ -209,10 +209,14 @@ namespace cse
 				return true;
 
 <<<<<<< HEAD
+<<<<<<< HEAD
 			auto MatchesFilter = [&](const std::string& String) -> bool {
 =======
 			auto MatchesFilter = [&](std::string String) -> bool {
 >>>>>>> origin/codex/fix-compilation-errors-in-construction-set-extender
+=======
+			auto MatchesFilter = [&](std::string String) -> bool {
+>>>>>>> origin/codex/fix-compilation-errors-in-construction-set-extender-skewg4
 				if (FilterString.empty())
 					return true;
 				else if (String.empty())
