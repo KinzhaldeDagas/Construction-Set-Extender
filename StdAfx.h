@@ -108,86 +108,11 @@ using namespace SME::INI;
 using namespace SME::Functors;
 using namespace SME::MemoryHandler;
 
-// xOBSE / editor-safe declarations only
-// Do NOT include obse\PluginAPI.h or obse\GameAPI.h in the editor PCH.
+// xOBSE / editor-safe declarations and interfaces
 #include "obse_common\obse_version.h"
 
-// Minimal plugin-facing types needed by CSE headers
-typedef UInt32 PluginHandle;
-#ifndef kPluginHandle_Invalid
-static const PluginHandle kPluginHandle_Invalid = static_cast<PluginHandle>(-1);
-#endif
-
-struct CommandInfo
-{
-	const char* longName;
-};
-
-enum
-{
-	kInterface_Messaging = 1,
-	kInterface_CommandTable = 9,
-};
-
-struct OBSEInterface
-{
-	UInt32		obseVersion;
-	UInt32		editorVersion;
-	UInt32		isEditor;
-	void*		(* QueryInterface)(UInt32 id);
-	PluginHandle (* GetPluginHandle)(void);
-	const char* (* GetOblivionDirectory)(void);
-};
-struct OBSEConsoleInterface;
-struct OBSEStringVarInterface;
-struct OBSEArrayVarInterface;
-struct OBSEScriptInterface;
-struct OBSEDataInterface;
-struct OBSESerializationInterface;
-struct OBSECommandTableInterface;
-struct OBSEScriptDataInterface;
-struct OBSEEventManagerInterface;
-
-// Main.h uses OBSEMessagingInterface::Message in callback signatures,
-// so forward declaration alone is insufficient.
-struct OBSEMessagingInterface
-{
-	struct Message;
-
-	enum
-	{
-		kMessage_PostLoad = 0,
-		kMessage_PostPostLoad,
-	};
-
-	bool (* RegisterListener)(PluginHandle listener, const char* sender, void (* handler)(Message* msg));
-	bool (* Dispatch)(PluginHandle sender, UInt32 messageType, void* data, UInt32 dataLen, const char* receiver);
-
-    struct Message
-    {
-        const char* sender;
-        UInt32      type;
-        UInt32      dataLen;
-        void*       data;
-    };
-};
-
-struct PluginInfo
-{
-	enum { kInfoVersion = 1 };
-    UInt32      infoVersion;
-    const char* name;
-    UInt32      version;
-};
-
-struct OBSECommandTableInterface
-{
-	UInt32 (* GetReturnType)(const CommandInfo* cmd);
-	PluginHandle (* GetParentPlugin)(const CommandInfo* cmd);
-	UInt32 (* GetRequiredOBSEVersion)(const CommandInfo* cmd);
-	const CommandInfo* (* Start)(void);
-	const CommandInfo* (* End)(void);
-};
+// Pull authoritative OBSE interfaces/types from xOBSE headers.
+#include <PluginAPI.h>
 
 // xOBSE templates may reference FormHeap allocators via declarations.
 void* FormHeap_Allocate(UInt32 Size);
