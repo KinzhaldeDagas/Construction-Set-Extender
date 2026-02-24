@@ -1,6 +1,6 @@
 #include "RTTI.h"
 
-void* Oblivion_DynamicCast( void * SrcObj, UInt32 Arg1, const void * FromType, const void * ToType, UInt32 Arg4 )
+void* Oblivion_DynamicCast( void * SrcObj, unsigned long Arg1, const void * FromType, const void * ToType, unsigned long Arg4 )
 {
 	return cdeclCall<void*>(0x0088DC0C, SrcObj, Arg1, FromType, ToType, Arg4);
 }

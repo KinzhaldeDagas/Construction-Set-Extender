@@ -33,6 +33,7 @@
   POSSIBILITY OF SUCH DAMAGE.
 */
 #include "mpFuncCommon.h"
+#include <algorithm>
 
 // #include <cassert>
 // #include <string>
@@ -106,7 +107,7 @@ namespace bgsee { namespace script { namespace mup {
 		  throw ParserError(err);
 		}
 	  }
-	  smax = max(smax, sval);
+	  smax = (std::max)(smax, sval);
 	}
 
 	*ret = smax;
@@ -161,7 +162,7 @@ namespace bgsee { namespace script { namespace mup {
 		  throw ParserError(err);
 		}
 	  }
-	  smin = min(smin, sval);
+	  smin = (std::min)(smin, sval);
 	}
 
 	*ret = smin;

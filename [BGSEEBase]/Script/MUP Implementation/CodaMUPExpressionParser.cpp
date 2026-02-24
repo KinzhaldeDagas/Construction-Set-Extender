@@ -11,8 +11,8 @@
 #include "mpPackageMatrix.h"
 #include "CodaMUPScriptCommand.h"
 #include "CodaUtilities.h"
-#include "..\Main.h"
-#include "..\Console.h"
+#include "..\..\Main.h"
+#include "..\..\Console.h"
 
 namespace bgsee
 {
@@ -295,7 +295,7 @@ namespace bgsee
 					MUP_ASSERT(opElse->GetCode()==cmELSE)
 					MUP_ASSERT(opIf->GetCode()==cmIF)
 
-					// If then else hat 3 argumente und erzeugt einen rückgabewert (3-1=2)
+					// If then else hat 3 argumente und erzeugt einen rckgabewert (3-1=2)
 					ByteCode->TokenPos -= 2;
 					ByteCode->RPNStack.Add(ptr_tok_type(new TokenIfThenElse(cmENDIF)));
 				}
@@ -466,8 +466,8 @@ namespace bgsee
 						{
 							ApplyRemainingOprt(stOpt);
 
-							// Value stack plätten
-							// Stack der RPN um die Anzahl im stack enthaltener Werte zurück setzen
+							// Value stack pltten
+							// Stack der RPN um die Anzahl im stack enthaltener Werte zurck setzen
 							OutByteCode->RPNStack.AddNewline(pTok, OutByteCode->TokenPos);
 							stOpt.clear();
 							OutByteCode->TokenPos = 0;
@@ -604,7 +604,7 @@ namespace bgsee
 				m_opContext()
 			{
 				DefineNameChars(_T("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"));
-				DefineOprtChars(_T("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+-*^/?<>=#!$%&|~'_µ{}"));
+				DefineOprtChars(_T("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+-*^/?<>=#!$%&|~'_{}"));
 				DefineInfixOprtChars(_T("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ()/+-*^?<>=#!$%&|~'_"));
 
 				m_TokenReader.reset(new TokenReader(this));

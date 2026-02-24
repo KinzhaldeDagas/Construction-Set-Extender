@@ -224,9 +224,12 @@ namespace cse
 		public:
 			MouseOverPopupProvider();
 
-			PopupIDT	RegisterPopup(const char* Name,
-									  RenderDelegateT DrawButton, RenderDelegateT DrawPopup,
-									  UInt8 PositionType = kPosition_Default, ImVec2& Pos = ImVec2(0, 0));
+			PopupIDT	RegisterPopup(const char* Name, RenderDelegateT DrawButton, RenderDelegateT DrawPopup, UInt8 PositionType, ImVec2& Pos);
+		inline PopupIDT	RegisterPopup(const char* Name, RenderDelegateT DrawButton, RenderDelegateT DrawPopup, UInt8 PositionType = kPosition_Default, const ImVec2& Pos = ImVec2(0, 0))
+		{
+			ImVec2 PosCopy = Pos;
+			return RegisterPopup(Name, DrawButton, DrawPopup, PositionType, PosCopy);
+		}
 			void		Draw(PopupIDT ID, ImGuiDX9* GUI, void* ParentWindow);
 			void		Update();		// called at the start of the layer's Draw method
 		};

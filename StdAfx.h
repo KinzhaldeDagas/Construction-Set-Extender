@@ -108,11 +108,58 @@ using namespace SME::INI;
 using namespace SME::Functors;
 using namespace SME::MemoryHandler;
 
-// OBSE
+// xOBSE / editor-safe declarations only
+// Do NOT include obse\PluginAPI.h or obse\GameAPI.h in the editor PCH.
 #include "obse_common\obse_version.h"
-#include "obse\PluginAPI.h"
-#include "obse\GameTypes.h"
-#include "obse\Utilities.h"
+
+// Minimal plugin-facing types needed by CSE headers
+typedef UInt32 PluginHandle;
+#ifndef kPluginHandle_Invalid
+static const PluginHandle kPluginHandle_Invalid = static_cast<PluginHandle>(-1);
+#endif
+
+struct OBSEInterface;
+struct OBSEConsoleInterface;
+struct OBSEStringVarInterface;
+struct OBSEArrayVarInterface;
+struct OBSEScriptInterface;
+struct OBSEDataInterface;
+struct OBSESerializationInterface;
+struct OBSECommandTableInterface;
+struct OBSEScriptDataInterface;
+struct OBSEEventManagerInterface;
+
+// Main.h uses OBSEMessagingInterface::Message in callback signatures,
+// so forward declaration alone is insufficient.
+struct OBSEMessagingInterface
+{
+    struct Message
+    {
+        const char* sender;
+        UInt32      type;
+        UInt32      dataLen;
+        void*       data;
+    };
+};
+
+struct PluginInfo
+{
+    UInt32      infoVersion;
+    const char* name;
+    UInt32      version;
+};
+
+// xOBSE templates may reference FormHeap allocators via declarations.
+void* FormHeap_Allocate(UInt32 Size);
+void  FormHeap_Free(void* Ptr);
+
+// xOBSE/xSE compatibility shim
+// Keep this active across BGSEEBase headers so any transitive xOBSE includes
+// get renamed and cannot collide with CSE editor-side classes.
+#define BSFile             OBSEShim_BSFile
+#define BSRenderedTexture  OBSEShim_BSRenderedTexture
+#define BSTextureManager   OBSEShim_BSTextureManager
+#define TESChildCell       OBSEShim_TESChildCell
 
 // BGSEEBASE
 #include "[BGSEEBase]\Main.h"
@@ -120,6 +167,11 @@ using namespace SME::MemoryHandler;
 #include "[BGSEEBase]\UIManager.h"
 #include "[BGSEEBase]\HookUtil.h"
 
+// End shim BEFORE CSE editor headers
+#undef TESChildCell
+#undef BSTextureManager
+#undef BSRenderedTexture
+#undef BSFile
 
 // CSE
 #include "Main.h"

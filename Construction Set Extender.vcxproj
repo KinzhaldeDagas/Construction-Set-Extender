@@ -1,5 +1,5 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<?xml version='1.0' encoding='utf-8'?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build" ToolsVersion="4.0">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug - Attach Debugger|Win32">
       <Configuration>Debug - Attach Debugger</Configuration>
@@ -127,7 +127,7 @@
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Release - No CrashRpt, Attach Debugger|Win32'" />
     <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(BGSEEBaseLibPath_DEBUG);$(DirectXLibPath);$(CrashRptLibPath);$(BoostLibPath);$(LibraryPath)</LibraryPath>
     <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug - Attach Debugger|Win32'">$(BGSEEBaseLibPath_DEBUG);$(DirectXLibPath);$(CrashRptLibPath);$(BoostLibPath);$(LibraryPath)</LibraryPath>
-    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(BGSEEBaseIncludePath);$(XSECommonIncludePath);$(DirectXIncludePath);$(SMESundriesIncludePath);$(BoostIncludePath);$(CrashRptIncludePath);$(NETFXKitsDir)\include\um;$(IncludePath)</IncludePath>
+    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir);$(BGSEEBaseIncludePath);$(XSECommonIncludePath);$(DirectXIncludePath);$(SMESundriesIncludePath);$(BoostIncludePath);$(CrashRptIncludePath);$(NETFXKitsDir)\include\um;$(IncludePath)</IncludePath>
     <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug - Attach Debugger|Win32'">$(BGSEEBaseIncludePath);$(XSECommonIncludePath);$(DirectXIncludePath);$(SMESundriesIncludePath);$(BoostIncludePath);$(CrashRptIncludePath);$(NETFXKitsDir)\include\um;$(IncludePath)</IncludePath>
     <SourcePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SourcePath)</SourcePath>
     <SourcePath Condition="'$(Configuration)|$(Platform)'=='Debug - Attach Debugger|Win32'">$(SourcePath)</SourcePath>
@@ -164,7 +164,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)\..\obse\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);C:\src\xOBSE-Plugins-main\obse\obse;C:\src\CrashRpt-main\include;C:\src\xOBSE-Plugins-main\obse;$(DXSDK_DIR)Include;$(SolutionDir);$(SolutionDir)\..\obse\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_WINDOWS;_USRDLL;NDEBUG;CS_VERSION=0x01020000;OBLIVION_VERSION=0x010201A0;CSE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessToFile>false</PreprocessToFile>
       <PreprocessSuppressLineNumbers>false</PreprocessSuppressLineNumbers>
@@ -173,7 +173,7 @@
       <WarningLevel>Level3</WarningLevel>
       <ForcedIncludeFiles>StdAfx.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <MinimalRebuild>false</MinimalRebuild>
-      <AdditionalOptions>-Zm200</AdditionalOptions>
+      <AdditionalOptions>-Zm200 /Zc:char8_t- /Zc:strictStrings-</AdditionalOptions>
       <StringPooling>true</StringPooling>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
@@ -185,7 +185,7 @@
       <OmitFramePointers>false</OmitFramePointers>
       <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <AdditionalDependencies>ComCtl32.lib;shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -203,13 +203,13 @@
       <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
       <SuppressStartupBanner>true</SuppressStartupBanner>
+      <AdditionalLibraryDirectories>$(XSECommonLibPath);C:\Libraries\common\Win32_v143\Release;$(DXSDK_DIR)Lib\x86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Message>Installing DLL...</Message>
-      <Command>copy "$(TargetPath)" "$(OblivionPath)\Data\obse\plugins\$(TargetFileName)"
-copy "$(TargetPath)" "$(DropboxPath)\CSE Once-In-Awhile'lies\Data\OBSE\Plugins\$(TargetFileName)"
-copy "$(TargetDir)$(TargetName).pdb" "$(DropboxPath)\CSE Once-In-Awhile'lies\Data\OBSE\Plugins\$(TargetName).pdb"
-</Command>
+      <Command>if not "$(OblivionPath)"=="" if exist "$(OblivionPath)\Data\obse\plugins" copy "$(TargetPath)" "$(OblivionPath)\Data\obse\plugins\$(TargetFileName)"
+if not "$(DropboxPath)"=="" if exist "$(DropboxPath)\CSE Once-In-Awhile'lies\Data\OBSE\Plugins" copy "$(TargetPath)" "$(DropboxPath)\CSE Once-In-Awhile'lies\Data\OBSE\Plugins\$(TargetFileName)"
+if not "$(DropboxPath)"=="" if exist "$(DropboxPath)\CSE Once-In-Awhile'lies\Data\OBSE\Plugins" copy "$(TargetDir)$(TargetName).pdb" "$(DropboxPath)\CSE Once-In-Awhile'lies\Data\OBSE\Plugins\$(TargetName).pdb"</Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>cscript.exe "$(SolutionDir)\BuildIncrement.jse"</Command>
@@ -220,7 +220,7 @@ copy "$(TargetDir)$(TargetName).pdb" "$(DropboxPath)\CSE Once-In-Awhile'lies\Dat
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release - Skip Dev Channel|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)\..\obse\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);C:\src\xOBSE-Plugins-main\obse\obse;C:\src\CrashRpt-main\include;C:\src\xOBSE-Plugins-main\obse;$(DXSDK_DIR)Include;$(SolutionDir);$(SolutionDir)\..\obse\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_WINDOWS;_USRDLL;NDEBUG;CS_VERSION=0x01020000;OBLIVION_VERSION=0x010201A0;CSE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessToFile>false</PreprocessToFile>
       <PreprocessSuppressLineNumbers>false</PreprocessSuppressLineNumbers>
@@ -229,7 +229,7 @@ copy "$(TargetDir)$(TargetName).pdb" "$(DropboxPath)\CSE Once-In-Awhile'lies\Dat
       <WarningLevel>Level3</WarningLevel>
       <ForcedIncludeFiles>StdAfx.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <MinimalRebuild>false</MinimalRebuild>
-      <AdditionalOptions>-Zm200</AdditionalOptions>
+      <AdditionalOptions>-Zm200 /Zc:char8_t- /Zc:strictStrings-</AdditionalOptions>
       <StringPooling>true</StringPooling>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
@@ -241,7 +241,7 @@ copy "$(TargetDir)$(TargetName).pdb" "$(DropboxPath)\CSE Once-In-Awhile'lies\Dat
       <OmitFramePointers>false</OmitFramePointers>
       <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <AdditionalDependencies>ComCtl32.lib;shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -259,10 +259,11 @@ copy "$(TargetDir)$(TargetName).pdb" "$(DropboxPath)\CSE Once-In-Awhile'lies\Dat
       <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
       <SuppressStartupBanner>true</SuppressStartupBanner>
+      <AdditionalLibraryDirectories>$(XSECommonLibPath);C:\Libraries\common\Win32_v143\Release;$(DXSDK_DIR)Lib\x86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Message>Installing DLL...</Message>
-      <Command>copy "$(TargetPath)" "$(OblivionPath)\Data\obse\plugins\$(TargetFileName)"</Command>
+      <Command>if not "$(OblivionPath)"=="" if exist "$(OblivionPath)\Data\obse\plugins" copy "$(TargetPath)" "$(OblivionPath)\Data\obse\plugins\$(TargetFileName)"</Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>cscript.exe "$(SolutionDir)\BuildIncrement.jse"</Command>
@@ -273,7 +274,7 @@ copy "$(TargetDir)$(TargetName).pdb" "$(DropboxPath)\CSE Once-In-Awhile'lies\Dat
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release - No CrashRpt, Attach Debugger|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)\..\obse\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);C:\src\xOBSE-Plugins-main\obse\obse;C:\src\CrashRpt-main\include;C:\src\xOBSE-Plugins-main\obse;$(DXSDK_DIR)Include;$(SolutionDir);$(SolutionDir)\..\obse\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_WINDOWS;_USRDLL;NDEBUG;CS_VERSION=0x01020000;OBLIVION_VERSION=0x010201A0;CSE;WAIT_FOR_DEBUGGER;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessToFile>false</PreprocessToFile>
       <PreprocessSuppressLineNumbers>false</PreprocessSuppressLineNumbers>
@@ -282,7 +283,7 @@ copy "$(TargetDir)$(TargetName).pdb" "$(DropboxPath)\CSE Once-In-Awhile'lies\Dat
       <WarningLevel>Level3</WarningLevel>
       <ForcedIncludeFiles>StdAfx.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
       <MinimalRebuild>false</MinimalRebuild>
-      <AdditionalOptions>-Zm200</AdditionalOptions>
+      <AdditionalOptions>-Zm200 /Zc:char8_t- /Zc:strictStrings-</AdditionalOptions>
       <StringPooling>true</StringPooling>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
@@ -296,7 +297,7 @@ copy "$(TargetDir)$(TargetName).pdb" "$(DropboxPath)\CSE Once-In-Awhile'lies\Dat
       <BufferSecurityCheck>true</BufferSecurityCheck>
       <WholeProgramOptimization>true</WholeProgramOptimization>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <AdditionalDependencies>ComCtl32.lib;shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -315,10 +316,11 @@ copy "$(TargetDir)$(TargetName).pdb" "$(DropboxPath)\CSE Once-In-Awhile'lies\Dat
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
       <SuppressStartupBanner>true</SuppressStartupBanner>
       <Profile>true</Profile>
+      <AdditionalLibraryDirectories>$(XSECommonLibPath);C:\Libraries\common\Win32_v143\Release;$(DXSDK_DIR)Lib\x86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Message>Installing DLL...</Message>
-      <Command>copy "$(TargetPath)" "$(OblivionPath)\Data\obse\plugins\$(TargetFileName)"</Command>
+      <Command>if not "$(OblivionPath)"=="" if exist "$(OblivionPath)\Data\obse\plugins" copy "$(TargetPath)" "$(OblivionPath)\Data\obse\plugins\$(TargetFileName)"</Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>cscript.exe "$(SolutionDir)\BuildIncrement.jse"</Command>
@@ -329,7 +331,7 @@ copy "$(TargetDir)$(TargetName).pdb" "$(DropboxPath)\CSE Once-In-Awhile'lies\Dat
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)\..\obse\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);C:\src\xOBSE-Plugins-main\obse\obse;C:\src\CrashRpt-main\include;C:\src\xOBSE-Plugins-main\obse;$(DXSDK_DIR)Include;$(SolutionDir);$(SolutionDir)\..\obse\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_DEBUG;WIN32;_WINDOWS;_USRDLL;CS_VERSION=0x01020000;OBLIVION_VERSION=0x010201A0;CSE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <IgnoreStandardIncludePath>false</IgnoreStandardIncludePath>
       <PreprocessToFile>false</PreprocessToFile>
@@ -351,8 +353,8 @@ copy "$(TargetDir)$(TargetName).pdb" "$(DropboxPath)\CSE Once-In-Awhile'lies\Dat
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <BasicRuntimeChecks>UninitializedLocalUsageCheck</BasicRuntimeChecks>
       <WholeProgramOptimization>false</WholeProgramOptimization>
-      <AdditionalOptions>-Zm200</AdditionalOptions>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>-Zm200 /Zc:char8_t- /Zc:strictStrings-</AdditionalOptions>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <AdditionalDependencies>ComCtl32.lib;shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -370,10 +372,11 @@ copy "$(TargetDir)$(TargetName).pdb" "$(DropboxPath)\CSE Once-In-Awhile'lies\Dat
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
       <UACExecutionLevel>AsInvoker</UACExecutionLevel>
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
+      <AdditionalLibraryDirectories>$(XSECommonLibPath);C:\Libraries\common\Win32_v143\Release;$(DXSDK_DIR)Lib\x86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Message>Installing DLL...</Message>
-      <Command>copy "$(TargetPath)" "$(OblivionPath)\data\obse\plugins\$(TargetFileName)"</Command>
+      <Command>if not "$(OblivionPath)"=="" if exist "$(OblivionPath)\data\obse\plugins" copy "$(TargetPath)" "$(OblivionPath)\data\obse\plugins\$(TargetFileName)"</Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>cscript.exe "$(SolutionDir)\BuildIncrement.jse"</Command>
@@ -390,7 +393,7 @@ copy "$(TargetDir)$(TargetName).pdb" "$(DropboxPath)\CSE Once-In-Awhile'lies\Dat
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug - Attach Debugger|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(SolutionDir);$(SolutionDir)\..\obse\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);C:\src\xOBSE-Plugins-main\obse\obse;C:\src\CrashRpt-main\include;C:\src\xOBSE-Plugins-main\obse;$(DXSDK_DIR)Include;$(SolutionDir);$(SolutionDir)\..\obse\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_DEBUG;WIN32;_WINDOWS;_USRDLL;CS_VERSION=0x01020000;OBLIVION_VERSION=0x010201A0;CSE;WAIT_FOR_DEBUGGER;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <IgnoreStandardIncludePath>false</IgnoreStandardIncludePath>
       <PreprocessToFile>false</PreprocessToFile>
@@ -412,8 +415,8 @@ copy "$(TargetDir)$(TargetName).pdb" "$(DropboxPath)\CSE Once-In-Awhile'lies\Dat
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <BasicRuntimeChecks>UninitializedLocalUsageCheck</BasicRuntimeChecks>
       <WholeProgramOptimization>false</WholeProgramOptimization>
-      <AdditionalOptions>-Zm200</AdditionalOptions>
-      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>-Zm200 /Zc:char8_t- /Zc:strictStrings-</AdditionalOptions>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <AdditionalDependencies>ComCtl32.lib;shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
@@ -431,10 +434,11 @@ copy "$(TargetDir)$(TargetName).pdb" "$(DropboxPath)\CSE Once-In-Awhile'lies\Dat
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
       <UACExecutionLevel>AsInvoker</UACExecutionLevel>
       <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
+      <AdditionalLibraryDirectories>$(XSECommonLibPath);C:\Libraries\common\Win32_v143\Release;$(DXSDK_DIR)Lib\x86;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <PostBuildEvent>
       <Message>Installing DLL...</Message>
-      <Command>copy "$(TargetPath)" "$(OblivionPath)\data\obse\plugins\$(TargetFileName)"</Command>
+      <Command>if not "$(OblivionPath)"=="" if exist "$(OblivionPath)\data\obse\plugins" copy "$(TargetPath)" "$(OblivionPath)\data\obse\plugins\$(TargetFileName)"</Command>
     </PostBuildEvent>
     <PreBuildEvent>
       <Command>cscript.exe "$(SolutionDir)\BuildIncrement.jse"</Command>
@@ -450,7 +454,7 @@ copy "$(TargetDir)$(TargetName).pdb" "$(DropboxPath)\CSE Once-In-Awhile'lies\Dat
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\OBSE\obse\NiTypes.cpp">
+    <ClCompile Include="$(OBSEIncludePath)\obse\NiTypes.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
       </ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug - Attach Debugger|Win32'">

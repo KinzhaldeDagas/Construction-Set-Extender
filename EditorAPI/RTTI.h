@@ -1,6 +1,7 @@
 #pragma once
+struct NiRTTI;
 
-void*	Oblivion_DynamicCast(void * SrcObj, UInt32 Arg1, const void * FromType, const void * ToType, UInt32 Arg4);
+void*	Oblivion_DynamicCast(void * SrcObj, unsigned long Arg1, const void * FromType, const void * ToType, unsigned long Arg4);
 void*	NiDynamicCast(const void* ToType, void* SrcObj);
 
 #define CS_CAST(obj, from, to)			(to *)Oblivion_DynamicCast((void*)(obj), 0, RTTI_ ## from, RTTI_ ## to, 0)

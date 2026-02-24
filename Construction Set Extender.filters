@@ -1,0 +1,1053 @@
+<?xml version='1.0' encoding='utf-8'?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <ItemGroup>
+    <Filter Include="OBSE">
+      <UniqueIdentifier>{ebc1f18f-877b-4955-8a28-1001c43d5570}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Wrappers">
+      <UniqueIdentifier>{3b815dbd-d8cf-4937-a2d4-34bbcb238638}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources">
+      <UniqueIdentifier>{a64f4266-378a-47b1-be47-766c21b45028}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources\Images">
+      <UniqueIdentifier>{e62d4749-16e2-4149-b016-1cfa2470bde2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Common">
+      <UniqueIdentifier>{f4474007-3606-490a-945e-5c57880074f0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Hooks">
+      <UniqueIdentifier>{d8a0ecb9-e056-469e-aac0-e8eb485e99fd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Components">
+      <UniqueIdentifier>{38df1a7a-ab76-44e1-b352-1c9aa39613d7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EditorAPI">
+      <UniqueIdentifier>{1123d9ac-df61-4a93-9bec-1ca6d5a32bdb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EditorAPI\Forms">
+      <UniqueIdentifier>{e1a88872-fa63-43c0-a11a-c771bc250ebe}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Interop">
+      <UniqueIdentifier>{5dcd7610-9727-4251-985b-7c6159ab54e9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Interop\Plugin">
+      <UniqueIdentifier>{00cd23b4-f1db-45de-b955-f317f461fc4e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Interop\CS 1.0">
+      <UniqueIdentifier>{e5000435-032f-47a5-9604-560b2ad3caf8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Interop\Component DLL">
+      <UniqueIdentifier>{8bc03154-4d74-40ad-aea1-5542706114b5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EditorAPI\Forms\Magic">
+      <UniqueIdentifier>{1bdc4fe4-9ce4-44e4-bde0-f3054aa32ede}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EditorAPI\Forms\Objects">
+      <UniqueIdentifier>{5cae79a0-9fbe-4e80-9084-cb288a92bcc8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EditorAPI\Forms\Actors">
+      <UniqueIdentifier>{d09a2a61-7105-4afb-a6e4-833188b71d3c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EditorAPI\Forms\AI">
+      <UniqueIdentifier>{46a638e0-e722-4b22-afbe-8bb67f4d0748}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EditorAPI\Forms\Gameplay">
+      <UniqueIdentifier>{5e97e0d8-901c-40af-b032-da21c4c2b5de}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EditorAPI\Forms\World">
+      <UniqueIdentifier>{3c9a3851-f75b-4d05-aee8-dfee27cdd138}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EditorAPI\System">
+      <UniqueIdentifier>{26e00126-86fb-460c-a5f7-450bf1266479}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EditorAPI\Types">
+      <UniqueIdentifier>{96f036e0-2da4-4960-95f0-ce6d8ad41411}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EditorAPI\System\I/O">
+      <UniqueIdentifier>{23fb7c72-74b7-489f-ba49-67e1dba28df4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EditorAPI\System\Core">
+      <UniqueIdentifier>{8f8d8f27-1c53-41ce-b696-80d45b88b1ac}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EditorAPI\System\ExtraData">
+      <UniqueIdentifier>{161df8d1-c6ad-4d08-b713-57145eced8ea}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EditorAPI\System\CS Interfaces">
+      <UniqueIdentifier>{66bffcd2-7ff2-47bf-b2e9-3896a28117f7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EditorAPI\System\Settings">
+      <UniqueIdentifier>{29cbad6a-31a2-431b-b241-a729972599fa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EditorAPI\Types\NetImmerse">
+      <UniqueIdentifier>{9fcf4dad-87cd-4e73-b263-0f0a8dc8c84e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EditorAPI\Types\Bethesda">
+      <UniqueIdentifier>{3bb9635e-5bb8-48b6-ba78-ae9f582e742c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Components\Coda">
+      <UniqueIdentifier>{253bc8ad-55c7-44ea-80d6-413eb868ee7d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Components\Coda\Commands">
+      <UniqueIdentifier>{d2b0fdf6-6089-45bb-bde4-d47867937e1f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Components\Render Window">
+      <UniqueIdentifier>{178bc5a9-5ba4-4326-8133-931864d24253}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Components\IMGUI">
+      <UniqueIdentifier>{840e81b2-3d8d-49a1-a634-94193d0753c6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Components\UI Manager">
+      <UniqueIdentifier>{e0cbcf87-cc2c-4a4e-9a9b-8102df1d48f4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Components\Render Window\OSD Layers">
+      <UniqueIdentifier>{d0c1189e-a0eb-45e4-a2bc-d45b0a2fa648}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Components\IMGUI\Fonts">
+      <UniqueIdentifier>{64aeb62c-7a16-40e9-837b-19d1fe1276f9}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="[Common]\CLIWrapper.cpp">
+      <Filter>Wrappers</Filter>
+    </ClCompile>
+    <ClCompile Include="[Common]\HandshakeStructs.cpp">
+      <Filter>Common</Filter>
+    </ClCompile>
+    <ClCompile Include="Exports.cpp" />
+    <ClCompile Include="StdAfx.cpp" />
+    <ClCompile Include="EditorAPI\Core.cpp">
+      <Filter>EditorAPI\System\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\MemoryHeap.cpp">
+      <Filter>EditorAPI\System\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\RTTI.cpp">
+      <Filter>EditorAPI\System\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\EffectSetting.cpp">
+      <Filter>EditorAPI\Forms\Magic</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\EffectItem.cpp">
+      <Filter>EditorAPI\Forms\Magic</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\MagicItemForm.cpp">
+      <Filter>EditorAPI\Forms\Magic</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\TESObjectREFR.cpp">
+      <Filter>EditorAPI\Forms\World</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\TESObjectCELL.cpp">
+      <Filter>EditorAPI\Forms\World</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\TESPathGrid.cpp">
+      <Filter>EditorAPI\Forms\AI</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\TESSound.cpp">
+      <Filter>EditorAPI\Forms\Objects</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\GameSetting.cpp">
+      <Filter>EditorAPI\Forms\Gameplay</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\Script.cpp">
+      <Filter>EditorAPI\Forms\Gameplay</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\TESQuest.cpp">
+      <Filter>EditorAPI\Forms\Gameplay</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\TESIdleForm.cpp">
+      <Filter>EditorAPI\Forms\AI</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\BaseFormComponent.cpp">
+      <Filter>EditorAPI\Forms</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\TESObject.cpp">
+      <Filter>EditorAPI\Forms</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\TESForm.cpp">
+      <Filter>EditorAPI\Forms</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\Archive.cpp">
+      <Filter>EditorAPI\System\I/O</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\BSFile.cpp">
+      <Filter>EditorAPI\System\I/O</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\ExtraDataList.cpp">
+      <Filter>EditorAPI\System\ExtraData</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\TESDialog.cpp">
+      <Filter>EditorAPI\System\CS Interfaces</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\TESConditionItem.cpp">
+      <Filter>EditorAPI\Forms\AI</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\SettingCollection.cpp">
+      <Filter>EditorAPI\System\Settings</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\NiClasses.cpp">
+      <Filter>EditorAPI\System</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\BSString.cpp">
+      <Filter>EditorAPI\Types\Bethesda</Filter>
+    </ClCompile>
+    <ClCompile Include="Coda\Commands\CodaScriptCommands-Form.cpp">
+      <Filter>Components\Coda\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="Coda\Commands\CodaScriptCommands-Reference.cpp">
+      <Filter>Components\Coda\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="Coda\Commands\CodaScriptCommands-BFC.cpp">
+      <Filter>Components\Coda\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\TESPackage.cpp">
+      <Filter>EditorAPI\Forms\AI</Filter>
+    </ClCompile>
+    <ClCompile Include="Hooks\Hooks-Common.cpp">
+      <Filter>Hooks</Filter>
+    </ClCompile>
+    <ClCompile Include="Hooks\Hooks-CompilerErrorDetours.cpp">
+      <Filter>Hooks</Filter>
+    </ClCompile>
+    <ClCompile Include="Hooks\Hooks-Dialog.cpp">
+      <Filter>Hooks</Filter>
+    </ClCompile>
+    <ClCompile Include="Hooks\Hooks-LOD.cpp">
+      <Filter>Hooks</Filter>
+    </ClCompile>
+    <ClCompile Include="Hooks\Hooks-Misc.cpp">
+      <Filter>Hooks</Filter>
+    </ClCompile>
+    <ClCompile Include="Hooks\Hooks-Renderer.cpp">
+      <Filter>Hooks</Filter>
+    </ClCompile>
+    <ClCompile Include="Hooks\Hooks-ScriptEditor.cpp">
+      <Filter>Hooks</Filter>
+    </ClCompile>
+    <ClCompile Include="Hooks\Hooks-Plugins.cpp">
+      <Filter>Hooks</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\TESFile.cpp">
+      <Filter>EditorAPI\System\I/O</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\TESNPC.cpp">
+      <Filter>EditorAPI\Forms\Actors</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\TESRender.cpp">
+      <Filter>EditorAPI\System\CS Interfaces</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\TESObjectLAND.cpp">
+      <Filter>EditorAPI\Forms\World</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\Setting.cpp">
+      <Filter>EditorAPI\System\Settings</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\MagicItem.cpp">
+      <Filter>EditorAPI\Forms\Magic</Filter>
+    </ClCompile>
+    <ClCompile Include="Achievements.cpp">
+      <Filter>Components</Filter>
+    </ClCompile>
+    <ClCompile Include="ChangeLogManager.cpp">
+      <Filter>Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Console.cpp">
+      <Filter>Components</Filter>
+    </ClCompile>
+    <ClCompile Include="DialogImposterManager.cpp">
+      <Filter>Components</Filter>
+    </ClCompile>
+    <ClCompile Include="FormUndoStack.cpp">
+      <Filter>Components</Filter>
+    </ClCompile>
+    <ClCompile Include="GlobalClipboard.cpp">
+      <Filter>Components</Filter>
+    </ClCompile>
+    <ClCompile Include="HallOfFame.cpp">
+      <Filter>Components</Filter>
+    </ClCompile>
+    <ClCompile Include="ObjectPaletteManager.cpp">
+      <Filter>Components</Filter>
+    </ClCompile>
+    <ClCompile Include="ObjectPrefabManager.cpp">
+      <Filter>Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Settings.cpp">
+      <Filter>Components</Filter>
+    </ClCompile>
+    <ClCompile Include="WorkspaceManager.cpp">
+      <Filter>Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Wrappers.cpp">
+      <Filter>Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Coda\Coda.cpp">
+      <Filter>Components\Coda</Filter>
+    </ClCompile>
+    <ClCompile Include="Hooks\Hooks-AssetSelector.cpp">
+      <Filter>Hooks</Filter>
+    </ClCompile>
+    <ClCompile Include="Main.cpp" />
+    <ClCompile Include="PluginAPIManager.cpp">
+      <Filter>Interop\Plugin</Filter>
+    </ClCompile>
+    <ClCompile Include="OldCSInteropManager.cpp">
+      <Filter>Interop\CS 1.0</Filter>
+    </ClCompile>
+    <ClCompile Include="[Common]\OldCSInteropData.cpp">
+      <Filter>Interop\CS 1.0</Filter>
+    </ClCompile>
+    <ClCompile Include="EventSources.cpp">
+      <Filter>Components</Filter>
+    </ClCompile>
+    <ClCompile Include="EventSinks.cpp">
+      <Filter>Components</Filter>
+    </ClCompile>
+    <ClCompile Include="Hooks\Hooks-Events.cpp">
+      <Filter>Hooks</Filter>
+    </ClCompile>
+    <ClCompile Include="Serialization.cpp">
+      <Filter>Components</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\TESLandTexture.cpp">
+      <Filter>EditorAPI\Forms\World</Filter>
+    </ClCompile>
+    <ClCompile Include="UIManager.cpp">
+      <Filter>Components\UI Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="MainWindowOverrides.cpp">
+      <Filter>Components\UI Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="CellViewWindowOverrides.cpp">
+      <Filter>Components\UI Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="ObjectWindowOverrides.cpp">
+      <Filter>Components\UI Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="CustomDialogProcs.cpp">
+      <Filter>Components\UI Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="MiscWindowOverrides.cpp">
+      <Filter>Components\UI Manager</Filter>
+    </ClCompile>
+    <ClCompile Include="Render Window\MouseOverTooltipOSDLayer.cpp">
+      <Filter>Components\Render Window\OSD Layers</Filter>
+    </ClCompile>
+    <ClCompile Include="Render Window\ToolbarOSDLayer.cpp">
+      <Filter>Components\Render Window\OSD Layers</Filter>
+    </ClCompile>
+    <ClCompile Include="Render Window\PathGridUndoManager.cpp">
+      <Filter>Components\Render Window</Filter>
+    </ClCompile>
+    <ClCompile Include="Render Window\RenderWindowCellLists.cpp">
+      <Filter>Components\Render Window</Filter>
+    </ClCompile>
+    <ClCompile Include="Render Window\RenderWindowManager.cpp">
+      <Filter>Components\Render Window</Filter>
+    </ClCompile>
+    <ClCompile Include="Render Window\RenderWindowOSD.cpp">
+      <Filter>Components\Render Window</Filter>
+    </ClCompile>
+    <ClCompile Include="Render Window\RenderWindowActions.cpp">
+      <Filter>Components\Render Window</Filter>
+    </ClCompile>
+    <ClCompile Include="Render Window\AuxiliaryViewport.cpp">
+      <Filter>Components\Render Window</Filter>
+    </ClCompile>
+    <ClCompile Include="Render Window\RenderWindowInput.cpp">
+      <Filter>Components\Render Window</Filter>
+    </ClCompile>
+    <ClCompile Include="Render Window\RenderWindowCommon.cpp">
+      <Filter>Components\Render Window</Filter>
+    </ClCompile>
+    <ClCompile Include="Render Window\RenderWindowLayers.cpp">
+      <Filter>Components\Render Window</Filter>
+    </ClCompile>
+    <ClCompile Include="Render Window\RenderWindowGroups.cpp">
+      <Filter>Components\Render Window</Filter>
+    </ClCompile>
+    <ClCompile Include="$(OBSEIncludePath)\obse\NiTypes.cpp">
+      <Filter>OBSE</Filter>
+    </ClCompile>
+    <ClCompile Include="Render Window\RenderWindowFlyCamera.cpp">
+      <Filter>Components\Render Window</Filter>
+    </ClCompile>
+    <ClCompile Include="IMGUI\imgui.cpp">
+      <Filter>Components\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="IMGUI\imgui_demo.cpp">
+      <Filter>Components\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="IMGUI\imgui_draw.cpp">
+      <Filter>Components\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="IMGUI\imgui_user.cpp">
+      <Filter>Components\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="IMGUI\imgui_widgets.cpp">
+      <Filter>Components\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="Render Window\InfoOverlayOSDLayer.cpp">
+      <Filter>Components\Render Window\OSD Layers</Filter>
+    </ClCompile>
+    <ClCompile Include="Render Window\ReferenceEditorOSDLayer.cpp">
+      <Filter>Components\Render Window\OSD Layers</Filter>
+    </ClCompile>
+    <ClCompile Include="IMGUI\imgui_tables.cpp">
+      <Filter>Components\IMGUI</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorAPI\Crt.cpp">
+      <Filter>EditorAPI</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\obse\obse\NiExtraData.h">
+      <Filter>OBSE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\NiGeometry.h">
+      <Filter>OBSE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\NiNodes.h">
+      <Filter>OBSE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\NiObjects.h">
+      <Filter>OBSE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\NiProperties.h">
+      <Filter>OBSE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\NiTypes.h">
+      <Filter>OBSE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\obse\obse\PluginAPI.h">
+      <Filter>OBSE</Filter>
+    </ClInclude>
+    <ClInclude Include="[Common]\CLIWrapper.h">
+      <Filter>Wrappers</Filter>
+    </ClInclude>
+    <ClInclude Include="[Common]\HandShakeStructs.h">
+      <Filter>Common</Filter>
+    </ClInclude>
+    <ClInclude Include="CSEInterfaceAPI.h">
+      <Filter>Interop\Plugin</Filter>
+    </ClInclude>
+    <ClInclude Include="Exports.h" />
+    <ClInclude Include="EditorAPI\TESEditorAPI.h">
+      <Filter>EditorAPI</Filter>
+    </ClInclude>
+    <ClInclude Include="[Common]\ComponentDLLInterface.h">
+      <Filter>Interop\Component DLL</Filter>
+    </ClInclude>
+    <ClInclude Include="StdAfx.h" />
+    <ClInclude Include="EditorAPI\Core.h">
+      <Filter>EditorAPI\System\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\MemoryHeap.h">
+      <Filter>EditorAPI\System\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\RTTI.h">
+      <Filter>EditorAPI\System\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\EffectSetting.h">
+      <Filter>EditorAPI\Forms\Magic</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\MagicItemObject.h">
+      <Filter>EditorAPI\Forms\Magic</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\EffectItem.h">
+      <Filter>EditorAPI\Forms\Magic</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\MagicItem.h">
+      <Filter>EditorAPI\Forms\Magic</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\MagicItemForm.h">
+      <Filter>EditorAPI\Forms\Magic</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESObjectACTI.h">
+      <Filter>EditorAPI\Forms\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESObjectWEAP.h">
+      <Filter>EditorAPI\Forms\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESObjectANIO.h">
+      <Filter>EditorAPI\Forms\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESObjectAPPA.h">
+      <Filter>EditorAPI\Forms\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESObjectARMO.h">
+      <Filter>EditorAPI\Forms\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESObjectBOOK.h">
+      <Filter>EditorAPI\Forms\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESObjectCLOT.h">
+      <Filter>EditorAPI\Forms\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESObjectCONT.h">
+      <Filter>EditorAPI\Forms\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESObjectDOOR.h">
+      <Filter>EditorAPI\Forms\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESObjectLIGH.h">
+      <Filter>EditorAPI\Forms\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESObjectMISC.h">
+      <Filter>EditorAPI\Forms\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESObjectSTAT.h">
+      <Filter>EditorAPI\Forms\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESObjectTREE.h">
+      <Filter>EditorAPI\Forms\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESObjectREFR.h">
+      <Filter>EditorAPI\Forms\World</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESObjectCELL.h">
+      <Filter>EditorAPI\Forms\World</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESActorBase.h">
+      <Filter>EditorAPI\Forms\Actors</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESClass.h">
+      <Filter>EditorAPI\Forms\Actors</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESCreature.h">
+      <Filter>EditorAPI\Forms\Actors</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESEyes.h">
+      <Filter>EditorAPI\Forms\Actors</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESFaction.h">
+      <Filter>EditorAPI\Forms\Actors</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESHair.h">
+      <Filter>EditorAPI\Forms\Actors</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESNPC.h">
+      <Filter>EditorAPI\Forms\Actors</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESRace.h">
+      <Filter>EditorAPI\Forms\Actors</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESSkill.h">
+      <Filter>EditorAPI\Forms\Actors</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESCombatStyle.h">
+      <Filter>EditorAPI\Forms\AI</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESPackage.h">
+      <Filter>EditorAPI\Forms\AI</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESPathGrid.h">
+      <Filter>EditorAPI\Forms\AI</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\BirthSign.h">
+      <Filter>EditorAPI\Forms\Actors</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESAmmo.h">
+      <Filter>EditorAPI\Forms\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESFurniture.h">
+      <Filter>EditorAPI\Forms\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESKey.h">
+      <Filter>EditorAPI\Forms\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESLevItem.h">
+      <Filter>EditorAPI\Forms\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESFlora.h">
+      <Filter>EditorAPI\Forms\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESGrass.h">
+      <Filter>EditorAPI\Forms\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESSigilStone.h">
+      <Filter>EditorAPI\Forms\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESSoulGem.h">
+      <Filter>EditorAPI\Forms\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESSubSpace.h">
+      <Filter>EditorAPI\Forms\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESSound.h">
+      <Filter>EditorAPI\Forms\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESWaterForm.h">
+      <Filter>EditorAPI\Forms\World</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESWorldSpace.h">
+      <Filter>EditorAPI\Forms\World</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESWeather.h">
+      <Filter>EditorAPI\Forms\World</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESLandTexture.h">
+      <Filter>EditorAPI\Forms\World</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESClimate.h">
+      <Filter>EditorAPI\Forms\World</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESLevCreature.h">
+      <Filter>EditorAPI\Forms\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\Script.h">
+      <Filter>EditorAPI\Forms\Gameplay</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\GameSetting.h">
+      <Filter>EditorAPI\Forms\Gameplay</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESGlobal.h">
+      <Filter>EditorAPI\Forms\Gameplay</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESQuest.h">
+      <Filter>EditorAPI\Forms\Gameplay</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESTopic.h">
+      <Filter>EditorAPI\Forms\Gameplay</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESTopicInfo.h">
+      <Filter>EditorAPI\Forms\Gameplay</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESIdleForm.h">
+      <Filter>EditorAPI\Forms\AI</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESEffectShader.h">
+      <Filter>EditorAPI\Forms\AI</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESLoadScreen.h">
+      <Filter>EditorAPI\Forms\World</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\BaseFormComponent.h">
+      <Filter>EditorAPI\Forms</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESObject.h">
+      <Filter>EditorAPI\Forms</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESForm.h">
+      <Filter>EditorAPI\Forms</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\FaceGen.h">
+      <Filter>EditorAPI\System</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\BSFile.h">
+      <Filter>EditorAPI\System\I/O</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\Archive.h">
+      <Filter>EditorAPI\System\I/O</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\ExtraData.h">
+      <Filter>EditorAPI\System\ExtraData</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\ExtraDataList.h">
+      <Filter>EditorAPI\System\ExtraData</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESDialog.h">
+      <Filter>EditorAPI\System\CS Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESConditionItem.h">
+      <Filter>EditorAPI\Forms\AI</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\ActorValues.h">
+      <Filter>EditorAPI\Forms\Actors</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\Magic.h">
+      <Filter>EditorAPI\Forms\Magic</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\Setting.h">
+      <Filter>EditorAPI\System\Settings</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\SettingCollection.h">
+      <Filter>EditorAPI\System\Settings</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\NiClasses.h">
+      <Filter>EditorAPI\System</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESFile.h">
+      <Filter>EditorAPI\System\I/O</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\BSTCaseInsensitiveStringMap.h">
+      <Filter>EditorAPI\Types\Bethesda</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\BSString.h">
+      <Filter>EditorAPI\Types\Bethesda</Filter>
+    </ClInclude>
+    <ClInclude Include="..\OBSE\obse\HavokBase.h">
+      <Filter>OBSE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\OBSE\obse\HavokCharacters.h">
+      <Filter>OBSE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\OBSE\obse\HavokCollision.h">
+      <Filter>OBSE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\OBSE\obse\HavokDynamics.h">
+      <Filter>OBSE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\OBSE\obse\HavokReflection.h">
+      <Filter>OBSE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\OBSE\obse\HavokTypes.h">
+      <Filter>OBSE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\OBSE\obse\NiCollision.h">
+      <Filter>OBSE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\OBSE\obse\NiControllers.h">
+      <Filter>OBSE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\OBSE\obse\NiHavok.h">
+      <Filter>OBSE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\OBSE\obse\NiHavokCharacters.h">
+      <Filter>OBSE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\OBSE\obse\NiHavokConstraints.h">
+      <Filter>OBSE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\OBSE\obse\NiHavokObjects.h">
+      <Filter>OBSE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\OBSE\obse\NiHavokShapes.h">
+      <Filter>OBSE</Filter>
+    </ClInclude>
+    <ClInclude Include="..\OBSE\obse\NiRenderer.h">
+      <Filter>OBSE</Filter>
+    </ClInclude>
+    <ClInclude Include="Construction Set Extender_Resource.h">
+      <Filter>Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="VersionInfo.h">
+      <Filter>Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="Coda\Commands\CodaScriptCommands-Form.h">
+      <Filter>Components\Coda\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="Coda\Commands\CodaScriptCommands-Reference.h">
+      <Filter>Components\Coda\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="Coda\Commands\CodaScriptCommands-BFC.h">
+      <Filter>Components\Coda\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="Hooks\Hooks-Common.h">
+      <Filter>Hooks</Filter>
+    </ClInclude>
+    <ClInclude Include="Hooks\Hooks-CompilerErrorDetours.h">
+      <Filter>Hooks</Filter>
+    </ClInclude>
+    <ClInclude Include="Hooks\Hooks-Dialog.h">
+      <Filter>Hooks</Filter>
+    </ClInclude>
+    <ClInclude Include="Hooks\Hooks-LOD.h">
+      <Filter>Hooks</Filter>
+    </ClInclude>
+    <ClInclude Include="Hooks\Hooks-Misc.h">
+      <Filter>Hooks</Filter>
+    </ClInclude>
+    <ClInclude Include="Hooks\Hooks-Renderer.h">
+      <Filter>Hooks</Filter>
+    </ClInclude>
+    <ClInclude Include="Hooks\Hooks-ScriptEditor.h">
+      <Filter>Hooks</Filter>
+    </ClInclude>
+    <ClInclude Include="Hooks\Hooks-Plugins.h">
+      <Filter>Hooks</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESRender.h">
+      <Filter>EditorAPI\System\CS Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESObjectLAND.h">
+      <Filter>EditorAPI\Forms\World</Filter>
+    </ClInclude>
+    <ClInclude Include="Achievements.h">
+      <Filter>Components</Filter>
+    </ClInclude>
+    <ClInclude Include="ChangeLogManager.h">
+      <Filter>Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Console.h">
+      <Filter>Components</Filter>
+    </ClInclude>
+    <ClInclude Include="DialogImposterManager.h">
+      <Filter>Components</Filter>
+    </ClInclude>
+    <ClInclude Include="FormUndoStack.h">
+      <Filter>Components</Filter>
+    </ClInclude>
+    <ClInclude Include="GlobalClipboard.h">
+      <Filter>Components</Filter>
+    </ClInclude>
+    <ClInclude Include="HallOfFame.h">
+      <Filter>Components</Filter>
+    </ClInclude>
+    <ClInclude Include="ObjectPaletteManager.h">
+      <Filter>Components</Filter>
+    </ClInclude>
+    <ClInclude Include="ObjectPrefabManager.h">
+      <Filter>Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Settings.h">
+      <Filter>Components</Filter>
+    </ClInclude>
+    <ClInclude Include="WorkspaceManager.h">
+      <Filter>Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Wrappers.h">
+      <Filter>Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Coda\Coda.h">
+      <Filter>Components\Coda</Filter>
+    </ClInclude>
+    <ClInclude Include="Hooks\Hooks-AssetSelector.h">
+      <Filter>Hooks</Filter>
+    </ClInclude>
+    <ClInclude Include="Main.h" />
+    <ClInclude Include="PluginAPIManager.h">
+      <Filter>Interop\Plugin</Filter>
+    </ClInclude>
+    <ClInclude Include="OldCSInteropManager.h">
+      <Filter>Interop\CS 1.0</Filter>
+    </ClInclude>
+    <ClInclude Include="[Common]\OldCSInteropData.h">
+      <Filter>Interop\CS 1.0</Filter>
+    </ClInclude>
+    <ClInclude Include="EventSources.h">
+      <Filter>Components</Filter>
+    </ClInclude>
+    <ClInclude Include="EventSinks.h">
+      <Filter>Components</Filter>
+    </ClInclude>
+    <ClInclude Include="Hooks\Hooks-Events.h">
+      <Filter>Hooks</Filter>
+    </ClInclude>
+    <ClInclude Include="Serialization.h">
+      <Filter>Components</Filter>
+    </ClInclude>
+    <ClInclude Include="UIManager.h">
+      <Filter>Components\UI Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="MainWindowOverrides.h">
+      <Filter>Components\UI Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="CellViewWindowOverrides.h">
+      <Filter>Components\UI Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="ObjectWindowOverrides.h">
+      <Filter>Components\UI Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="CustomDialogProcs.h">
+      <Filter>Components\UI Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="MiscWindowOverrides.h">
+      <Filter>Components\UI Manager</Filter>
+    </ClInclude>
+    <ClInclude Include="Render Window\MouseOverTooltipOSDLayer.h">
+      <Filter>Components\Render Window\OSD Layers</Filter>
+    </ClInclude>
+    <ClInclude Include="Render Window\ToolbarOSDLayer.h">
+      <Filter>Components\Render Window\OSD Layers</Filter>
+    </ClInclude>
+    <ClInclude Include="Render Window\PathGridUndoManager.h">
+      <Filter>Components\Render Window</Filter>
+    </ClInclude>
+    <ClInclude Include="Render Window\RenderWindowCellLists.h">
+      <Filter>Components\Render Window</Filter>
+    </ClInclude>
+    <ClInclude Include="Render Window\RenderWindowManager.h">
+      <Filter>Components\Render Window</Filter>
+    </ClInclude>
+    <ClInclude Include="Render Window\RenderWindowOSD.h">
+      <Filter>Components\Render Window</Filter>
+    </ClInclude>
+    <ClInclude Include="IconFontCppHeaders\IconsFontAwesome.h">
+      <Filter>Components\IMGUI\Fonts</Filter>
+    </ClInclude>
+    <ClInclude Include="IconFontCppHeaders\IconsKenney.h">
+      <Filter>Components\IMGUI\Fonts</Filter>
+    </ClInclude>
+    <ClInclude Include="IconFontCppHeaders\IconsMaterialDesign.h">
+      <Filter>Components\IMGUI\Fonts</Filter>
+    </ClInclude>
+    <ClInclude Include="Render Window\RenderWindowActions.h">
+      <Filter>Components\Render Window</Filter>
+    </ClInclude>
+    <ClInclude Include="Render Window\AuxiliaryViewport.h">
+      <Filter>Components\Render Window</Filter>
+    </ClInclude>
+    <ClInclude Include="Render Window\RenderWindowInput.h">
+      <Filter>Components\Render Window</Filter>
+    </ClInclude>
+    <ClInclude Include="Render Window\RenderWindowCommon.h">
+      <Filter>Components\Render Window</Filter>
+    </ClInclude>
+    <ClInclude Include="Render Window\RenderWindowLayers.h">
+      <Filter>Components\Render Window</Filter>
+    </ClInclude>
+    <ClInclude Include="Render Window\RenderWindowGroups.h">
+      <Filter>Components\Render Window</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\TESLevSpell.h">
+      <Filter>EditorAPI\Forms\Objects</Filter>
+    </ClInclude>
+    <ClInclude Include="Render Window\RenderWindowFlyCamera.h">
+      <Filter>Components\Render Window</Filter>
+    </ClInclude>
+    <ClInclude Include="IMGUI\imconfig.h">
+      <Filter>Components\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="IMGUI\imgui.h">
+      <Filter>Components\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="IMGUI\imgui_internal.h">
+      <Filter>Components\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="IMGUI\imgui_user.h">
+      <Filter>Components\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="IMGUI\imstb_rectpack.h">
+      <Filter>Components\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="IMGUI\imstb_textedit.h">
+      <Filter>Components\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="IMGUI\imstb_truetype.h">
+      <Filter>Components\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="IMGUI\stb_sprintf.h">
+      <Filter>Components\IMGUI</Filter>
+    </ClInclude>
+    <ClInclude Include="Render Window\InfoOverlayOSDLayer.h">
+      <Filter>Components\Render Window\OSD Layers</Filter>
+    </ClInclude>
+    <ClInclude Include="Render Window\ReferenceEditorOSDLayer.h">
+      <Filter>Components\Render Window\OSD Layers</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorAPI\Crt.h">
+      <Filter>EditorAPI</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Libraries\SME Sundries\INIEditGUI_Res.h">
+      <Filter>Resources</Filter>
+    </ClInclude>
+    <ClInclude Include="[BGSEEBase]\BGSEditorExtenderBase_Resource.h">
+      <Filter>Resources</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Images\Splash.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="EditorAPI\NiTMap.h">
+      <Filter>EditorAPI\Types\NetImmerse</Filter>
+    </None>
+    <None Include="Images\antic.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="Images\wtf.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="Images\automaton.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="Images\bob.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="Images\cardinalsin.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="Images\cheat.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="Images\command.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="Images\compart.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="Images\erudite.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="Images\fearless.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="Images\fly.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="Images\heretic.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="Images\jobless.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="Images\lazybum.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="Images\loquacious.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="Images\madsci.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="Images\magister.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="Images\pedantic.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="Images\powerusr.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="Images\saboteur.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="Images\soprano.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="Images\wiseone.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="Images\lost.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="..\..\[Libraries]\BGSEditorExtenderBase\[Resources]\generic.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="Images\fakevoice.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="Images\omfgodrays.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="Images\funnyman.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="Images\cake.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+    <None Include="Images\chicken.bmp">
+      <Filter>Resources\Images</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Construction Set Extender.rc">
+      <Filter>Resources</Filter>
+    </ResourceCompile>
+    <ResourceCompile Include="VersionInfo.rc">
+      <Filter>Resources</Filter>
+    </ResourceCompile>
+    <ResourceCompile Include="..\..\Libraries\SME Sundries\INIEditGUI_Res.rc">
+      <Filter>Resources</Filter>
+    </ResourceCompile>
+    <ResourceCompile Include="[BGSEEBase]\BGSEditorExtenderBase.rc">
+      <Filter>Resources</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="IMGUI\imgui.natvis">
+      <Filter>Components\IMGUI</Filter>
+    </Natvis>
+  </ItemGroup>
+</Project>

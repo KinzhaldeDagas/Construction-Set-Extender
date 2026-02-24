@@ -17,6 +17,8 @@
 #define _WIN32_WINNT	0x0601
 #define DPSAPI_VERSION	1
 
+#include "EditorAPI/RTTI.h"
+
 // WIN32
 #include <windows.h>
 #include <windowsx.h>

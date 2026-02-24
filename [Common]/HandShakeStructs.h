@@ -9,7 +9,18 @@ class GameSetting;
 struct CommandInfo;
 struct PluginInfo;
 #else
-typedef int HWND;
+// BGSEEBase can include this header after Windows headers without defining CSE.
+// Avoid redefining HWND in that case, but keep a fallback for non-Windows/opaque builds.
+#if !defined(_WINDEF_) && !defined(_WINDOWS_) && !defined(_INC_WINDOWS)
+typedef void* HWND;
+#endif
+#if !defined(_WINDEF_) && !defined(_WINDOWS_) && !defined(_INC_WINDOWS)
+typedef struct tagPOINT
+{
+	long x;
+	long y;
+} POINT;
+#endif
 #endif
 
 namespace componentDLLInterface
@@ -503,7 +514,7 @@ namespace componentDLLInterface
 #ifdef CSE
 		POINT InsertionPoint;
 #else
-		Point InsertionPoint;
+		POINT InsertionPoint;
 #endif
 
 		FormData* FormListHead;

@@ -269,7 +269,11 @@ namespace cse
 
 		BGSEECONSOLE_MESSAGE("Initializing Toolbox");
 		BGSEECONSOLE->Indent();
-		bgsee::ToolBox::Initialize(BGSEEMAIN->INIGetter(), BGSEEMAIN->INISetter());
+		{
+			bgsee::INIManagerGetterFunctor iniGetter = BGSEEMAIN->INIGetter();
+			bgsee::INIManagerSetterFunctor iniSetter = BGSEEMAIN->INISetter();
+			bgsee::ToolBox::Initialize(iniGetter, iniSetter);
+		}
 		BGSEECONSOLE->Outdent();
 
 		BGSEECONSOLE_MESSAGE("Initializing Workspace Manager");

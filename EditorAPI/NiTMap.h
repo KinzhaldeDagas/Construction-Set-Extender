@@ -580,7 +580,7 @@ namespace cseOverride			// can't be in the global namespace as it conflicts with
 			while (*pKey)
 				uiHash = (uiHash << 5) + uiHash + *pKey++;
 
-			return uiHash % m_uiHashSize;
+			return uiHash % this->m_uiHashSize;
 		}
 		//---------------------------------------------------------------------------
 		template <class TPARENT, class TVAL>

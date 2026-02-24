@@ -3,6 +3,7 @@
 #include "UIManager.h"
 #include "ToolBox.h"
 #include "BGSEditorExtenderBase_Resource.h"
+#include <commdlg.h>
 
 namespace bgsee
 {

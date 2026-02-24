@@ -34,6 +34,7 @@
 */
 
 #include "mpRPN.h"
+#include <algorithm>
 #include "mpIToken.h"
 #include "mpICallback.h"
 #include "mpError.h"
@@ -71,7 +72,7 @@ namespace bgsee { namespace script { namespace mup {
 	}
 
 	MUP_ASSERT(m_nStackPos>=0);
-	m_nMaxStackPos = max(m_nStackPos, m_nMaxStackPos);
+	m_nMaxStackPos = (std::max)(m_nStackPos, m_nMaxStackPos);
   }
 
   //---------------------------------------------------------------------------
