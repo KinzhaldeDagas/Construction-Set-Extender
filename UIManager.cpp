@@ -208,7 +208,11 @@ namespace cse
 			if (FilterString.empty())
 				return true;
 
+<<<<<<< HEAD
 			auto MatchesFilter = [&](const std::string& String) -> bool {
+=======
+			auto MatchesFilter = [&](std::string String) -> bool {
+>>>>>>> origin/codex/fix-compilation-errors-in-construction-set-extender
 				if (FilterString.empty())
 					return true;
 				else if (String.empty())

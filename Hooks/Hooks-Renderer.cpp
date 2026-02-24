@@ -197,7 +197,7 @@ namespace cse
 				if (Geom->m_pcName && strstr(Geom->m_pcName, "Block") == Geom->m_pcName)
 					return false;
 
-				NiAVObject* Parent = Geom->m_parent;
+				NiAVObject* Parent = NI_CAST(Geom->m_parent, NiAVObject);
 				while (Parent)
 				{
 					auto Node = NI_CAST(Parent, NiNode);
@@ -212,7 +212,7 @@ namespace cse
 						}
 					}
 
-					Parent = Parent->m_parent;
+					Parent = NI_CAST(Parent->m_parent, NiAVObject);
 				}
 
 				return false;
@@ -225,7 +225,7 @@ namespace cse
 				if (CurrentRenderPass)
 				{
 					NiColor MaskColor;
-					if (IsGeometryMasked(CurrentRenderPass->geom, &MaskColor))
+					if (IsGeometryMasked(reinterpret_cast<NiAVObject*>(CurrentRenderPass->pGeometry), &MaskColor))
 					{
 						cdeclCall<void>(0x0079AC60,
 										ConstantIndex,
@@ -873,7 +873,7 @@ namespace cse
 
 		void __stdcall DoTESPathGridPointDtorHook(TESPathGridPoint* Point)
 		{
-			PathGridPointListT* DeletionList = (PathGridPointListT*)PathGridPointListT::Create(&FormHeap_Allocate);
+			PathGridPointListT* DeletionList = (PathGridPointListT*)PathGridPointListT::Create();
 			DeletionList->AddAt(Point, eListEnd);
 			_RENDERWIN_MGR.GetPathGridUndoManager()->HandlePathGridPointDeletion(DeletionList);
 			DeletionList->RemoveAll();
@@ -1325,7 +1325,7 @@ namespace cse
 			if (settings::renderer::kPathGridLinkedRefIndicator().i == 0)
 			{
 				if ((settings::renderer::kPathGridLinkedRefIndicatorFlags().u & settings::renderer::kPathGridLinkedRefIndicatorFlag_HideLineConnector))
-					Connector->SetCulled(true);
+					Connector->m_flags |= NiAVObject::kFlag_AppCulled;
 			}
 		}
 
@@ -1352,7 +1352,7 @@ namespace cse
 			if (settings::renderer::kPathGridLinkedRefIndicator().i == 0)
 			{
 				if ((settings::renderer::kPathGridLinkedRefIndicatorFlags().u & settings::renderer::kPathGridLinkedRefIndicatorFlag_HidePointBoundingBox))
-					BoundingBox->SetCulled(true);
+					BoundingBox->m_flags |= NiAVObject::kFlag_AppCulled;
 			}
 		}
 
@@ -1380,7 +1380,7 @@ namespace cse
 			{
 				if ((settings::renderer::kPathGridLinkedRefIndicatorFlags().u & settings::renderer::kPathGridLinkedRefIndicatorFlag_HideLinkedRefNode))
 				{
-					RefNode->SetCulled(true);
+					RefNode->m_flags |= NiAVObject::kFlag_AppCulled;
 				}
 			}
 		}
