@@ -208,7 +208,7 @@ namespace cse
 			if (FilterString.empty())
 				return true;
 
-			auto MatchesFilter = [&](std::string& String) -> bool {
+			auto MatchesFilter = [&](std::string String) -> bool {
 				if (FilterString.empty())
 					return true;
 				else if (String.empty())
