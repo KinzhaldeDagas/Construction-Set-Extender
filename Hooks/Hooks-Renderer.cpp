@@ -226,11 +226,7 @@ namespace cse
 				{
 					NiAVObject* PassGeometry = reinterpret_cast<NiAVObject**>(CurrentRenderPass)[0];
 					NiColor MaskColor;
-<<<<<<< HEAD
-					if (IsGeometryMasked(reinterpret_cast<NiAVObject*>(CurrentRenderPass->pGeometry), &MaskColor))
-=======
 					if (PassGeometry && IsGeometryMasked(PassGeometry, &MaskColor))
->>>>>>> origin/codex/fix-compilation-errors-in-construction-set-extender-skewg4
 					{
 						cdeclCall<void>(0x0079AC60,
 										ConstantIndex,
