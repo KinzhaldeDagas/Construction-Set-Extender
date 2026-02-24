@@ -1,6 +1,16 @@
 #pragma once
 
+#define BSFile             OBSEShim_BSFile
+#define BSRenderedTexture  OBSEShim_BSRenderedTexture
+#define BSTextureManager   OBSEShim_BSTextureManager
+#define TESChildCell       OBSEShim_TESChildCell
+
 #include "obse\NiNodes.h"
+
+#undef TESChildCell
+#undef BSTextureManager
+#undef BSRenderedTexture
+#undef BSFile
 
 #include "TESForm.h"
 #include "TESObjectCELL.h"

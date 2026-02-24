@@ -1,6 +1,16 @@
 #pragma once
+
+#define BSFile             OBSEShim_BSFile
+#define BSRenderedTexture  OBSEShim_BSRenderedTexture
+#define BSTextureManager   OBSEShim_BSTextureManager
+#define TESChildCell       OBSEShim_TESChildCell
 #include "obse\NiNodes.h"
 #include "obse\NiExtraData.h"
+
+#undef TESChildCell
+#undef BSTextureManager
+#undef BSRenderedTexture
+#undef BSFile
 
 //	EditorAPI: Misc. NetImmerse classes.
 //	A number of class definitions are directly derived from the COEF API; Credit to JRoush for his comprehensive decoding

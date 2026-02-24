@@ -1,8 +1,18 @@
 #pragma once
 
+#define BSFile             OBSEShim_BSFile
+#define BSRenderedTexture  OBSEShim_BSRenderedTexture
+#define BSTextureManager   OBSEShim_BSTextureManager
+#define TESChildCell       OBSEShim_TESChildCell
+
 #include "TESActorBase.h"
 #include "FaceGen.h"
 #include "obse\NiObjects.h"
+
+#undef TESChildCell
+#undef BSTextureManager
+#undef BSRenderedTexture
+#undef BSFile
 
 //	EditorAPI: TESNPC class.
 
