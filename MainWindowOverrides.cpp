@@ -140,9 +140,17 @@ namespace cse
 
 			const bool DarkModeEnabled = BGSEEUI->GetColorThemer() && BGSEEUI->GetColorThemer()->IsEnabled();
 			const COLORREF ToolbarBackColor = DarkModeEnabled ? RGB(45, 45, 48) : CLR_DEFAULT;
+			#ifdef TB_SETTEXTCOLOR
 			const COLORREF ToolbarTextColor = DarkModeEnabled ? RGB(220, 220, 220) : CLR_DEFAULT;
+#endif
+#ifdef TB_SETBKCOLOR
 			SendMessage(ToolbarWindow, TB_SETBKCOLOR, 0, ToolbarBackColor);
+#elif defined(CCM_SETBKCOLOR)
+			SendMessage(ToolbarWindow, CCM_SETBKCOLOR, 0, ToolbarBackColor);
+#endif
+#ifdef TB_SETTEXTCOLOR
 			SendMessage(ToolbarWindow, TB_SETTEXTCOLOR, 0, ToolbarTextColor);
+#endif
 
 			auto ApplyImageListBkColor = [ToolbarWindow, ToolbarBackColor](UINT Message)
 			{
@@ -207,9 +215,9 @@ namespace cse
 					return;
 
 				if (ChildTop <= WorkRect.top + 2)
-					WorkRect.top = std::max(WorkRect.top, ChildBottom + 2);
+					WorkRect.top = std::max<LONG>(WorkRect.top, ChildBottom + 2);
 				else if (ChildBottom >= WorkRect.bottom - 2)
-					WorkRect.bottom = std::min(WorkRect.bottom, ChildTop - 2);
+					WorkRect.bottom = std::min<LONG>(WorkRect.bottom, ChildTop - 2);
 			};
 
 			if (TESCSMain::MainToolbarHandle && *TESCSMain::MainToolbarHandle)
