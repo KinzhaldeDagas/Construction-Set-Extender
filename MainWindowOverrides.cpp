@@ -335,13 +335,17 @@ namespace cse
 								Info->formID,
 								Response->responseNumber);
 
-							Output
+							if (!(Output
 								<< std::uppercase << std::hex << std::setfill('0') << std::setw(8) << Info->formID << std::dec
 								<< "\t" << SanitizeTabDelimitedField(VoiceID)
 								<< "\t" << SanitizeTabDelimitedField(SpeakerInfo.c_str())
 								<< "\t" << SanitizeTabDelimitedField(OutPath)
 								<< "\t" << SanitizeTabDelimitedField(ResponseText)
-								<< "\n";
+								<< "\n"))
+							{
+								BGSEEUI->MsgBoxE("reVoice CSV export failed while writing output file:\n%s", FilePath.c_str());
+								return;
+							}
 							Rows++;
 						}
 					}
@@ -349,6 +353,19 @@ namespace cse
 			}
 
 			Output.flush();
+			if (Output.fail())
+			{
+				BGSEEUI->MsgBoxE("reVoice CSV export failed while finalizing output file:\n%s", FilePath.c_str());
+				return;
+			}
+
+			Output.close();
+			if (Output.fail())
+			{
+				BGSEEUI->MsgBoxE("reVoice CSV export failed while closing output file:\n%s", FilePath.c_str());
+				return;
+			}
+
 			BGSEEUI->MsgBoxI("reVoice CSV export complete. Wrote %u dialogue rows to:\n%s", Rows, FilePath.c_str());
 		}
 
