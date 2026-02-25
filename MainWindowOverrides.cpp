@@ -1719,11 +1719,6 @@ namespace cse
 					}
 
 					break;
-				case ID_MAINWINDOW_SNAPLAYOUT_TIMERID:
-					if (SnapPrimaryWindowsIntoMainFrame(hWnd))
-						KillTimer(hWnd, ID_MAINWINDOW_SNAPLAYOUT_TIMERID);
-
-					break;
 				}
 
 				break;
