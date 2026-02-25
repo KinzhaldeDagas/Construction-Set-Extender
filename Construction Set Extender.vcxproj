@@ -572,6 +572,7 @@ if not "$(DropboxPath)"=="" if exist "$(DropboxPath)\CSE Once-In-Awhile'lies\Dat
     <ClCompile Include="Exports.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="$(SMESundriesIncludePath)\INIEditGUI_Res.h" />
     <ClInclude Include="..\OBSE\obse\HavokBase.h" />
     <ClInclude Include="..\OBSE\obse\HavokCharacters.h" />
     <ClInclude Include="..\OBSE\obse\HavokCollision.h" />
@@ -786,6 +787,7 @@ if not "$(DropboxPath)"=="" if exist "$(DropboxPath)\CSE Once-In-Awhile'lies\Dat
     <None Include="Images\wtf.bmp" />
   </ItemGroup>
   <ItemGroup>
+    <ResourceCompile Include="$(SMESundriesIncludePath)\INIEditGUI_Res.rc" />
     <ResourceCompile Include="Construction Set Extender.rc" />
     <ResourceCompile Include="VersionInfo.rc">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
