@@ -296,7 +296,7 @@ namespace cse
 			return BaseName + "_reVoice.csv";
 		}
 
-		static bool IsAbsolutePath(const std::string& Path)
+		static bool IsAbsoluteRevoicePath(const std::string& Path)
 		{
 			if (Path.size() >= 2 && Path[1] == ':')
 				return true;
@@ -305,56 +305,7 @@ namespace cse
 			return false;
 		}
 
-		static bool EnsureParentDirectoryExists(const std::string& Path, std::string& OutError)
-		{
-			std::error_code Error;
-			std::filesystem::path OutputPath(Path);
-			std::filesystem::path ParentPath = OutputPath.parent_path();
-			if (ParentPath.empty())
-				return true;
-
-			if (std::filesystem::exists(ParentPath, Error))
-			{
-				if (Error)
-				{
-					OutError = Error.message();
-					return false;
-				}
-
-				if (std::filesystem::is_directory(ParentPath, Error) == false || Error)
-				{
-					OutError = Error ? Error.message() : "Parent path is not a directory";
-					return false;
-				}
-
-				return true;
-			}
-
-			if (Error)
-			{
-				OutError = Error.message();
-				return false;
-			}
-
-			if (std::filesystem::create_directories(ParentPath, Error) == false || Error)
-			{
-				OutError = Error ? Error.message() : "Couldn't create parent directory";
-				return false;
-			}
-
-			return true;
-		}
-
-		static bool IsAbsolutePath(const std::string& Path)
-		{
-			if (Path.size() >= 2 && Path[1] == ':')
-				return true;
-			if (Path.size() >= 2 && Path[0] == '\\' && Path[1] == '\\')
-				return true;
-			return false;
-		}
-
-		static bool EnsureParentDirectoryExists(const std::string& Path, std::string& OutError)
+		static bool EnsureRevoiceParentDirectoryExists(const std::string& Path, std::string& OutError)
 		{
 			std::error_code Error;
 			std::filesystem::path OutputPath(Path);
@@ -433,7 +384,7 @@ namespace cse
 			while (FilePath.empty() == false && (FilePath[0] == '\\' || FilePath[0] == '/'))
 				FilePath.erase(0, 1);
 
-			if (IsAbsolutePath(FilePath) == false && _strnicmp(FilePath.c_str(), "Data\\", 5) != 0)
+			if (IsAbsoluteRevoicePath(FilePath) == false && _strnicmp(FilePath.c_str(), "Data\\", 5) != 0)
 				FilePath = std::string("Data\\") + FilePath;
 
 			if (FilePath.size() < 4 || _stricmp(FilePath.c_str() + FilePath.size() - 4, ".csv"))
@@ -448,7 +399,7 @@ namespace cse
 			const std::string OutputPathForIO = AbsoluteOutputPath.string();
 
 			std::string DirectoryError;
-			if (EnsureParentDirectoryExists(OutputPathForIO, DirectoryError) == false)
+			if (EnsureRevoiceParentDirectoryExists(OutputPathForIO, DirectoryError) == false)
 			{
 				BGSEEUI->MsgBoxE("Couldn't prepare output folder for reVoice CSV export:\n%s\n\nReason: %s", OutputPathForIO.c_str(), DirectoryError.c_str());
 				return;
