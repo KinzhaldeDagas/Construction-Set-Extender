@@ -3000,16 +3000,24 @@ void ScriptEditorWorkspace::FinalizeComponents()
 
 	DockManager->BarStateChanged += DelegateDockBarStateChanged;
 
-	// ### TODO doesn't work correctly; panes go missing, etc
-	//try
-	//{
-	//	if (System::IO::File::Exists(DockablePanelLayoutFileName))
-	//		DockManager->LoadLayout(DockablePanelLayoutFileName);
-	//}
-	//catch (Exception^ E)
-	//{
-	//	DebugPrint("Couldn't load script editor UI layout from disk! Exception: " + E->ToString());
-	//}
+	try
+	{
+		if (System::IO::File::Exists(DockablePanelLayoutFileName))
+			DockManager->LoadLayout(DockablePanelLayoutFileName);
+	}
+	catch (Exception^ E)
+	{
+		DebugPrint("Couldn't load script editor UI layout from disk! Exception: " + E->ToString());
+		try
+		{
+			if (System::IO::File::Exists(DockablePanelLayoutFileName))
+				System::IO::File::Delete(DockablePanelLayoutFileName);
+		}
+		catch (Exception^)
+		{
+			;
+		}
+	}
 
 	this->ResumeLayout(true);
 }
@@ -3189,14 +3197,14 @@ ScriptEditorWorkspace::~ScriptEditorWorkspace()
 	auto Bounds = this->WindowState == FormWindowState::Normal ? this->Bounds : this->RestoreBounds;
 	nativeWrapper::g_CSEInterfaceTable->ScriptEditor.SaveEditorBoundsToINI(Bounds.Left, Bounds.Top, Bounds.Width, Bounds.Height);
 
-	//try
-	//{
-	//	DockManager->SaveLayout(DockablePanelLayoutFileName);
-	//}
-	//catch (Exception^ E)
-	//{
-	//	DebugPrint("Couldn't save script editor UI layout to disk! Exception: " + E->ToString());
-	//}
+	try
+	{
+		DockManager->SaveLayout(DockablePanelLayoutFileName);
+	}
+	catch (Exception^ E)
+	{
+		DebugPrint("Couldn't save script editor UI layout to disk! Exception: " + E->ToString());
+	}
 
 	DeinitializeViewComponents();
 	SAFEDELETE_CLR(IntelliSenseInterface);

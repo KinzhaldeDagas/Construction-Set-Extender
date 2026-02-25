@@ -158,7 +158,8 @@ namespace cse
 
 					CodaScriptCommandExtractArgs(&FormType);
 
-					if (FormType < TESForm::kFormType_GMST || FormType > TESForm::kFormType_TOFT)
+					if (FormType < static_cast<CodaScriptNumericDataTypeT>(TESForm::kFormType_GMST) ||
+						FormType > static_cast<CodaScriptNumericDataTypeT>(TESForm::kFormType_TOFT))
 						return false;
 
 					ICodaScriptDataStore* Array = Utilities->ArrayAllocate(200);

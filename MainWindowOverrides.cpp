@@ -27,13 +27,22 @@
 #define WM_DPICHANGED 0x02E0
 #endif
 
-#ifndef TB_SETBKCOLOR
-#define TB_SETBKCOLOR CCM_SETBKCOLOR
+#if defined(TB_SETBKCOLOR)
+static constexpr UINT kToolbarSetBkColorMessage = TB_SETBKCOLOR;
+#elif defined(CCM_SETBKCOLOR)
+static constexpr UINT kToolbarSetBkColorMessage = CCM_SETBKCOLOR;
+#else
+static constexpr UINT kToolbarSetBkColorMessage = 0;
 #endif
 
-#ifndef TB_SETTEXTCOLOR
-#define TB_SETTEXTCOLOR CCM_SETTEXTCOLOR
+#if defined(TB_SETTEXTCOLOR)
+static constexpr UINT kToolbarSetTextColorMessage = TB_SETTEXTCOLOR;
+#elif defined(CCM_SETTEXTCOLOR)
+static constexpr UINT kToolbarSetTextColorMessage = CCM_SETTEXTCOLOR;
+#else
+static constexpr UINT kToolbarSetTextColorMessage = 0;
 #endif
+
 
 namespace cse
 {
@@ -148,23 +157,20 @@ namespace cse
 
 			const bool DarkModeEnabled = BGSEEUI->GetColorThemer() && BGSEEUI->GetColorThemer()->IsEnabled();
 			const COLORREF ToolbarBackColor = DarkModeEnabled ? RGB(45, 45, 48) : CLR_DEFAULT;
-			#ifdef TB_SETTEXTCOLOR
 			const COLORREF ToolbarTextColor = DarkModeEnabled ? RGB(220, 220, 220) : CLR_DEFAULT;
-#endif
-#ifdef TB_SETBKCOLOR
-			SendMessage(ToolbarWindow, TB_SETBKCOLOR, 0, ToolbarBackColor);
-#elif defined(CCM_SETBKCOLOR)
-			SendMessage(ToolbarWindow, CCM_SETBKCOLOR, 0, ToolbarBackColor);
-#endif
-#ifdef TB_SETTEXTCOLOR
-			SendMessage(ToolbarWindow, TB_SETTEXTCOLOR, 0, ToolbarTextColor);
-#endif
+			const COLORREF ImageListBackColor = DarkModeEnabled ? ToolbarBackColor : CLR_NONE;
 
-			auto ApplyImageListBkColor = [ToolbarWindow, ToolbarBackColor](UINT Message)
+			if (kToolbarSetBkColorMessage != 0)
+				SendMessage(ToolbarWindow, kToolbarSetBkColorMessage, 0, ToolbarBackColor);
+
+			if (kToolbarSetTextColorMessage != 0)
+				SendMessage(ToolbarWindow, kToolbarSetTextColorMessage, 0, ToolbarTextColor);
+
+			auto ApplyImageListBkColor = [ToolbarWindow, ImageListBackColor](UINT Message)
 			{
 				HIMAGELIST List = reinterpret_cast<HIMAGELIST>(SendMessage(ToolbarWindow, Message, 0, 0));
 				if (List)
-					ImageList_SetBkColor(List, ToolbarBackColor);
+					ImageList_SetBkColor(List, ImageListBackColor);
 			};
 
 			ApplyImageListBkColor(TB_GETIMAGELIST);

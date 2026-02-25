@@ -1324,7 +1324,7 @@ namespace cse
 					if (Form == nullptr)
 						return false;
 
-					if (Attribute >= TESAttributes::kAttribute__MAX)
+					if (Attribute >= static_cast<CodaScriptNumericDataTypeT>(TESAttributes::kAttribute__MAX))
 						return false;
 
 					TESAttributes* Component = CS_CAST(Form, TESForm, TESAttributes);
@@ -1461,7 +1461,7 @@ namespace cse
 
 					if (Form == nullptr)
 						return false;
-					else if (AIStat >= TESAIForm::kAIStat__MAX)
+					else if (AIStat >= static_cast<CodaScriptNumericDataTypeT>(TESAIForm::kAIStat__MAX))
 						return false;
 
 					TESAIForm* Component = CS_CAST(Form, TESForm, TESAIForm);
@@ -1486,7 +1486,8 @@ namespace cse
 
 					if (Form == nullptr)
 						return false;
-					else if (Buffer >= ActorValues::kActorVal__MAX_Skill || Buffer < ActorValues::kActorVal_Armorer)
+					else if (Buffer >= static_cast<CodaScriptNumericDataTypeT>(ActorValues::kActorVal__MAX_Skill) ||
+						Buffer < static_cast<CodaScriptNumericDataTypeT>(ActorValues::kActorVal_Armorer))
 						return false;
 
 					TESAIForm* Component = CS_CAST(Form, TESForm, TESAIForm);
