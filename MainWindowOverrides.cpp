@@ -27,6 +27,14 @@
 #define WM_DPICHANGED 0x02E0
 #endif
 
+#ifndef TB_SETBKCOLOR
+#define TB_SETBKCOLOR CCM_SETBKCOLOR
+#endif
+
+#ifndef TB_SETTEXTCOLOR
+#define TB_SETTEXTCOLOR CCM_SETTEXTCOLOR
+#endif
+
 namespace cse
 {
 	namespace uiManager
@@ -207,9 +215,9 @@ namespace cse
 					return;
 
 				if (ChildTop <= WorkRect.top + 2)
-					WorkRect.top = std::max(WorkRect.top, ChildBottom + 2);
+					WorkRect.top = std::max<LONG>(WorkRect.top, ChildBottom + 2);
 				else if (ChildBottom >= WorkRect.bottom - 2)
-					WorkRect.bottom = std::min(WorkRect.bottom, ChildTop - 2);
+					WorkRect.bottom = std::min<LONG>(WorkRect.bottom, ChildTop - 2);
 			};
 
 			if (TESCSMain::MainToolbarHandle && *TESCSMain::MainToolbarHandle)
