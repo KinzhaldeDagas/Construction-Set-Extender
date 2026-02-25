@@ -214,7 +214,7 @@ namespace cse
 			const int GapMajor = 10;
 			const int GapMinor = 4;
 			const int ClusterWidth = LaunchW + GapMajor + LabelW + GapMinor + SliderW + GapMinor + EditW;
-			const int ClusterStartX = std::max(2, ((ToolbarRect.right - ToolbarRect.left) - ClusterWidth) / 2);
+			const int ClusterStartX = std::max(2, static_cast<int>(((ToolbarRect.right - ToolbarRect.left) - ClusterWidth) / 2));
 			const int CenterY = (ToolbarRect.bottom - ToolbarRect.top) / 2;
 
 			int X = ClusterStartX;
@@ -276,7 +276,7 @@ namespace cse
 				if (Bitmap.GetLastStatus() != Gdiplus::Ok)
 					continue;
 
-				Gdiplus::Bitmap Scaled(IconW, IconH, Gdiplus::PixelFormat32bppARGB);
+				Gdiplus::Bitmap Scaled(IconW, IconH);
 				Gdiplus::Graphics Graphics(&Scaled);
 				Graphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
 				Graphics.DrawImage(&Bitmap, 0, 0, IconW, IconH);
