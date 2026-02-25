@@ -76,13 +76,29 @@ namespace cse
 
 			const UINT Dpi = GetWindowDPI(ToolbarWindow);
 
-			int ImageWidth = 16, ImageHeight = 16;
-			HIMAGELIST ImageList = reinterpret_cast<HIMAGELIST>(SendMessage(ToolbarWindow, TB_GETIMAGELIST, 0, 0));
-			if (ImageList)
-				ImageList_GetIconSize(ImageList, &ImageWidth, &ImageHeight);
+			const char* kToolbarBaseGlyphWProp = "CSE_MainToolbarBaseGlyphW";
+			const char* kToolbarBaseGlyphHProp = "CSE_MainToolbarBaseGlyphH";
 
-			const int ScaledImageWidth = std::max(ImageWidth, MulDiv(ImageWidth, Dpi, 96));
-			const int ScaledImageHeight = std::max(ImageHeight, MulDiv(ImageHeight, Dpi, 96));
+			int BaseGlyphWidth = static_cast<int>(reinterpret_cast<INT_PTR>(GetPropA(ToolbarWindow, kToolbarBaseGlyphWProp)));
+			int BaseGlyphHeight = static_cast<int>(reinterpret_cast<INT_PTR>(GetPropA(ToolbarWindow, kToolbarBaseGlyphHProp)));
+
+			if (BaseGlyphWidth <= 0 || BaseGlyphHeight <= 0)
+			{
+				int ImageWidth = 16, ImageHeight = 16;
+				HIMAGELIST ImageList = reinterpret_cast<HIMAGELIST>(SendMessage(ToolbarWindow, TB_GETIMAGELIST, 0, 0));
+				if (ImageList)
+					ImageList_GetIconSize(ImageList, &ImageWidth, &ImageHeight);
+
+				// Normalize the currently reported size back to 96-DPI logical units once, then cache.
+				BaseGlyphWidth = std::max(16, MulDiv(std::max(ImageWidth, 16), 96, std::max<UINT>(Dpi, 96)));
+				BaseGlyphHeight = std::max(16, MulDiv(std::max(ImageHeight, 16), 96, std::max<UINT>(Dpi, 96)));
+
+				SetPropA(ToolbarWindow, kToolbarBaseGlyphWProp, reinterpret_cast<HANDLE>(static_cast<INT_PTR>(BaseGlyphWidth)));
+				SetPropA(ToolbarWindow, kToolbarBaseGlyphHProp, reinterpret_cast<HANDLE>(static_cast<INT_PTR>(BaseGlyphHeight)));
+			}
+
+			const int ScaledImageWidth = std::max(16, MulDiv(BaseGlyphWidth, Dpi, 96));
+			const int ScaledImageHeight = std::max(16, MulDiv(BaseGlyphHeight, Dpi, 96));
 			const int HorizontalPadding = std::max(4, MulDiv(4, Dpi, 96));
 			const int VerticalPadding = std::max(3, MulDiv(3, Dpi, 96));
 			const int ButtonWidth = std::max(ScaledImageWidth + (HorizontalPadding * 2), MulDiv(24, Dpi, 96));
@@ -1363,6 +1379,8 @@ namespace cse
 				{
 					RemovePropA(hWnd, "CSE_MainToolbarVisualCache");
 					RemovePropA(hWnd, "CSE_MainToolbarVisualCacheEx");
+					RemovePropA(hWnd, "CSE_MainToolbarBaseGlyphW");
+					RemovePropA(hWnd, "CSE_MainToolbarBaseGlyphH");
 
 					MainWindowToolbarData* xData = BGSEE_GETWINDOWXDATA(MainWindowToolbarData, SubclassParams->In.ExtraData);
 					if (xData)
