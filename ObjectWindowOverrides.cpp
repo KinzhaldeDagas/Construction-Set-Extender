@@ -7,6 +7,22 @@ namespace cse
 {
 	namespace uiManager
 	{
+		#define ID_OBJECTWINDOW_TITLE_REFRESH_TIMERID			0x9A1
+
+
+
+		static void UpdateObjectWindowTitle(HWND hWnd)
+		{
+			std::string WndTitle = "Object Window";
+
+			if (settings::general::kShowHallOfFameMembersInTitleBar().i != hallOfFame::kDisplayESMember_None)
+			{
+				hallOfFame::GetRandomESMember(WndTitle);
+				WndTitle += " Object Window";
+			}
+
+			SetWindowText(hWnd, WndTitle.c_str());
+		}
 
 		std::string ObjectWindowFormListGetColumnText(HWND FormList, TESForm* Form, UInt32 ColumnIndex)
 		{
@@ -87,6 +103,11 @@ namespace cse
 				SubclassParams->Out.MarkMessageAsHandled = true;
 
 				break;
+			case WM_TIMER:
+				if (wParam == ID_OBJECTWINDOW_TITLE_REFRESH_TIMERID)
+					UpdateObjectWindowTitle(hWnd);
+
+				break;
 			case WM_CLOSE:
 				SendMessage(*TESCSMain::WindowHandle, WM_COMMAND, TESCSMain::kMainMenu_View_ObjectWindow, NULL);
 				SubclassParams->Out.MarkMessageAsHandled = true;
@@ -96,6 +117,7 @@ namespace cse
 			case WM_DESTROY:
 				{
 					FilterableFormListManager::Instance.Unregister(FilterEditBox);
+					KillTimer(hWnd, ID_OBJECTWINDOW_TITLE_REFRESH_TIMERID);
 					ObjectWindowImposterManager::Instance.DestroyImposters();
 					TESObjectWindow::PrimaryObjectWindowHandle = nullptr;
 				}
@@ -113,13 +135,8 @@ namespace cse
 					Params.ColumnTextCallback = ObjectWindowFormListGetColumnText;
 					uiManager::FilterableFormListManager::Instance.Register(Params);
 
-					std::string WndTitle = "Object Window";
-					if (settings::general::kShowHallOfFameMembersInTitleBar().i != hallOfFame::kDisplayESMember_None)
-					{
-						hallOfFame::GetRandomESMember(WndTitle);
-						WndTitle += " Object Window";
-					}
-					SetWindowText(hWnd, WndTitle.c_str());
+					UpdateObjectWindowTitle(hWnd);
+					SetTimer(hWnd, ID_OBJECTWINDOW_TITLE_REFRESH_TIMERID, 5 * 60 * 1000, nullptr);
 
 					TESObjectWindow::PrimaryObjectWindowHandle = hWnd;
 				}
