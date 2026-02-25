@@ -125,6 +125,36 @@ namespace cse
 			SendMessage(ToolbarWindow, TB_SETPADDING, 0, MAKELPARAM(HorizontalPadding, VerticalPadding));
 			SendMessage(ToolbarWindow, TB_SETBUTTONSIZE, 0, MAKELPARAM(ButtonWidth, ButtonHeight));
 
+#ifdef TB_SETMETRICS
+			TBMETRICS Metrics = { 0 };
+			Metrics.cbSize = sizeof(TBMETRICS);
+			Metrics.dwMask = TBMF_PAD | TBMF_BARPAD | TBMF_BUTTONSPACING;
+			Metrics.cxPad = HorizontalPadding;
+			Metrics.cyPad = VerticalPadding;
+			Metrics.cxBarPad = 0;
+			Metrics.cyBarPad = 0;
+			Metrics.cxButtonSpacing = 0;
+			Metrics.cyButtonSpacing = 0;
+			SendMessage(ToolbarWindow, TB_SETMETRICS, 0, reinterpret_cast<LPARAM>(&Metrics));
+#endif
+
+			const bool DarkModeEnabled = BGSEEUI->GetColorThemer() && BGSEEUI->GetColorThemer()->IsEnabled();
+			const COLORREF ToolbarBackColor = DarkModeEnabled ? RGB(45, 45, 48) : CLR_DEFAULT;
+			const COLORREF ToolbarTextColor = DarkModeEnabled ? RGB(220, 220, 220) : CLR_DEFAULT;
+			SendMessage(ToolbarWindow, TB_SETBKCOLOR, 0, ToolbarBackColor);
+			SendMessage(ToolbarWindow, TB_SETTEXTCOLOR, 0, ToolbarTextColor);
+
+			auto ApplyImageListBkColor = [ToolbarWindow, ToolbarBackColor](UINT Message)
+			{
+				HIMAGELIST List = reinterpret_cast<HIMAGELIST>(SendMessage(ToolbarWindow, Message, 0, 0));
+				if (List)
+					ImageList_SetBkColor(List, ToolbarBackColor);
+			};
+
+			ApplyImageListBkColor(TB_GETIMAGELIST);
+			ApplyImageListBkColor(TB_GETHOTIMAGELIST);
+			ApplyImageListBkColor(TB_GETDISABLEDIMAGELIST);
+
 			typedef HRESULT(WINAPI* SetWindowThemeProcT)(HWND, LPCWSTR, LPCWSTR);
 			static SetWindowThemeProcT SetWindowThemeProc = []() -> SetWindowThemeProcT
 			{
@@ -153,46 +183,99 @@ namespace cse
 			if (RenderWindow == nullptr || ObjectWindow == nullptr || CellViewWindow == nullptr)
 				return false;
 
-			RECT MainBounds = { 0 };
-			if (GetClientRect(MainWindow, &MainBounds) == FALSE)
+			RECT WorkRect = { 0 };
+			if (GetClientRect(MainWindow, &WorkRect) == FALSE)
 				return false;
 
-			POINT MainTopLeft = { MainBounds.left, MainBounds.top };
-			ClientToScreen(MainWindow, &MainTopLeft);
+			auto ExcludeVerticalBandFromClientRect = [MainWindow, &WorkRect](HWND Child)
+			{
+				if (Child == nullptr || IsWindowVisible(Child) == FALSE)
+					return;
 
-			const int MainWidth = MainBounds.right - MainBounds.left;
-			const int MainHeight = MainBounds.bottom - MainBounds.top;
-			if (MainWidth <= 0 || MainHeight <= 0)
+				RECT ChildRect = { 0 };
+				if (GetWindowRect(Child, &ChildRect) == FALSE)
+					return;
+
+				POINT ChildTopLeft = { ChildRect.left, ChildRect.top };
+				POINT ChildBottomRight = { ChildRect.right, ChildRect.bottom };
+				ScreenToClient(MainWindow, &ChildTopLeft);
+				ScreenToClient(MainWindow, &ChildBottomRight);
+
+				const int ChildTop = ChildTopLeft.y;
+				const int ChildBottom = ChildBottomRight.y;
+				if (ChildBottom <= WorkRect.top || ChildTop >= WorkRect.bottom)
+					return;
+
+				if (ChildTop <= WorkRect.top + 2)
+					WorkRect.top = std::max(WorkRect.top, ChildBottom + 2);
+				else if (ChildBottom >= WorkRect.bottom - 2)
+					WorkRect.bottom = std::min(WorkRect.bottom, ChildTop - 2);
+			};
+
+			if (TESCSMain::MainToolbarHandle && *TESCSMain::MainToolbarHandle)
+				ExcludeVerticalBandFromClientRect(*TESCSMain::MainToolbarHandle);
+
+			HWND Child = nullptr;
+			char ClassName[64] = { 0 };
+			while ((Child = FindWindowEx(MainWindow, Child, nullptr, nullptr)) != nullptr)
+			{
+				GetClassNameA(Child, ClassName, sizeof(ClassName));
+				if (_stricmp(ClassName, "msctls_statusbar32") == 0)
+					ExcludeVerticalBandFromClientRect(Child);
+			}
+
+			POINT WorkTopLeft = { WorkRect.left, WorkRect.top };
+			ClientToScreen(MainWindow, &WorkTopLeft);
+
+			const int WorkWidth = WorkRect.right - WorkRect.left;
+			const int WorkHeight = WorkRect.bottom - WorkRect.top;
+			if (WorkWidth <= 0 || WorkHeight <= 0)
 				return false;
 
 			const int Gap = 6;
-			const int MinSideWidth = 220;
-			const int MinCenterWidth = 360;
-
-			int LeftWidth = std::max(MinSideWidth, MainWidth / 4);
-			int RightWidth = std::max(MinSideWidth, MainWidth / 4);
-			int CenterWidth = MainWidth - LeftWidth - RightWidth - (Gap * 2);
-
-			if (CenterWidth < MinCenterWidth)
+			const int MinLeftWidth = 320;
+			const int MinRenderWidth = 420;
+			int LeftWidth = std::max(MinLeftWidth, WorkWidth / 3);
+			int RenderWidth = WorkWidth - LeftWidth - Gap;
+			if (RenderWidth < MinRenderWidth)
 			{
-				int Deficit = MinCenterWidth - CenterWidth;
-				int RightShrink = std::min(Deficit / 2, RightWidth - MinSideWidth);
-				RightWidth -= RightShrink;
-				Deficit -= RightShrink;
-
-				int LeftShrink = std::min(Deficit, LeftWidth - MinSideWidth);
-				LeftWidth -= LeftShrink;
-				Deficit -= LeftShrink;
-
-
-				CenterWidth = MainWidth - LeftWidth - RightWidth - (Gap * 2);
+				RenderWidth = MinRenderWidth;
+				LeftWidth = WorkWidth - RenderWidth - Gap;
 			}
 
-			CenterWidth = std::max(1, CenterWidth);
+			if (LeftWidth < 220)
+			{
+				LeftWidth = std::max(120, WorkWidth / 2 - (Gap / 2));
+				RenderWidth = std::max(120, WorkWidth - LeftWidth - Gap);
+			}
 
-			SetWindowPos(ObjectWindow, nullptr, MainTopLeft.x, MainTopLeft.y, LeftWidth, MainHeight, SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
-			SetWindowPos(RenderWindow, nullptr, MainTopLeft.x + LeftWidth + Gap, MainTopLeft.y, CenterWidth, MainHeight, SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
-			SetWindowPos(CellViewWindow, nullptr, MainTopLeft.x + LeftWidth + Gap + CenterWidth + Gap, MainTopLeft.y, RightWidth, MainHeight, SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+			const int CellHeight = std::max(220, WorkHeight / 3);
+			const int ObjectHeight = std::max(220, WorkHeight - CellHeight - Gap);
+			const int FinalCellHeight = std::max(1, WorkHeight - ObjectHeight - Gap);
+
+			SetWindowPos(ObjectWindow,
+				nullptr,
+				WorkTopLeft.x,
+				WorkTopLeft.y,
+				LeftWidth,
+				ObjectHeight,
+				SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+
+			SetWindowPos(CellViewWindow,
+				nullptr,
+				WorkTopLeft.x,
+				WorkTopLeft.y + ObjectHeight + Gap,
+				LeftWidth,
+				FinalCellHeight,
+				SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+
+			SetWindowPos(RenderWindow,
+				nullptr,
+				WorkTopLeft.x + LeftWidth + Gap,
+				WorkTopLeft.y,
+				RenderWidth,
+				WorkHeight,
+				SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
 
 			return true;
 		}
@@ -1193,6 +1276,9 @@ namespace cse
 					else
 						BGSEEUI->GetColorThemer()->Enable();
 
+					if (TESCSMain::MainToolbarHandle && *TESCSMain::MainToolbarHandle)
+						UpdateToolbarVisualsForDPIAndTheme(*TESCSMain::MainToolbarHandle, true);
+
 					break;
 				case IDC_MAINMENU_ONEDITORSTARTUP_LOADSTARTUPPLUGIN:
 					settings::startup::kLoadPlugin.ToggleData();
@@ -1337,7 +1423,6 @@ namespace cse
 							SendMessage(*TESCSMain::MainToolbarHandle, TB_SETBUTTONINFO, TESCSMain::kToolbar_PathGridEdit, (LPARAM)&PathGridData);
 						}
 
-						UpdateToolbarVisualsForDPIAndTheme(*TESCSMain::MainToolbarHandle);
 					}
 
 					break;
