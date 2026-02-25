@@ -148,9 +148,17 @@ namespace cse
 
 			const bool DarkModeEnabled = BGSEEUI->GetColorThemer() && BGSEEUI->GetColorThemer()->IsEnabled();
 			const COLORREF ToolbarBackColor = DarkModeEnabled ? RGB(45, 45, 48) : CLR_DEFAULT;
+			#ifdef TB_SETTEXTCOLOR
 			const COLORREF ToolbarTextColor = DarkModeEnabled ? RGB(220, 220, 220) : CLR_DEFAULT;
+#endif
+#ifdef TB_SETBKCOLOR
 			SendMessage(ToolbarWindow, TB_SETBKCOLOR, 0, ToolbarBackColor);
+#elif defined(CCM_SETBKCOLOR)
+			SendMessage(ToolbarWindow, CCM_SETBKCOLOR, 0, ToolbarBackColor);
+#endif
+#ifdef TB_SETTEXTCOLOR
 			SendMessage(ToolbarWindow, TB_SETTEXTCOLOR, 0, ToolbarTextColor);
+#endif
 
 			auto ApplyImageListBkColor = [ToolbarWindow, ToolbarBackColor](UINT Message)
 			{
