@@ -15,7 +15,9 @@
 #include "CustomDialogProcs.h"
 
 #include <fstream>
-#include <iomanip>
+#include <filesystem>
+#include <vector>
+#include <unordered_set>
 
 #include "[BGSEEBase]\ToolBox.h"
 #include "[BGSEEBase]\Script\CodaVM.h"
@@ -200,10 +202,15 @@ namespace cse
 		}
 
 
-		static TESNPC* GetSpeakerFromTopicInfo(TESTopicInfo* Info)
+		static void CollectSpeakersFromTopicInfo(TESTopicInfo* Info, std::vector<TESNPC*>& OutSpeakers)
 		{
+			OutSpeakers.clear();
 			if (Info == nullptr)
-				return nullptr;
+				return;
+
+			std::unordered_set<TESNPC*> UniqueSpeakers;
+			std::unordered_set<TESRace*> RaceFilters;
+			bool HasExplicitNPCSpeaker = false;
 
 			for (ConditionListT::Iterator Itr = Info->conditions.Begin(); Itr.End() == false && Itr.Get(); ++Itr)
 			{
@@ -211,27 +218,131 @@ namespace cse
 				SME_ASSERT(Condition);
 
 				const UInt16 FunctionIndex = Condition->functionIndex & 0x0FFF;
-				if (FunctionIndex == 72 || FunctionIndex == 224)
+				if (FunctionIndex == 72)
 				{
 					TESNPC* Speaker = CS_CAST(Condition->param1.form, TESForm, TESNPC);
 					if (Speaker)
-						return Speaker;
+					{
+						UniqueSpeakers.insert(Speaker);
+						HasExplicitNPCSpeaker = true;
+					}
+				}
+				else if (FunctionIndex == 224)
+				{
+					TESRace* Race = CS_CAST(Condition->param1.form, TESForm, TESRace);
+					if (Race)
+						RaceFilters.insert(Race);
 				}
 			}
 
-			return nullptr;
-		}
-
-		static std::string SanitizeTabDelimitedField(const char* Input)
-		{
-			std::string Result = Input ? Input : "";
-			for (auto& Ch : Result)
+			// Only expand to race-matched NPCs when the line has explicit race filters and no
+			// direct NPC speaker conditions, avoiding a global all-races fallback per line.
+			if (HasExplicitNPCSpeaker == false && RaceFilters.empty() == false)
 			{
-				if (Ch == '\t' || Ch == '\r' || Ch == '\n')
-					Ch = ' ';
+				for (TESObject* Object = _DATAHANDLER->objects ? _DATAHANDLER->objects->first : nullptr;
+					Object != nullptr;
+					Object = Object->next)
+				{
+					TESNPC* NPC = CS_CAST(Object, TESForm, TESNPC);
+					if (NPC == nullptr || NPC->race == nullptr)
+						continue;
+
+					if (RaceFilters.find(NPC->race) != RaceFilters.end())
+						UniqueSpeakers.insert(NPC);
+				}
 			}
 
-			return Result;
+			OutSpeakers.reserve(UniqueSpeakers.size());
+			for (auto Speaker : UniqueSpeakers)
+				OutSpeakers.push_back(Speaker);
+		}
+
+		static std::string EscapeCSVField(const char* Input)
+		{
+			std::string Result = Input ? Input : "";
+			std::string Escaped;
+			Escaped.reserve(Result.length() + 2);
+
+			Escaped.push_back('"');
+			for (auto Ch : Result)
+			{
+				if (Ch == '"')
+					Escaped += "\"\"";
+				else
+					Escaped.push_back(Ch);
+			}
+			Escaped.push_back('"');
+
+			return Escaped;
+		}
+
+		static std::string GetDefaultRevoiceCSVName(const char* ActivePluginName)
+		{
+			std::string BaseName = ActivePluginName ? ActivePluginName : "ActivePlugin";
+			if (BaseName.empty())
+				BaseName = "ActivePlugin";
+
+			size_t LastSlash = BaseName.find_last_of("\\/");
+			if (LastSlash != std::string::npos)
+				BaseName.erase(0, LastSlash + 1);
+
+			size_t LastDot = BaseName.find_last_of('.');
+			if (LastDot != std::string::npos)
+				BaseName.erase(LastDot);
+
+			if (BaseName.empty())
+				BaseName = "ActivePlugin";
+
+			return BaseName + "_reVoice.csv";
+		}
+
+		static bool IsAbsoluteRevoicePath(const std::string& Path)
+		{
+			if (Path.size() >= 2 && Path[1] == ':')
+				return true;
+			if (Path.size() >= 2 && Path[0] == '\\' && Path[1] == '\\')
+				return true;
+			return false;
+		}
+
+		static bool EnsureRevoiceParentDirectoryExists(const std::string& Path, std::string& OutError)
+		{
+			std::error_code Error;
+			std::filesystem::path OutputPath(Path);
+			std::filesystem::path ParentPath = OutputPath.parent_path();
+			if (ParentPath.empty())
+				return true;
+
+			if (std::filesystem::exists(ParentPath, Error))
+			{
+				if (Error)
+				{
+					OutError = Error.message();
+					return false;
+				}
+
+				if (std::filesystem::is_directory(ParentPath, Error) == false || Error)
+				{
+					OutError = Error ? Error.message() : "Parent path is not a directory";
+					return false;
+				}
+
+				return true;
+			}
+
+			if (Error)
+			{
+				OutError = Error.message();
+				return false;
+			}
+
+			if (std::filesystem::create_directories(ParentPath, Error) == false || Error)
+			{
+				OutError = Error ? Error.message() : "Couldn't create parent directory";
+				return false;
+			}
+
+			return true;
 		}
 
 		void ExportRevoiceCSVForActivePlugin(HWND hWnd)
@@ -243,6 +354,9 @@ namespace cse
 			}
 
 			char SelectPath[MAX_PATH] = { 0 };
+			std::string DefaultCSVName = GetDefaultRevoiceCSVName(_DATAHANDLER->activeFile->fileName);
+			strncpy_s(SelectPath, DefaultCSVName.c_str(), _TRUNCATE);
+
 			if (TESDialog::ShowFileSelect(hWnd,
 				"Data",
 				"CSV Files\0*.csv\0\0",
@@ -260,17 +374,49 @@ namespace cse
 			std::string FilePath(SelectPath);
 			if (FilePath.empty())
 				return;
+
+			for (auto& Ch : FilePath)
+			{
+				if (Ch == '/')
+					Ch = '\\';
+			}
+
+			while (FilePath.empty() == false && (FilePath[0] == '\\' || FilePath[0] == '/'))
+				FilePath.erase(0, 1);
+
+			if (IsAbsoluteRevoicePath(FilePath) == false && _strnicmp(FilePath.c_str(), "Data\\", 5) != 0)
+				FilePath = std::string("Data\\") + FilePath;
+
 			if (FilePath.size() < 4 || _stricmp(FilePath.c_str() + FilePath.size() - 4, ".csv"))
 				FilePath += ".csv";
 
-			std::ofstream Output(FilePath, std::ios::trunc);
-			if (Output.good() == false)
+			std::filesystem::path OutputPath(FilePath);
+			std::error_code PathError;
+			std::filesystem::path AbsoluteOutputPath = std::filesystem::absolute(OutputPath, PathError);
+			if (PathError)
+				AbsoluteOutputPath = OutputPath;
+
+			const std::string OutputPathForIO = AbsoluteOutputPath.string();
+
+			std::string DirectoryError;
+			if (EnsureRevoiceParentDirectoryExists(OutputPathForIO, DirectoryError) == false)
 			{
-				BGSEEUI->MsgBoxE("Couldn't open output file for writing:\n%s", FilePath.c_str());
+				BGSEEUI->MsgBoxE("Couldn't prepare output folder for reVoice CSV export:\n%s\n\nReason: %s", OutputPathForIO.c_str(), DirectoryError.c_str());
 				return;
 			}
 
-			Output << "FormID\tVoiceID\tSpeakerInfo\tOutputPath\tDialogue\n";
+			std::ofstream Output(OutputPathForIO, std::ios::trunc);
+			if (Output.good() == false)
+			{
+				BGSEEUI->MsgBoxE("Couldn't open output file for writing:\n%s", OutputPathForIO.c_str());
+				return;
+			}
+
+			if (!(Output << "FormID,VoiceID,SpeakerInfo,OutputPath,Dialogue\n"))
+			{
+				BGSEEUI->MsgBoxE("Couldn't write CSV header to output file:\n%s", OutputPathForIO.c_str());
+				return;
+			}
 
 			UInt32 Rows = 0;
 			for (tList<TESTopic>::Iterator ItrTopic = _DATAHANDLER->topics.Begin(); ItrTopic.End() == false && ItrTopic.Get(); ++ItrTopic)
@@ -295,61 +441,88 @@ namespace cse
 						if ((Info->formFlags & TESForm::kFormFlags_FromActiveFile) == false)
 							continue;
 
-						TESNPC* Speaker = GetSpeakerFromTopicInfo(Info);
-						if (Speaker == nullptr || Speaker->race.race == nullptr)
+						std::vector<TESNPC*> Speakers;
+						CollectSpeakersFromTopicInfo(Info, Speakers);
+						if (Speakers.empty())
 							continue;
 
-						const bool IsFemale = (Speaker->actorFlags & TESActorBaseData::kNPCFlag_Female) != 0;
-						const char* SexToken = IsFemale ? "F" : "M";
-						TESRace* SpeakerRace = Speaker->race.race;
-						TESRace* VoiceRace = IsFemale ? SpeakerRace->femaleVoiceRace : SpeakerRace->maleVoiceRace;
-						if (VoiceRace == nullptr)
-							VoiceRace = SpeakerRace;
-
-						const char* VoiceID = VoiceRace->GetEditorID() ? VoiceRace->GetEditorID() : "";
-						const char* RaceName = SpeakerRace->name.c_str();
-						if (RaceName == nullptr || strlen(RaceName) == 0)
-							RaceName = "Unknown";
-
-						std::string SpeakerInfo = std::string(RaceName) + "\\" + SexToken;
-
-						for (TESTopicInfo::ResponseListT::Iterator ItrResponse = Info->responseList.Begin();
-							ItrResponse.End() == false && ItrResponse.Get();
-							++ItrResponse)
+						for (auto Speaker : Speakers)
 						{
-							TESTopicInfo::ResponseData* Response = ItrResponse.Get();
-							if (Response == nullptr)
+							if (Speaker == nullptr || Speaker->race == nullptr)
 								continue;
 
-							const char* ResponseText = Response->responseText.c_str();
-							if (ResponseText == nullptr || strlen(ResponseText) == 0)
-								continue;
+							const bool IsFemale = (Speaker->actorFlags & TESActorBaseData::kNPCFlag_Female) != 0;
+							const char* SexToken = IsFemale ? "F" : "M";
+							TESRace* SpeakerRace = Speaker->race;
+							TESRace* VoiceRace = IsFemale ? SpeakerRace->femaleVoiceRace : SpeakerRace->maleVoiceRace;
+							if (VoiceRace == nullptr)
+								VoiceRace = SpeakerRace;
 
-							char OutPath[MAX_PATH] = { 0 };
-							FORMAT_STR(OutPath, "Sound\\Voice\\%s\\%s\\%s\\%s_%s_%08X_%u.mp3",
-								_DATAHANDLER->activeFile->fileName,
-								RaceName,
-								SexToken,
-								Quest->editorID.c_str(),
-								Topic->editorID.c_str(),
-								Info->formID,
-								Response->responseNumber);
+							const char* VoiceID = VoiceRace->GetEditorID() ? VoiceRace->GetEditorID() : "";
+							const char* RaceName = SpeakerRace->name.c_str();
+							if (RaceName == nullptr || strlen(RaceName) == 0)
+								RaceName = "Unknown";
 
-							Output
-								<< std::uppercase << std::hex << std::setfill('0') << std::setw(8) << Info->formID << std::dec
-								<< "\t" << SanitizeTabDelimitedField(VoiceID)
-								<< "\t" << SanitizeTabDelimitedField(SpeakerInfo.c_str())
-								<< "\t" << SanitizeTabDelimitedField(OutPath)
-								<< "\t" << SanitizeTabDelimitedField(ResponseText)
-								<< "\n";
-							Rows++;
+							std::string SpeakerInfo = std::string(RaceName) + "\\" + SexToken;
+
+							for (TESTopicInfo::ResponseListT::Iterator ItrResponse = Info->responseList.Begin();
+								ItrResponse.End() == false && ItrResponse.Get();
+								++ItrResponse)
+							{
+								TESTopicInfo::ResponseData* Response = ItrResponse.Get();
+								if (Response == nullptr)
+									continue;
+
+								const char* ResponseText = Response->responseText.c_str();
+								if (ResponseText == nullptr || strlen(ResponseText) == 0)
+									continue;
+
+								char OutPath[MAX_PATH] = { 0 };
+								FORMAT_STR(OutPath, "Sound\\Voice\\%s\\%s\\%s\\%s_%s_%08X_%u.mp3",
+									_DATAHANDLER->activeFile->fileName,
+									(VoiceID && strlen(VoiceID)) ? VoiceID : RaceName,
+									SexToken,
+									Quest->editorID.c_str(),
+									Topic->editorID.c_str(),
+									Info->formID,
+									Response->responseNumber);
+
+								char FormID[16] = { 0 };
+								FORMAT_STR(FormID, "%08X", Info->formID);
+
+								if (!(Output
+									<< EscapeCSVField(FormID)
+									<< "," << EscapeCSVField(VoiceID)
+									<< "," << EscapeCSVField(SpeakerInfo.c_str())
+									<< "," << EscapeCSVField(OutPath)
+									<< "," << EscapeCSVField(ResponseText)
+									<< "\n"))
+								{
+									BGSEEUI->MsgBoxE("reVoice CSV export failed while writing output file:\n%s", OutputPathForIO.c_str());
+									return;
+								}
+								Rows++;
+							}
 						}
 					}
 				}
 			}
 
 			Output.flush();
-			BGSEEUI->MsgBoxI("reVoice CSV export complete. Wrote %u dialogue rows to:\n%s", Rows, FilePath.c_str());
+			if (Output.fail())
+			{
+				BGSEEUI->MsgBoxE("reVoice CSV export failed while finalizing output file:\n%s", OutputPathForIO.c_str());
+				return;
+			}
+
+			Output.close();
+			if (Output.fail())
+			{
+				BGSEEUI->MsgBoxE("reVoice CSV export failed while closing output file:\n%s", OutputPathForIO.c_str());
+				return;
+			}
+
+			BGSEEUI->MsgBoxI("reVoice CSV export complete. Wrote %u dialogue rows to:\n%s", Rows, OutputPathForIO.c_str());
 		}
 
 

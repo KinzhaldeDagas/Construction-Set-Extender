@@ -309,15 +309,21 @@ namespace cse
 					if (_stricmp(ClassName, "Button"))
 						continue;
 
+					if ((GetWindowLong(Child, GWL_STYLE) & BS_AUTOCHECKBOX) == 0)
+						continue;
+
 					GetWindowText(Child, ControlText, sizeof(ControlText));
-					if (!_stricmp(ControlText, "Enable this type of data"))
+					if (_stricmp(ControlText, "Enable this type of data") == 0)
+						return Child;
+
+					if (strstr(ControlText, "Enable") && strstr(ControlText, "data"))
 						return Child;
 				}
 
 				return nullptr;
 			};
 
-			static bool PreventAutoEnableAfterTabSwitch = false;
+			const char* kPreventAutoEnableAfterTabSwitchProp = "CSE_RegionEditorPreventAutoEnableAfterTabSwitch";
 
 			switch (uMsg)
 			{
@@ -327,9 +333,9 @@ namespace cse
 					if (NotifyData && NotifyData->code == TCN_SELCHANGING)
 					{
 						HWND EnableCheckBox = GetEnableDataTypeCheckBox();
-						PreventAutoEnableAfterTabSwitch = EnableCheckBox && SendMessage(EnableCheckBox, BM_GETCHECK, 0, 0) != BST_CHECKED;
+						SetProp(hWnd, kPreventAutoEnableAfterTabSwitchProp, reinterpret_cast<HANDLE>(static_cast<INT_PTR>(EnableCheckBox && SendMessage(EnableCheckBox, BM_GETCHECK, 0, 0) != BST_CHECKED)));
 					}
-					else if (NotifyData && NotifyData->code == TCN_SELCHANGE && PreventAutoEnableAfterTabSwitch)
+					else if (NotifyData && NotifyData->code == TCN_SELCHANGE && GetProp(hWnd, kPreventAutoEnableAfterTabSwitchProp))
 					{
 						HWND EnableCheckBox = GetEnableDataTypeCheckBox();
 						if (EnableCheckBox && SendMessage(EnableCheckBox, BM_GETCHECK, 0, 0) == BST_CHECKED)
@@ -341,13 +347,13 @@ namespace cse
 								reinterpret_cast<LPARAM>(EnableCheckBox));
 						}
 
-						PreventAutoEnableAfterTabSwitch = false;
+						RemoveProp(hWnd, kPreventAutoEnableAfterTabSwitchProp);
 					}
 				}
 
 				break;
 			case WM_DESTROY:
-				PreventAutoEnableAfterTabSwitch = false;
+				RemoveProp(hWnd, kPreventAutoEnableAfterTabSwitchProp);
 				break;
 			}
 
