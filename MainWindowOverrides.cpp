@@ -15,6 +15,7 @@
 #include "CustomDialogProcs.h"
 
 #include <fstream>
+#include <algorithm>
 #include <filesystem>
 #include <vector>
 #include <unordered_set>
@@ -51,6 +52,101 @@ namespace cse
 		MainWindowToolbarData::~MainWindowToolbarData()
 		{
 			;//
+		}
+
+		static UINT GetWindowDPI(HWND hWnd)
+		{
+			typedef UINT(WINAPI* GetDpiForWindowProcT)(HWND);
+			static GetDpiForWindowProcT GetDpiForWindowProc = reinterpret_cast<GetDpiForWindowProcT>(GetProcAddress(GetModuleHandleA("user32.dll"), "GetDpiForWindow"));
+
+			if (GetDpiForWindowProc && hWnd)
+				return GetDpiForWindowProc(hWnd);
+
+			return 96;
+		}
+
+		static void UpdateToolbarVisualsForDPIAndTheme(HWND ToolbarWindow)
+		{
+			if (ToolbarWindow == nullptr)
+				return;
+
+			const UINT Dpi = GetWindowDPI(ToolbarWindow);
+			const int GlyphSize = std::max(16, MulDiv(16, Dpi, 96));
+			const int ButtonWidth = std::max(24, GlyphSize + 8);
+			const int ButtonHeight = std::max(24, GlyphSize + 8);
+
+			// Keep toolbar glyph metrics DPI-aware and opt into modern Explorer theming for better dark-mode integration.
+			SendMessage(ToolbarWindow, TB_SETBITMAPSIZE, 0, MAKELPARAM(GlyphSize, GlyphSize));
+			SendMessage(ToolbarWindow, TB_SETBUTTONSIZE, 0, MAKELPARAM(ButtonWidth, ButtonHeight));
+			typedef HRESULT(WINAPI* SetWindowThemeProcT)(HWND, LPCWSTR, LPCWSTR);
+			static SetWindowThemeProcT SetWindowThemeProc = []() -> SetWindowThemeProcT
+			{
+				HMODULE UXThemeModule = LoadLibraryA("uxtheme.dll");
+				if (UXThemeModule == nullptr)
+					return nullptr;
+
+				return reinterpret_cast<SetWindowThemeProcT>(GetProcAddress(UXThemeModule, "SetWindowTheme"));
+			}();
+
+			if (SetWindowThemeProc)
+				SetWindowThemeProc(ToolbarWindow, L"Explorer", nullptr);
+			InvalidateRect(ToolbarWindow, nullptr, TRUE);
+		}
+
+		static bool SnapPrimaryWindowsIntoMainFrame(HWND MainWindow)
+		{
+			if (MainWindow == nullptr)
+				return false;
+
+			HWND RenderWindow = TESRenderWindow::WindowHandle ? *TESRenderWindow::WindowHandle : nullptr;
+			HWND ObjectWindow = TESObjectWindow::WindowHandle ? *TESObjectWindow::WindowHandle : nullptr;
+			HWND CellViewWindow = TESCellViewWindow::WindowHandle ? *TESCellViewWindow::WindowHandle : nullptr;
+
+			if (RenderWindow == nullptr || ObjectWindow == nullptr || CellViewWindow == nullptr)
+				return false;
+
+			RECT MainBounds = { 0 };
+			if (GetClientRect(MainWindow, &MainBounds) == FALSE)
+				return false;
+
+			POINT MainTopLeft = { MainBounds.left, MainBounds.top };
+			ClientToScreen(MainWindow, &MainTopLeft);
+
+			const int MainWidth = MainBounds.right - MainBounds.left;
+			const int MainHeight = MainBounds.bottom - MainBounds.top;
+			if (MainWidth <= 0 || MainHeight <= 0)
+				return false;
+
+			const int Gap = 6;
+			const int MinSideWidth = 220;
+			const int MinCenterWidth = 360;
+
+			int LeftWidth = std::max(MinSideWidth, MainWidth / 4);
+			int RightWidth = std::max(MinSideWidth, MainWidth / 4);
+			int CenterWidth = MainWidth - LeftWidth - RightWidth - (Gap * 2);
+
+			if (CenterWidth < MinCenterWidth)
+			{
+				int Deficit = MinCenterWidth - CenterWidth;
+				int RightShrink = std::min(Deficit / 2, RightWidth - MinSideWidth);
+				RightWidth -= RightShrink;
+				Deficit -= RightShrink;
+
+				int LeftShrink = std::min(Deficit, LeftWidth - MinSideWidth);
+				LeftWidth -= LeftShrink;
+				Deficit -= LeftShrink;
+
+
+				CenterWidth = MainWidth - LeftWidth - RightWidth - (Gap * 2);
+			}
+
+			CenterWidth = std::max(1, CenterWidth);
+
+			SetWindowPos(ObjectWindow, nullptr, MainTopLeft.x, MainTopLeft.y, LeftWidth, MainHeight, SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+			SetWindowPos(RenderWindow, nullptr, MainTopLeft.x + LeftWidth + Gap, MainTopLeft.y, CenterWidth, MainHeight, SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+			SetWindowPos(CellViewWindow, nullptr, MainTopLeft.x + LeftWidth + Gap + CenterWidth + Gap, MainTopLeft.y, RightWidth, MainHeight, SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+
+			return true;
 		}
 
 		void BatchGenerateLipSyncFiles(HWND hWnd)
@@ -1093,6 +1189,7 @@ namespace cse
 		}
 
 #define ID_PATHGRIDTOOLBARBUTTION_TIMERID		0x99
+#define ID_MAINWINDOW_SNAPLAYOUT_TIMERID		0x9A
 
 		LRESULT CALLBACK MainWindowMiscSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
 													bgsee::WindowSubclassProcCollection::SubclassProcExtraParams* SubclassParams)
@@ -1111,6 +1208,7 @@ namespace cse
 			case WM_MAINWINDOW_INIT_DIALOG:
 				{
 					SetTimer(hWnd, ID_PATHGRIDTOOLBARBUTTION_TIMERID, 500, nullptr);
+					SetTimer(hWnd, ID_MAINWINDOW_SNAPLAYOUT_TIMERID, 250, nullptr);
 					SubclassParams->Out.MarkMessageAsHandled = true;
 				}
 
@@ -1118,6 +1216,7 @@ namespace cse
 			case WM_DESTROY:
 				{
 					KillTimer(hWnd, ID_PATHGRIDTOOLBARBUTTION_TIMERID);
+					KillTimer(hWnd, ID_MAINWINDOW_SNAPLAYOUT_TIMERID);
 
 					MainWindowMiscData* xData = BGSEE_GETWINDOWXDATA(MainWindowMiscData, SubclassParams->In.ExtraData);
 					if (xData)
@@ -1148,6 +1247,7 @@ namespace cse
 						{
 							SubclassParams->In.Subclasser->RegisterSubclassForWindow(*TESCSMain::MainToolbarHandle, MainWindowToolbarSubClassProc);
 							SendMessage(*TESCSMain::MainToolbarHandle, WM_MAINTOOLBAR_INIT, NULL, NULL);
+							UpdateToolbarVisualsForDPIAndTheme(*TESCSMain::MainToolbarHandle);
 
 							HWND TODSlider = GetDlgItem(hWnd, IDC_TOOLBAR_TODSLIDER);
 							HWND TODEdit = GetDlgItem(hWnd, IDC_TOOLBAR_TODCURRENT);
@@ -1188,7 +1288,14 @@ namespace cse
 							PathGridData.fsState |= TBSTATE_CHECKED;
 							SendMessage(*TESCSMain::MainToolbarHandle, TB_SETBUTTONINFO, TESCSMain::kToolbar_PathGridEdit, (LPARAM)&PathGridData);
 						}
+
+						UpdateToolbarVisualsForDPIAndTheme(*TESCSMain::MainToolbarHandle);
 					}
+
+					break;
+				case ID_MAINWINDOW_SNAPLAYOUT_TIMERID:
+					if (SnapPrimaryWindowsIntoMainFrame(hWnd))
+						KillTimer(hWnd, ID_MAINWINDOW_SNAPLAYOUT_TIMERID);
 
 					break;
 				}
