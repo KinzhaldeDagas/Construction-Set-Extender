@@ -297,6 +297,27 @@ namespace cse
 			LRESULT DlgProcResult = FALSE;
 			SubclassParams->Out.MarkMessageAsHandled = false;
 
+			auto IsMouseClickToggleInputActive = [](HWND CheckBox) -> bool
+			{
+				if (CheckBox == nullptr)
+					return false;
+
+				RECT CheckBoxBounds = { 0 };
+				if (GetWindowRect(CheckBox, &CheckBoxBounds) == FALSE)
+					return false;
+
+				POINT CursorPos = { 0 };
+				if (GetCursorPos(&CursorPos) == FALSE)
+					return false;
+
+				const SHORT LeftMouseState = GetAsyncKeyState(VK_LBUTTON);
+				const bool LeftButtonDown = (LeftMouseState & 0x8000) != 0;
+				const bool LeftButtonPressedSinceLastCheck = (LeftMouseState & 0x0001) != 0;
+				const bool CursorOverCheckBox = PtInRect(&CheckBoxBounds, CursorPos) != FALSE;
+
+				return CursorOverCheckBox && (LeftButtonDown || LeftButtonPressedSinceLastCheck);
+			};
+
 			auto GetEnableDataTypeCheckBox = [hWnd]() -> HWND
 			{
 				HWND Child = nullptr;
@@ -324,6 +345,7 @@ namespace cse
 			};
 
 			const char* kPreventAutoEnableAfterTabSwitchProp = "CSE_RegionEditorPreventAutoEnableAfterTabSwitch";
+			const char* kAllowSyntheticToggleCommandProp = "CSE_RegionEditorAllowSyntheticToggleCommand";
 
 			switch (uMsg)
 			{
@@ -341,6 +363,7 @@ namespace cse
 						if (EnableCheckBox && SendMessage(EnableCheckBox, BM_GETCHECK, 0, 0) == BST_CHECKED)
 						{
 							SendMessage(EnableCheckBox, BM_SETCHECK, BST_UNCHECKED, 0);
+							SetProp(hWnd, kAllowSyntheticToggleCommandProp, reinterpret_cast<HANDLE>(1));
 							PostMessage(hWnd,
 								WM_COMMAND,
 								MAKEWPARAM(GetDlgCtrlID(EnableCheckBox), BN_CLICKED),
@@ -352,8 +375,32 @@ namespace cse
 				}
 
 				break;
+			case WM_COMMAND:
+				if (HIWORD(wParam) == BN_CLICKED)
+				{
+					HWND EnableCheckBox = GetEnableDataTypeCheckBox();
+					if (reinterpret_cast<HWND>(lParam) == EnableCheckBox)
+					{
+						if (GetProp(hWnd, kAllowSyntheticToggleCommandProp))
+						{
+							RemoveProp(hWnd, kAllowSyntheticToggleCommandProp);
+						}
+						else if (IsMouseClickToggleInputActive(EnableCheckBox) == false)
+						{
+							// Filter out bogus auto-click messages (e.g. hover-triggered toggles).
+							if (SendMessage(EnableCheckBox, BM_GETCHECK, 0, 0) == BST_CHECKED)
+								SendMessage(EnableCheckBox, BM_SETCHECK, BST_UNCHECKED, 0);
+
+							SubclassParams->Out.MarkMessageAsHandled = true;
+							DlgProcResult = TRUE;
+						}
+					}
+				}
+
+				break;
 			case WM_DESTROY:
 				RemoveProp(hWnd, kPreventAutoEnableAfterTabSwitchProp);
+				RemoveProp(hWnd, kAllowSyntheticToggleCommandProp);
 				break;
 			}
 
@@ -3353,6 +3400,12 @@ namespace cse
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_AIPackages, AIPackagesDlgSubClassProc);
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_AIForm, AIFormDlgSubClassProc);
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorGeneral, RegionEditorGeneralDlgSubClassProc);
+			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorWeatherData, RegionEditorGeneralDlgSubClassProc);
+			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorObjectsData, RegionEditorGeneralDlgSubClassProc);
+			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorMapData, RegionEditorGeneralDlgSubClassProc);
+			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorObjectsExtraData, RegionEditorGeneralDlgSubClassProc);
+			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorGrassData, RegionEditorGeneralDlgSubClassProc);
+			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorSoundData, RegionEditorGeneralDlgSubClassProc);
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_NPC, FaceGenDlgSubClassProc);
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_Race, FaceGenDlgSubClassProc);
 
