@@ -1761,6 +1761,10 @@ namespace cse
 				ApplyModernChromeToPrimaryWindows(true);
 				LayoutToolbarExtras(hWnd);
 				break;
+			case WM_SIZE:
+			case WM_WINDOWPOSCHANGED:
+				LayoutToolbarExtras(hWnd);
+				break;
 			case WM_COMMAND:
 				{
 					MainWindowToolbarData* xData = BGSEE_GETWINDOWXDATA(MainWindowToolbarData, SubclassParams->In.ExtraData);
