@@ -1631,12 +1631,17 @@ namespace cse
 			_hhSetVar(Jump, 0x004320DD);
 			__asm
 			{
+				test	esi, esi
+				jz		BOOKEND
+
 				mov		eax, TESRenderWindow::UndoBuffer
 				mov		eax, [eax]
 				cmp		[eax], esi
 				jz		BOOKEND
 
 				mov		eax, [esi + 0x8]
+				test	eax, eax
+				jz		BOOKEND
 				cmp		byte ptr [eax + 0x4], 0x31
 				jmp		_hhGetVar(Retn)
 			BOOKEND:
@@ -1660,6 +1665,8 @@ namespace cse
 				jz		BOOKEND
 
 				mov		eax, [esi + 0x8]
+				test	eax, eax
+				jz		BOOKEND
 				cmp		byte ptr [eax + 0x4], 0x31
 				jmp		_hhGetVar(Retn)
 			BOOKEND:
