@@ -16,6 +16,7 @@
 
 #include <fstream>
 #include <iomanip>
+#include <filesystem>
 
 #include "[BGSEEBase]\ToolBox.h"
 #include "[BGSEEBase]\Script\CodaVM.h"
@@ -234,6 +235,55 @@ namespace cse
 			return Result;
 		}
 
+		static bool IsAbsolutePath(const std::string& Path)
+		{
+			if (Path.size() >= 2 && Path[1] == ':')
+				return true;
+			if (Path.size() >= 2 && Path[0] == '\\' && Path[1] == '\\')
+				return true;
+			return false;
+		}
+
+		static bool EnsureParentDirectoryExists(const std::string& Path, std::string& OutError)
+		{
+			std::error_code Error;
+			std::filesystem::path OutputPath(Path);
+			std::filesystem::path ParentPath = OutputPath.parent_path();
+			if (ParentPath.empty())
+				return true;
+
+			if (std::filesystem::exists(ParentPath, Error))
+			{
+				if (Error)
+				{
+					OutError = Error.message();
+					return false;
+				}
+
+				if (std::filesystem::is_directory(ParentPath, Error) == false || Error)
+				{
+					OutError = Error ? Error.message() : "Parent path is not a directory";
+					return false;
+				}
+
+				return true;
+			}
+
+			if (Error)
+			{
+				OutError = Error.message();
+				return false;
+			}
+
+			if (std::filesystem::create_directories(ParentPath, Error) == false || Error)
+			{
+				OutError = Error ? Error.message() : "Couldn't create parent directory";
+				return false;
+			}
+
+			return true;
+		}
+
 		void ExportRevoiceCSVForActivePlugin(HWND hWnd)
 		{
 			if (_DATAHANDLER->activeFile == nullptr)
@@ -260,17 +310,49 @@ namespace cse
 			std::string FilePath(SelectPath);
 			if (FilePath.empty())
 				return;
+
+			for (auto& Ch : FilePath)
+			{
+				if (Ch == '/')
+					Ch = '\\';
+			}
+
+			while (FilePath.empty() == false && (FilePath[0] == '\\' || FilePath[0] == '/'))
+				FilePath.erase(0, 1);
+
+			if (IsAbsolutePath(FilePath) == false && _strnicmp(FilePath.c_str(), "Data\\", 5) != 0)
+				FilePath = std::string("Data\\") + FilePath;
+
 			if (FilePath.size() < 4 || _stricmp(FilePath.c_str() + FilePath.size() - 4, ".csv"))
 				FilePath += ".csv";
 
-			std::ofstream Output(FilePath, std::ios::trunc);
-			if (Output.good() == false)
+			std::filesystem::path OutputPath(FilePath);
+			std::error_code PathError;
+			std::filesystem::path AbsoluteOutputPath = std::filesystem::absolute(OutputPath, PathError);
+			if (PathError)
+				AbsoluteOutputPath = OutputPath;
+
+			const std::string OutputPathForIO = AbsoluteOutputPath.string();
+
+			std::string DirectoryError;
+			if (EnsureParentDirectoryExists(OutputPathForIO, DirectoryError) == false)
 			{
-				BGSEEUI->MsgBoxE("Couldn't open output file for writing:\n%s", FilePath.c_str());
+				BGSEEUI->MsgBoxE("Couldn't prepare output folder for reVoice CSV export:\n%s\n\nReason: %s", OutputPathForIO.c_str(), DirectoryError.c_str());
 				return;
 			}
 
-			Output << "FormID\tVoiceID\tSpeakerInfo\tOutputPath\tDialogue\n";
+			std::ofstream Output(OutputPathForIO, std::ios::trunc);
+			if (Output.good() == false)
+			{
+				BGSEEUI->MsgBoxE("Couldn't open output file for writing:\n%s", OutputPathForIO.c_str());
+				return;
+			}
+
+			if (!(Output << "FormID\tVoiceID\tSpeakerInfo\tOutputPath\tDialogue\n"))
+			{
+				BGSEEUI->MsgBoxE("Couldn't write CSV header to output file:\n%s", OutputPathForIO.c_str());
+				return;
+			}
 
 			UInt32 Rows = 0;
 			for (tList<TESTopic>::Iterator ItrTopic = _DATAHANDLER->topics.Begin(); ItrTopic.End() == false && ItrTopic.Get(); ++ItrTopic)
@@ -296,12 +378,12 @@ namespace cse
 							continue;
 
 						TESNPC* Speaker = GetSpeakerFromTopicInfo(Info);
-						if (Speaker == nullptr || Speaker->race.race == nullptr)
+						if (Speaker == nullptr || Speaker->race == nullptr)
 							continue;
 
 						const bool IsFemale = (Speaker->actorFlags & TESActorBaseData::kNPCFlag_Female) != 0;
 						const char* SexToken = IsFemale ? "F" : "M";
-						TESRace* SpeakerRace = Speaker->race.race;
+						TESRace* SpeakerRace = Speaker->race;
 						TESRace* VoiceRace = IsFemale ? SpeakerRace->femaleVoiceRace : SpeakerRace->maleVoiceRace;
 						if (VoiceRace == nullptr)
 							VoiceRace = SpeakerRace;
@@ -335,13 +417,17 @@ namespace cse
 								Info->formID,
 								Response->responseNumber);
 
-							Output
+							if (!(Output
 								<< std::uppercase << std::hex << std::setfill('0') << std::setw(8) << Info->formID << std::dec
 								<< "\t" << SanitizeTabDelimitedField(VoiceID)
 								<< "\t" << SanitizeTabDelimitedField(SpeakerInfo.c_str())
 								<< "\t" << SanitizeTabDelimitedField(OutPath)
 								<< "\t" << SanitizeTabDelimitedField(ResponseText)
-								<< "\n";
+								<< "\n"))
+							{
+								BGSEEUI->MsgBoxE("reVoice CSV export failed while writing output file:\n%s", OutputPathForIO.c_str());
+								return;
+							}
 							Rows++;
 						}
 					}
@@ -349,7 +435,20 @@ namespace cse
 			}
 
 			Output.flush();
-			BGSEEUI->MsgBoxI("reVoice CSV export complete. Wrote %u dialogue rows to:\n%s", Rows, FilePath.c_str());
+			if (Output.fail())
+			{
+				BGSEEUI->MsgBoxE("reVoice CSV export failed while finalizing output file:\n%s", OutputPathForIO.c_str());
+				return;
+			}
+
+			Output.close();
+			if (Output.fail())
+			{
+				BGSEEUI->MsgBoxE("reVoice CSV export failed while closing output file:\n%s", OutputPathForIO.c_str());
+				return;
+			}
+
+			BGSEEUI->MsgBoxI("reVoice CSV export complete. Wrote %u dialogue rows to:\n%s", Rows, OutputPathForIO.c_str());
 		}
 
 
