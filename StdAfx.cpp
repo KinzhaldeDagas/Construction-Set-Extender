@@ -12,7 +12,9 @@
 #pragma comment(lib, "UxTheme.lib")
 #pragma comment(lib, "mscoree.lib")
 #pragma comment(lib, "Psapi.lib")
+#if defined(NDEBUG) && !defined(WAIT_FOR_DEBUGGER)
 #pragma comment(lib, "CrashRpt1403.lib")
+#endif
 
 #pragma comment(linker, "\"/manifestdependency:type='win32' \
 name='Microsoft.Windows.Common-Controls' version='6.0.0.0' \
