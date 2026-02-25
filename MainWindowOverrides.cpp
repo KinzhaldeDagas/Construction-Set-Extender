@@ -23,6 +23,10 @@
 #include "[BGSEEBase]\ToolBox.h"
 #include "[BGSEEBase]\Script\CodaVM.h"
 
+#ifndef WM_DPICHANGED
+#define WM_DPICHANGED 0x02E0
+#endif
+
 namespace cse
 {
 	namespace uiManager
@@ -65,19 +69,46 @@ namespace cse
 			return 96;
 		}
 
-		static void UpdateToolbarVisualsForDPIAndTheme(HWND ToolbarWindow)
+		static void UpdateToolbarVisualsForDPIAndTheme(HWND ToolbarWindow, bool ForceRefresh = false)
 		{
 			if (ToolbarWindow == nullptr)
 				return;
 
 			const UINT Dpi = GetWindowDPI(ToolbarWindow);
-			const int GlyphSize = std::max(16, MulDiv(16, Dpi, 96));
-			const int ButtonWidth = std::max(24, GlyphSize + 8);
-			const int ButtonHeight = std::max(24, GlyphSize + 8);
 
-			// Keep toolbar glyph metrics DPI-aware and opt into modern Explorer theming for better dark-mode integration.
-			SendMessage(ToolbarWindow, TB_SETBITMAPSIZE, 0, MAKELPARAM(GlyphSize, GlyphSize));
+			int ImageWidth = 16, ImageHeight = 16;
+			HIMAGELIST ImageList = reinterpret_cast<HIMAGELIST>(SendMessage(ToolbarWindow, TB_GETIMAGELIST, 0, 0));
+			if (ImageList)
+				ImageList_GetIconSize(ImageList, &ImageWidth, &ImageHeight);
+
+			const int ScaledImageWidth = std::max(ImageWidth, MulDiv(ImageWidth, Dpi, 96));
+			const int ScaledImageHeight = std::max(ImageHeight, MulDiv(ImageHeight, Dpi, 96));
+			const int HorizontalPadding = std::max(4, MulDiv(4, Dpi, 96));
+			const int VerticalPadding = std::max(3, MulDiv(3, Dpi, 96));
+			const int ButtonWidth = std::max(ScaledImageWidth + (HorizontalPadding * 2), MulDiv(24, Dpi, 96));
+			const int ButtonHeight = std::max(ScaledImageHeight + (VerticalPadding * 2), MulDiv(24, Dpi, 96));
+
+			const char* kToolbarVisualCacheProp = "CSE_MainToolbarVisualCache";
+			const UINT PackedMetrics = (ScaledImageWidth & 0x3FF) |
+				((ScaledImageHeight & 0x3FF) << 10) |
+				((ButtonWidth & 0x3FF) << 20);
+			const UINT PackedMetricsEx = (ButtonHeight & 0x3FF) | ((Dpi & 0x3FF) << 10);
+
+			UINT PreviousMetrics = static_cast<UINT>(reinterpret_cast<UINT_PTR>(GetPropA(ToolbarWindow, kToolbarVisualCacheProp)));
+			UINT PreviousMetricsEx = static_cast<UINT>(reinterpret_cast<UINT_PTR>(GetPropA(ToolbarWindow, "CSE_MainToolbarVisualCacheEx")));
+			const bool MetricsChanged = (PreviousMetrics != PackedMetrics) || (PreviousMetricsEx != PackedMetricsEx);
+			const bool RequiresRefresh = ForceRefresh || MetricsChanged;
+			if (RequiresRefresh == false)
+				return;
+
+			SetPropA(ToolbarWindow, kToolbarVisualCacheProp, reinterpret_cast<HANDLE>(static_cast<UINT_PTR>(PackedMetrics)));
+			SetPropA(ToolbarWindow, "CSE_MainToolbarVisualCacheEx", reinterpret_cast<HANDLE>(static_cast<UINT_PTR>(PackedMetricsEx)));
+
+			SendMessage(ToolbarWindow, TB_SETEXTENDEDSTYLE, 0, TBSTYLE_EX_DOUBLEBUFFER);
+			SendMessage(ToolbarWindow, TB_SETBITMAPSIZE, 0, MAKELPARAM(ScaledImageWidth, ScaledImageHeight));
+			SendMessage(ToolbarWindow, TB_SETPADDING, 0, MAKELPARAM(HorizontalPadding, VerticalPadding));
 			SendMessage(ToolbarWindow, TB_SETBUTTONSIZE, 0, MAKELPARAM(ButtonWidth, ButtonHeight));
+
 			typedef HRESULT(WINAPI* SetWindowThemeProcT)(HWND, LPCWSTR, LPCWSTR);
 			static SetWindowThemeProcT SetWindowThemeProc = []() -> SetWindowThemeProcT
 			{
@@ -90,7 +121,8 @@ namespace cse
 
 			if (SetWindowThemeProc)
 				SetWindowThemeProc(ToolbarWindow, L"Explorer", nullptr);
-			InvalidateRect(ToolbarWindow, nullptr, TRUE);
+
+			RedrawWindow(ToolbarWindow, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_NOERASE);
 		}
 
 		static bool SnapPrimaryWindowsIntoMainFrame(HWND MainWindow)
@@ -1247,7 +1279,7 @@ namespace cse
 						{
 							SubclassParams->In.Subclasser->RegisterSubclassForWindow(*TESCSMain::MainToolbarHandle, MainWindowToolbarSubClassProc);
 							SendMessage(*TESCSMain::MainToolbarHandle, WM_MAINTOOLBAR_INIT, NULL, NULL);
-							UpdateToolbarVisualsForDPIAndTheme(*TESCSMain::MainToolbarHandle);
+							UpdateToolbarVisualsForDPIAndTheme(*TESCSMain::MainToolbarHandle, true);
 
 							HWND TODSlider = GetDlgItem(hWnd, IDC_TOOLBAR_TODSLIDER);
 							HWND TODEdit = GetDlgItem(hWnd, IDC_TOOLBAR_TODCURRENT);
@@ -1329,6 +1361,9 @@ namespace cse
 				break;
 			case WM_DESTROY:
 				{
+					RemovePropA(hWnd, "CSE_MainToolbarVisualCache");
+					RemovePropA(hWnd, "CSE_MainToolbarVisualCacheEx");
+
 					MainWindowToolbarData* xData = BGSEE_GETWINDOWXDATA(MainWindowToolbarData, SubclassParams->In.ExtraData);
 					if (xData)
 					{
@@ -1337,6 +1372,11 @@ namespace cse
 					}
 				}
 
+				break;
+			case WM_DPICHANGED:
+			case WM_THEMECHANGED:
+			case WM_SETTINGCHANGE:
+				UpdateToolbarVisualsForDPIAndTheme(hWnd, true);
 				break;
 			case WM_COMMAND:
 				{
