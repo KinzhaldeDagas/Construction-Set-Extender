@@ -215,6 +215,7 @@ namespace bgsee
 		}
 
 
+	#if defined(CSE_ENABLE_CRASHRPT)
 		CR_EXCEPTION_INFO ExceptionInfo;
 		memset(&ExceptionInfo, 0, sizeof(CR_EXCEPTION_INFO));
 		ExceptionInfo.cb = sizeof(CR_EXCEPTION_INFO);
@@ -237,6 +238,9 @@ namespace bgsee
 		}
 
 		BGSEECONSOLE_MESSAGE("Generated crash report for external crash and terminated process for crash type %d", Type);
+	#else
+		BGSEECONSOLE_MESSAGE("CrashRpt disabled; terminating process for crash type %d", Type);
+	#endif
 
 		// Manually terminate program
 		ExitProcess(0);
@@ -687,8 +691,10 @@ namespace bgsee
 
 		Singleton = nullptr;
 
+	#if defined(CSE_ENABLE_CRASHRPT)
 		if (CrashRptSupport)
 			crUninstall();
+	#endif
 
 		ExitProcess(0);
 	}
@@ -758,8 +764,12 @@ namespace bgsee
 		BGSEEDAEMON->RegisterInitCallback(Daemon::kInitCallback_Query, InitCallback);
 
 		CrashRptSupport = Params.CrashRptSupport;
+	#if !defined(CSE_ENABLE_CRASHRPT)
+		CrashRptSupport = false;
+	#endif
 		Initialized = true;
 
+	#if defined(CSE_ENABLE_CRASHRPT)
 		if (CrashRptSupport)
 		{
 			CR_INSTALL_INFO CrashRptData = { 0 };
@@ -817,6 +827,7 @@ namespace bgsee
 				crAddScreenshot2(CR_AS_PROCESS_WINDOWS, 0);
 			}
 		}
+	#endif
 	}
 
 
@@ -927,6 +938,7 @@ namespace bgsee
 		return ParentEditorSupportedVersion;
 	}
 
+#if defined(CSE_ENABLE_CRASHRPT)
 	int CALLBACK Main::CrashRptCrashCallback(CR_CRASH_CALLBACK_INFO* pInfo)
 	{
 		// panic and toss grenades around
@@ -944,6 +956,7 @@ namespace bgsee
 
 		return CR_CB_DODEFAULT;
 	}
+#endif
 
 	void Main::ShowPreferencesGUI( void )
 	{
