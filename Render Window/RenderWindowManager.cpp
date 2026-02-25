@@ -171,7 +171,7 @@ namespace cse
 							ExtraEnableStateParent* xParent = (ExtraEnableStateParent*)Itr->extraData.GetExtraDataByType(BSExtraData::kExtra_EnableStateParent);
 							SME_ASSERT(xParent && xParent->parent);
 
-							if (TESRenderWindow::GetCellInActiveGrid(xParent->parent->parentCell))
+							if (xParent->parent->parentCell && TESRenderWindow::GetCellInActiveGrid(xParent->parent->parentCell))
 							{
 								bool NewParentNode = false;
 								if (std::find(EnumeratedParents.begin(), EnumeratedParents.end(), xParent->parent) == EnumeratedParents.end())
@@ -253,6 +253,9 @@ namespace cse
 					if (ReferenceVisibilityManager::IsCulled(Itr) == false)
 					{
 						NiNode* Node = Itr->GetNiNode();
+						if (Node == nullptr)
+							continue;
+
 						Node->m_flags |= NiAVObject::kFlag_AppCulled;
 						CulledRefBuffer.push_back(Node);
 					}
@@ -619,17 +622,69 @@ namespace cse
 
 			Executing = true;
 
-			for (auto& Itr : Handlers)
-				Itr();
+			DelegateArrayT Pending;
+			Pending.swap(Handlers);
 
-			Handlers.clear();
+			auto LogRenderWindowContext = []() {
+				TESObjectCELL* ActiveCell = *TESRenderWindow::ActiveCell;
+				if (ActiveCell == nullptr)
+				{
+					BGSEECONSOLE_MESSAGE("Deferred task context: ActiveCell=<null>");
+					return;
+				}
+
+				if (ActiveCell->IsInterior())
+				{
+					const char* EditorID = ActiveCell->GetEditorID();
+					if (EditorID == nullptr)
+						EditorID = "";
+
+					BGSEECONSOLE_MESSAGE("Deferred task context: ActiveCell=Interior [%08X] '%s'", ActiveCell->formID, EditorID);
+				}
+				else
+				{
+					BGSEECONSOLE_MESSAGE("Deferred task context: ActiveCell=Exterior [%08X] (%d,%d)",
+						ActiveCell->formID,
+						ActiveCell->cellData.coords->x,
+						ActiveCell->cellData.coords->y);
+				}
+			};
+
+			for (size_t i = 0; i < Pending.size(); ++i)
+			{
+				auto& Task = Pending[i];
+				if (!Task)
+				{
+					BGSEECONSOLE_MESSAGE("Skipped null deferred render-window task at index %d", static_cast<int>(i));
+					continue;
+				}
+
+				try
+				{
+					Task();
+				}
+				catch (const std::exception& E)
+				{
+					BGSEECONSOLE_MESSAGE("Deferred render-window task threw std::exception at index %d: %s", static_cast<int>(i), E.what());
+					LogRenderWindowContext();
+				}
+				catch (...)
+				{
+					BGSEECONSOLE_MESSAGE("Deferred render-window task threw unknown exception at index %d", static_cast<int>(i));
+					LogRenderWindowContext();
+				}
+			}
 
 			Executing = false;
 		}
 
 		void RenderWindowDeferredExecutor::QueueTask(DelegateT Delegate)
 		{
-			SME_ASSERT(Executing == false);
+			if (!Delegate)
+			{
+				BGSEECONSOLE_MESSAGE("Attempting to queue a null deferred render-window task");
+				return;
+			}
 
 			Handlers.push_back(Delegate);
 		}

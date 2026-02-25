@@ -1295,6 +1295,9 @@ namespace cse
 
 		void __stdcall DoBSFadeNodeDrawTransparencyHook(BSFadeNode* FadeNode, float* OutAlpha)
 		{
+			if (FadeNode == nullptr || OutAlpha == nullptr)
+				return;
+
 			if ((FadeNode->m_flags & TESObjectREFR::kNiNodeSpecialFlags_SpecialFade))
 				*OutAlpha = FadeNode->fCurrentAlpha;
 		}
@@ -1323,6 +1326,9 @@ namespace cse
 
 		void __stdcall DoTESPathGridPointGenerateNiNodeA(NiLines* Connector)
 		{
+			if (Connector == nullptr)
+				return;
+
 			if (settings::renderer::kPathGridLinkedRefIndicator().i == 0)
 			{
 				if ((settings::renderer::kPathGridLinkedRefIndicatorFlags().u & settings::renderer::kPathGridLinkedRefIndicatorFlag_HideLineConnector))
@@ -1350,6 +1356,9 @@ namespace cse
 
 		void __stdcall DoTESPathGridPointGenerateNiNodeB(NiTriShape* BoundingBox)
 		{
+			if (BoundingBox == nullptr)
+				return;
+
 			if (settings::renderer::kPathGridLinkedRefIndicator().i == 0)
 			{
 				if ((settings::renderer::kPathGridLinkedRefIndicatorFlags().u & settings::renderer::kPathGridLinkedRefIndicatorFlag_HidePointBoundingBox))
@@ -1377,6 +1386,9 @@ namespace cse
 
 		void __stdcall DoTESPathGridGenerateNiNode(NiTriShape* RefNode)
 		{
+			if (RefNode == nullptr)
+				return;
+
 			if (settings::renderer::kPathGridLinkedRefIndicator().i == 0)
 			{
 				if ((settings::renderer::kPathGridLinkedRefIndicatorFlags().u & settings::renderer::kPathGridLinkedRefIndicatorFlag_HideLinkedRefNode))
@@ -1547,6 +1559,9 @@ namespace cse
 
 		NiSourceTexture* __stdcall DoLandscapeTextureLoad(TESLandTexture* Texture)
 		{
+			if (Texture == nullptr)
+				return nullptr;
+
 			if (_RENDERWIN_XSTATE.UseGrassTextureOverlay && Texture->potentialGrassList.Count())
 			{
 				if (_RENDERWIN_XSTATE.GrassOverlayTexture)
@@ -1631,12 +1646,17 @@ namespace cse
 			_hhSetVar(Jump, 0x004320DD);
 			__asm
 			{
+				test	esi, esi
+				jz		BOOKEND
+
 				mov		eax, TESRenderWindow::UndoBuffer
 				mov		eax, [eax]
 				cmp		[eax], esi
 				jz		BOOKEND
 
 				mov		eax, [esi + 0x8]
+				test	eax, eax
+				jz		BOOKEND
 				cmp		byte ptr [eax + 0x4], 0x31
 				jmp		_hhGetVar(Retn)
 			BOOKEND:
@@ -1660,6 +1680,8 @@ namespace cse
 				jz		BOOKEND
 
 				mov		eax, [esi + 0x8]
+				test	eax, eax
+				jz		BOOKEND
 				cmp		byte ptr [eax + 0x4], 0x31
 				jmp		_hhGetVar(Retn)
 			BOOKEND:
