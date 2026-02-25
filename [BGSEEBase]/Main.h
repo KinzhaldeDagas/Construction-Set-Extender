@@ -202,7 +202,9 @@ namespace bgsee
 			virtual bool			Handle(void* Parameter = nullptr);
 		};
 
+#if defined(CSE_ENABLE_CRASHRPT)
 		static int CALLBACK			CrashRptCrashCallback(CR_CRASH_CALLBACK_INFO* pInfo);
+#endif
 
 		class DefaultDeinitCallback : public DaemonCallback
 		{
