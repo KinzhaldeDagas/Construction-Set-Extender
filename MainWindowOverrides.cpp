@@ -117,7 +117,7 @@ namespace cse
 
 			SetWindowTheme(Window, L"Explorer", nullptr);
 			EnumChildWindows(Window, ApplyExplorerThemeToChildProc, 0);
-			RedrawWindow(Window, nullptr, nullptr, RDW_INVALIDATE | RDW_FRAME | RDW_ALLCHILDREN | RDW_UPDATENOW | RDW_NOERASE);
+			RedrawWindow(Window, nullptr, nullptr, RDW_INVALIDATE | RDW_FRAME | RDW_NOERASE);
 		}
 
 		static void ApplyModernChromeToPrimaryWindows(bool Force = false)
@@ -196,26 +196,41 @@ namespace cse
 
 			RECT ToolbarRect = { 0 };
 			GetClientRect(ToolbarWindow, &ToolbarRect);
-			RECT LaunchRect = { 0 }, LabelRect = { 0 }, SliderRect = { 0 }, EditRect = { 0 };
-			GetWindowRect(LaunchGameButton, &LaunchRect);
-			GetWindowRect(TODLabel, &LabelRect);
-			GetWindowRect(TODSlider, &SliderRect);
-			GetWindowRect(TODEdit, &EditRect);
-
-			const int LaunchW = std::max(72, static_cast<int>(LaunchRect.right - LaunchRect.left));
-			const int LaunchH = std::max(13, static_cast<int>(LaunchRect.bottom - LaunchRect.top));
-			const int LabelW = std::max(52, static_cast<int>(LabelRect.right - LabelRect.left));
-			const int LabelH = std::max(9, static_cast<int>(LabelRect.bottom - LabelRect.top));
-			const int SliderW = std::max(90, static_cast<int>(SliderRect.right - SliderRect.left));
-			const int SliderH = std::max(13, static_cast<int>(SliderRect.bottom - SliderRect.top));
-			const int EditW = std::max(30, static_cast<int>(EditRect.right - EditRect.left));
-			const int EditH = std::max(13, static_cast<int>(EditRect.bottom - EditRect.top));
+			const int ToolbarWidth = std::max(1, static_cast<int>(ToolbarRect.right - ToolbarRect.left));
+			const int ToolbarHeight = std::max(1, static_cast<int>(ToolbarRect.bottom - ToolbarRect.top));
 
 			const int GapMajor = 10;
 			const int GapMinor = 4;
-			const int ClusterWidth = LaunchW + GapMajor + LabelW + GapMinor + SliderW + GapMinor + EditW;
-			const int ClusterStartX = std::max(2, static_cast<int>(((ToolbarRect.right - ToolbarRect.left) - ClusterWidth) / 2));
-			const int CenterY = (ToolbarRect.bottom - ToolbarRect.top) / 2;
+			const int LaunchH = 13;
+			const int LabelH = 9;
+			const int SliderH = 13;
+			const int EditH = 13;
+
+			int LaunchW = 72;
+			int LabelW = 52;
+			int SliderW = 90;
+			int EditW = 30;
+
+			const int MinSliderW = 56;
+			const int MinLaunchW = 56;
+			const int ClusterFixed = GapMajor + (GapMinor * 2);
+			int Needed = LaunchW + LabelW + SliderW + EditW + ClusterFixed;
+			if (Needed > ToolbarWidth - 4)
+			{
+				int Delta = Needed - (ToolbarWidth - 4);
+				int ReduceSlider = std::min(Delta, SliderW - MinSliderW);
+				SliderW -= ReduceSlider;
+				Delta -= ReduceSlider;
+				int ReduceLaunch = std::min(Delta, LaunchW - MinLaunchW);
+				LaunchW -= ReduceLaunch;
+				Delta -= ReduceLaunch;
+				if (Delta > 0)
+					LabelW = std::max(36, LabelW - Delta);
+			}
+
+			const int ClusterWidth = LaunchW + LabelW + SliderW + EditW + ClusterFixed;
+			const int ClusterStartX = std::max(2, (ToolbarWidth - ClusterWidth) / 2);
+			const int CenterY = ToolbarHeight / 2;
 
 			int X = ClusterStartX;
 			MoveWindow(LaunchGameButton, X, std::max(0, CenterY - (LaunchH / 2)), LaunchW, LaunchH, TRUE);
@@ -1656,12 +1671,6 @@ namespace cse
 			case WM_SETTINGCHANGE:
 				ApplyModernChromeToPrimaryWindows(true);
 				break;
-			case WM_SIZE:
-			case WM_WINDOWPOSCHANGED:
-				ApplyModernWindowChrome(hWnd);
-				if (TESCSMain::MainToolbarHandle && *TESCSMain::MainToolbarHandle)
-					LayoutToolbarExtras(*TESCSMain::MainToolbarHandle);
-				break;
 			case WM_TIMER:
 				DlgProcResult = TRUE;
 				SubclassParams->Out.MarkMessageAsHandled = true;
@@ -1676,6 +1685,9 @@ namespace cse
 					break;
 				case ID_PATHGRIDTOOLBARBUTTION_TIMERID:
 					{
+						if (TESCSMain::MainToolbarHandle && *TESCSMain::MainToolbarHandle)
+							LayoutToolbarExtras(*TESCSMain::MainToolbarHandle);
+
 						TBBUTTONINFO PathGridData = { 0 };
 						PathGridData.cbSize = sizeof(TBBUTTONINFO);
 						PathGridData.dwMask = TBIF_STATE;
