@@ -67,27 +67,31 @@ namespace cse
 
 		static BOOL CALLBACK ApplyExplorerThemeToChildProc(HWND Child, LPARAM)
 		{
-			if (Child == nullptr || IsWindow(Child) == FALSE)
+				if (Child == nullptr || IsWindow(Child) == FALSE)
+					return TRUE;
+
+				char ClassName[64] = { 0 };
+				GetClassNameA(Child, ClassName, sizeof(ClassName));
+				const bool DarkModeEnabled = BGSEEUI->GetColorThemer() && BGSEEUI->GetColorThemer()->IsEnabled();
+
+				if (_stricmp(ClassName, "ToolbarWindow32") == 0 ||
+					_stricmp(ClassName, "ReBarWindow32") == 0 ||
+					_stricmp(ClassName, "msctls_statusbar32") == 0 ||
+					_stricmp(ClassName, "SysTabControl32") == 0 ||
+					_stricmp(ClassName, "SysListView32") == 0 ||
+					_stricmp(ClassName, "SysTreeView32") == 0 ||
+					_stricmp(ClassName, "Button") == 0 ||
+					_stricmp(ClassName, "Edit") == 0 ||
+					_stricmp(ClassName, "ComboBox") == 0)
+				{
+					if (_stricmp(ClassName, "ComboBox") == 0)
+						SetWindowTheme(Child, DarkModeEnabled ? L"DarkMode_CFD" : L"CFD", nullptr);
+					else
+						SetWindowTheme(Child, DarkModeEnabled ? L"DarkMode_Explorer" : L"Explorer", nullptr);
+				}
+
 				return TRUE;
-
-			char ClassName[64] = { 0 };
-			GetClassNameA(Child, ClassName, sizeof(ClassName));
-
-			if (_stricmp(ClassName, "ToolbarWindow32") == 0 ||
-				_stricmp(ClassName, "ReBarWindow32") == 0 ||
-				_stricmp(ClassName, "msctls_statusbar32") == 0 ||
-				_stricmp(ClassName, "SysTabControl32") == 0 ||
-				_stricmp(ClassName, "SysListView32") == 0 ||
-				_stricmp(ClassName, "SysTreeView32") == 0 ||
-				_stricmp(ClassName, "Button") == 0 ||
-				_stricmp(ClassName, "Edit") == 0 ||
-				_stricmp(ClassName, "ComboBox") == 0)
-			{
-				SetWindowTheme(Child, L"Explorer", nullptr);
 			}
-
-			return TRUE;
-		}
 
 		static void ApplyModernWindowChrome(HWND Window, bool Force = false)
 		{
@@ -115,7 +119,7 @@ namespace cse
 			if (DwmSetWindowAttributeProc)
 				DwmSetWindowAttributeProc(Window, DWMWA_USE_IMMERSIVE_DARK_MODE, &DarkTitleBar, sizeof(DarkTitleBar));
 
-			SetWindowTheme(Window, L"Explorer", nullptr);
+			SetWindowTheme(Window, DarkTitleBar ? L"DarkMode_Explorer" : L"Explorer", nullptr);
 			EnumChildWindows(Window, ApplyExplorerThemeToChildProc, 0);
 			RedrawWindow(Window, nullptr, nullptr, RDW_INVALIDATE | RDW_FRAME | RDW_NOERASE);
 		}
@@ -422,9 +426,9 @@ namespace cse
 			}();
 
 			if (SetWindowThemeProc)
-				SetWindowThemeProc(ToolbarWindow, L"Explorer", nullptr);
+				SetWindowThemeProc(ToolbarWindow, DarkModeEnabled ? L"DarkMode_Explorer" : L"Explorer", nullptr);
 
-			RedrawWindow(ToolbarWindow, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_NOERASE);
+			RedrawWindow(ToolbarWindow, nullptr, nullptr, RDW_INVALIDATE | RDW_NOERASE);
 		}
 
 		static bool SnapPrimaryWindowsIntoMainFrame(HWND MainWindow)
@@ -1601,6 +1605,7 @@ namespace cse
 			case WM_MAINWINDOW_INIT_DIALOG:
 				{
 					SetTimer(hWnd, ID_PATHGRIDTOOLBARBUTTION_TIMERID, 500, nullptr);
+					SetPropA(hWnd, "CSE_MainWindowSnapAttempts", reinterpret_cast<HANDLE>(0));
 					SetTimer(hWnd, ID_MAINWINDOW_SNAPLAYOUT_TIMERID, 250, nullptr);
 					if (TESCSMain::MainToolbarHandle && *TESCSMain::MainToolbarHandle)
 						LayoutToolbarExtras(*TESCSMain::MainToolbarHandle);
@@ -1613,6 +1618,7 @@ namespace cse
 				{
 					KillTimer(hWnd, ID_PATHGRIDTOOLBARBUTTION_TIMERID);
 					KillTimer(hWnd, ID_MAINWINDOW_SNAPLAYOUT_TIMERID);
+					RemovePropA(hWnd, "CSE_MainWindowSnapAttempts");
 					RemovePropA(hWnd, "CSE_ModernChromeDarkModeState");
 					RemovePropA(hWnd, "CSE_ToolbarExternalIconSizeCache");
 					if (TESCSMain::MainToolbarHandle && *TESCSMain::MainToolbarHandle)
@@ -1699,6 +1705,17 @@ namespace cse
 							SendMessage(*TESCSMain::MainToolbarHandle, TB_SETBUTTONINFO, TESCSMain::kToolbar_PathGridEdit, (LPARAM)&PathGridData);
 						}
 
+					}
+
+					break;
+				case ID_MAINWINDOW_SNAPLAYOUT_TIMERID:
+					{
+						const char* kSnapAttemptProp = "CSE_MainWindowSnapAttempts";
+						INT_PTR Attempts = reinterpret_cast<INT_PTR>(GetPropA(hWnd, kSnapAttemptProp));
+						if (SnapPrimaryWindowsIntoMainFrame(hWnd) || Attempts >= 40)
+							KillTimer(hWnd, ID_MAINWINDOW_SNAPLAYOUT_TIMERID);
+						else
+							SetPropA(hWnd, kSnapAttemptProp, reinterpret_cast<HANDLE>(Attempts + 1));
 					}
 
 					break;
