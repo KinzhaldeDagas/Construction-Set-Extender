@@ -171,7 +171,7 @@ namespace cse
 							ExtraEnableStateParent* xParent = (ExtraEnableStateParent*)Itr->extraData.GetExtraDataByType(BSExtraData::kExtra_EnableStateParent);
 							SME_ASSERT(xParent && xParent->parent);
 
-							if (TESRenderWindow::GetCellInActiveGrid(xParent->parent->parentCell))
+							if (xParent->parent->parentCell && TESRenderWindow::GetCellInActiveGrid(xParent->parent->parentCell))
 							{
 								bool NewParentNode = false;
 								if (std::find(EnumeratedParents.begin(), EnumeratedParents.end(), xParent->parent) == EnumeratedParents.end())
@@ -253,6 +253,9 @@ namespace cse
 					if (ReferenceVisibilityManager::IsCulled(Itr) == false)
 					{
 						NiNode* Node = Itr->GetNiNode();
+						if (Node == nullptr)
+							continue;
+
 						Node->m_flags |= NiAVObject::kFlag_AppCulled;
 						CulledRefBuffer.push_back(Node);
 					}
