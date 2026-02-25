@@ -297,29 +297,57 @@ namespace cse
 			LRESULT DlgProcResult = FALSE;
 			SubclassParams->Out.MarkMessageAsHandled = false;
 
+			auto GetEnableDataTypeCheckBox = [hWnd]() -> HWND
+			{
+				HWND Child = nullptr;
+				char ClassName[0x40] = { 0 };
+				char ControlText[0x200] = { 0 };
+
+				while ((Child = FindWindowEx(hWnd, Child, nullptr, nullptr)) != nullptr)
+				{
+					GetClassName(Child, ClassName, sizeof(ClassName));
+					if (_stricmp(ClassName, "Button"))
+						continue;
+
+					GetWindowText(Child, ControlText, sizeof(ControlText));
+					if (!_stricmp(ControlText, "Enable this type of data"))
+						return Child;
+				}
+
+				return nullptr;
+			};
+
+			static bool PreventAutoEnableAfterTabSwitch = false;
+
 			switch (uMsg)
 			{
-			case WM_MOUSEMOVE:
+			case WM_NOTIFY:
 				{
-					HWND HoveredControl = ChildWindowFromPointEx(hWnd,
-						POINT{ GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) },
-						CWP_SKIPINVISIBLE | CWP_SKIPDISABLED);
-
-					if (HoveredControl)
+					NMHDR* NotifyData = reinterpret_cast<NMHDR*>(lParam);
+					if (NotifyData && NotifyData->code == TCN_SELCHANGING)
 					{
-						char ClassName[0x40] = { 0 };
-						char ControlText[0x200] = { 0 };
-						GetClassName(HoveredControl, ClassName, sizeof(ClassName));
-						GetWindowText(HoveredControl, ControlText, sizeof(ControlText));
-
-						if (!_stricmp(ClassName, "Button") &&
-							!_stricmp(ControlText, "Enable this type of data"))
+						HWND EnableCheckBox = GetEnableDataTypeCheckBox();
+						PreventAutoEnableAfterTabSwitch = EnableCheckBox && SendMessage(EnableCheckBox, BM_GETCHECK, 0, 0) != BST_CHECKED;
+					}
+					else if (NotifyData && NotifyData->code == TCN_SELCHANGE && PreventAutoEnableAfterTabSwitch)
+					{
+						HWND EnableCheckBox = GetEnableDataTypeCheckBox();
+						if (EnableCheckBox && SendMessage(EnableCheckBox, BM_GETCHECK, 0, 0) == BST_CHECKED)
 						{
-							EnableWindow(HoveredControl, FALSE);
+							SendMessage(EnableCheckBox, BM_SETCHECK, BST_UNCHECKED, 0);
+							PostMessage(hWnd,
+								WM_COMMAND,
+								MAKEWPARAM(GetDlgCtrlID(EnableCheckBox), BN_CLICKED),
+								reinterpret_cast<LPARAM>(EnableCheckBox));
 						}
+
+						PreventAutoEnableAfterTabSwitch = false;
 					}
 				}
 
+				break;
+			case WM_DESTROY:
+				PreventAutoEnableAfterTabSwitch = false;
 				break;
 			}
 
