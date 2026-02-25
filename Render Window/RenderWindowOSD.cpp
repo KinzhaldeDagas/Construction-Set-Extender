@@ -1747,12 +1747,12 @@ namespace cse
 				SME_ASSERT(ID != kInvalidID);
 				SME_ASSERT(GUI && ParentWindow);
 
-				PopupData* PopupData = FindPopupData(ID);
-				SME_ASSERT(PopupData);
-				if (PopupData == nullptr)
+				PopupData* CurrentPopup = FindPopupData(ID);
+				SME_ASSERT(CurrentPopup);
+				if (CurrentPopup == nullptr)
 					return;
 
-				PopupData& CurrentPopupData = *PopupData;
+				PopupData& CurrentPopupData = *CurrentPopup;
 				bool Hovering = false, BeginHover = false, EndHover = false;
 				const char* PopupStrID = CurrentPopupData.PopupName.c_str();
 
