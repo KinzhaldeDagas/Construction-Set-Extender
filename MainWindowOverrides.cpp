@@ -235,13 +235,11 @@ namespace cse
 			return Result;
 		}
 
-		static bool IsAbsoluteOrRootedPath(const std::string& Path)
+		static bool IsAbsolutePath(const std::string& Path)
 		{
 			if (Path.size() >= 2 && Path[1] == ':')
 				return true;
 			if (Path.size() >= 2 && Path[0] == '\\' && Path[1] == '\\')
-				return true;
-			if (Path.empty() == false && (Path[0] == '\\' || Path[0] == '/'))
 				return true;
 			return false;
 		}
@@ -313,29 +311,46 @@ namespace cse
 			if (FilePath.empty())
 				return;
 
-			if (IsAbsoluteOrRootedPath(FilePath) == false && _strnicmp(FilePath.c_str(), "Data\\", 5) != 0)
+			for (auto& Ch : FilePath)
+			{
+				if (Ch == '/')
+					Ch = '\\';
+			}
+
+			while (FilePath.empty() == false && (FilePath[0] == '\\' || FilePath[0] == '/'))
+				FilePath.erase(0, 1);
+
+			if (IsAbsolutePath(FilePath) == false && _strnicmp(FilePath.c_str(), "Data\\", 5) != 0)
 				FilePath = std::string("Data\\") + FilePath;
 
 			if (FilePath.size() < 4 || _stricmp(FilePath.c_str() + FilePath.size() - 4, ".csv"))
 				FilePath += ".csv";
 
+			std::filesystem::path OutputPath(FilePath);
+			std::error_code PathError;
+			std::filesystem::path AbsoluteOutputPath = std::filesystem::absolute(OutputPath, PathError);
+			if (PathError)
+				AbsoluteOutputPath = OutputPath;
+
+			const std::string OutputPathForIO = AbsoluteOutputPath.string();
+
 			std::string DirectoryError;
-			if (EnsureParentDirectoryExists(FilePath, DirectoryError) == false)
+			if (EnsureParentDirectoryExists(OutputPathForIO, DirectoryError) == false)
 			{
-				BGSEEUI->MsgBoxE("Couldn't prepare output folder for reVoice CSV export:\n%s\n\nReason: %s", FilePath.c_str(), DirectoryError.c_str());
+				BGSEEUI->MsgBoxE("Couldn't prepare output folder for reVoice CSV export:\n%s\n\nReason: %s", OutputPathForIO.c_str(), DirectoryError.c_str());
 				return;
 			}
 
-			std::ofstream Output(FilePath, std::ios::trunc);
+			std::ofstream Output(OutputPathForIO, std::ios::trunc);
 			if (Output.good() == false)
 			{
-				BGSEEUI->MsgBoxE("Couldn't open output file for writing:\n%s", FilePath.c_str());
+				BGSEEUI->MsgBoxE("Couldn't open output file for writing:\n%s", OutputPathForIO.c_str());
 				return;
 			}
 
 			if (!(Output << "FormID\tVoiceID\tSpeakerInfo\tOutputPath\tDialogue\n"))
 			{
-				BGSEEUI->MsgBoxE("Couldn't write CSV header to output file:\n%s", FilePath.c_str());
+				BGSEEUI->MsgBoxE("Couldn't write CSV header to output file:\n%s", OutputPathForIO.c_str());
 				return;
 			}
 
@@ -410,7 +425,7 @@ namespace cse
 								<< "\t" << SanitizeTabDelimitedField(ResponseText)
 								<< "\n"))
 							{
-								BGSEEUI->MsgBoxE("reVoice CSV export failed while writing output file:\n%s", FilePath.c_str());
+								BGSEEUI->MsgBoxE("reVoice CSV export failed while writing output file:\n%s", OutputPathForIO.c_str());
 								return;
 							}
 							Rows++;
@@ -422,18 +437,18 @@ namespace cse
 			Output.flush();
 			if (Output.fail())
 			{
-				BGSEEUI->MsgBoxE("reVoice CSV export failed while finalizing output file:\n%s", FilePath.c_str());
+				BGSEEUI->MsgBoxE("reVoice CSV export failed while finalizing output file:\n%s", OutputPathForIO.c_str());
 				return;
 			}
 
 			Output.close();
 			if (Output.fail())
 			{
-				BGSEEUI->MsgBoxE("reVoice CSV export failed while closing output file:\n%s", FilePath.c_str());
+				BGSEEUI->MsgBoxE("reVoice CSV export failed while closing output file:\n%s", OutputPathForIO.c_str());
 				return;
 			}
 
-			BGSEEUI->MsgBoxI("reVoice CSV export complete. Wrote %u dialogue rows to:\n%s", Rows, FilePath.c_str());
+			BGSEEUI->MsgBoxI("reVoice CSV export complete. Wrote %u dialogue rows to:\n%s", Rows, OutputPathForIO.c_str());
 		}
 
 
