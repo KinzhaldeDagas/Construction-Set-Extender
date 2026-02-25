@@ -14,13 +14,25 @@
 #include "Render Window\RenderWindowManager.h"
 #include "CustomDialogProcs.h"
 
+#include <gdiplus.h>
+#pragma comment(lib, "gdiplus.lib")
+
 #include <fstream>
+#include <algorithm>
 #include <filesystem>
 #include <vector>
 #include <unordered_set>
 
 #include "[BGSEEBase]\ToolBox.h"
 #include "[BGSEEBase]\Script\CodaVM.h"
+
+#ifndef WM_DPICHANGED
+#define WM_DPICHANGED 0x02E0
+#endif
+
+#ifndef DWMWA_USE_IMMERSIVE_DARK_MODE
+#define DWMWA_USE_IMMERSIVE_DARK_MODE 20
+#endif
 
 namespace cse
 {
@@ -51,6 +63,479 @@ namespace cse
 		MainWindowToolbarData::~MainWindowToolbarData()
 		{
 			;//
+		}
+
+		static BOOL CALLBACK ApplyExplorerThemeToChildProc(HWND Child, LPARAM)
+		{
+			if (Child == nullptr || IsWindow(Child) == FALSE)
+				return TRUE;
+
+			char ClassName[64] = { 0 };
+			GetClassNameA(Child, ClassName, sizeof(ClassName));
+
+			if (_stricmp(ClassName, "ToolbarWindow32") == 0 ||
+				_stricmp(ClassName, "ReBarWindow32") == 0 ||
+				_stricmp(ClassName, "msctls_statusbar32") == 0 ||
+				_stricmp(ClassName, "SysTabControl32") == 0 ||
+				_stricmp(ClassName, "SysListView32") == 0 ||
+				_stricmp(ClassName, "SysTreeView32") == 0 ||
+				_stricmp(ClassName, "Button") == 0 ||
+				_stricmp(ClassName, "Edit") == 0 ||
+				_stricmp(ClassName, "ComboBox") == 0)
+			{
+				SetWindowTheme(Child, L"Explorer", nullptr);
+			}
+
+			return TRUE;
+		}
+
+		static void ApplyModernWindowChrome(HWND Window, bool Force = false)
+		{
+			if (Window == nullptr || IsWindow(Window) == FALSE)
+				return;
+
+			const char* kChromeDarkModeStateProp = "CSE_ModernChromeDarkModeState";
+			const BOOL DarkTitleBar = BGSEEUI->GetColorThemer() && BGSEEUI->GetColorThemer()->IsEnabled();
+			const INT_PTR DesiredState = DarkTitleBar ? 1 : 0;
+			const INT_PTR CachedState = reinterpret_cast<INT_PTR>(GetPropA(Window, kChromeDarkModeStateProp));
+			if (Force == false && CachedState == DesiredState)
+				return;
+
+			SetPropA(Window, kChromeDarkModeStateProp, reinterpret_cast<HANDLE>(DesiredState));
+
+			typedef HRESULT(WINAPI* DwmSetWindowAttributeProcT)(HWND, DWORD, LPCVOID, DWORD);
+			static DwmSetWindowAttributeProcT DwmSetWindowAttributeProc = []() -> DwmSetWindowAttributeProcT
+			{
+				HMODULE DwmapiModule = LoadLibraryA("dwmapi.dll");
+				if (DwmapiModule == nullptr)
+					return nullptr;
+				return reinterpret_cast<DwmSetWindowAttributeProcT>(GetProcAddress(DwmapiModule, "DwmSetWindowAttribute"));
+			}();
+
+			if (DwmSetWindowAttributeProc)
+				DwmSetWindowAttributeProc(Window, DWMWA_USE_IMMERSIVE_DARK_MODE, &DarkTitleBar, sizeof(DarkTitleBar));
+
+			SetWindowTheme(Window, L"Explorer", nullptr);
+			EnumChildWindows(Window, ApplyExplorerThemeToChildProc, 0);
+			RedrawWindow(Window, nullptr, nullptr, RDW_INVALIDATE | RDW_FRAME | RDW_NOERASE);
+		}
+
+		static void ApplyModernChromeToPrimaryWindows(bool Force = false)
+		{
+			ApplyModernWindowChrome(BGSEEUI->GetMainWindow(), Force);
+			ApplyModernWindowChrome(TESRenderWindow::WindowHandle ? *TESRenderWindow::WindowHandle : nullptr, Force);
+			ApplyModernWindowChrome(TESObjectWindow::WindowHandle ? *TESObjectWindow::WindowHandle : nullptr, Force);
+			ApplyModernWindowChrome(TESCellViewWindow::WindowHandle ? *TESCellViewWindow::WindowHandle : nullptr, Force);
+		}
+
+		static ULONG_PTR GetGdiPlusToken()
+		{
+			static ULONG_PTR Token = 0;
+			static bool Initialized = false;
+
+			if (Initialized == false)
+			{
+				Gdiplus::GdiplusStartupInput StartupInput;
+				if (Gdiplus::GdiplusStartup(&Token, &StartupInput, nullptr) != Gdiplus::Ok)
+					Token = 0;
+				Initialized = true;
+			}
+
+			return Token;
+		}
+
+		static std::wstring Utf8ToWide(const char* Input)
+		{
+			if (Input == nullptr || Input[0] == 0)
+				return std::wstring();
+
+			int CharCount = MultiByteToWideChar(CP_ACP, 0, Input, -1, nullptr, 0);
+			if (CharCount <= 1)
+				return std::wstring();
+
+			std::wstring Result(CharCount - 1, L'\0');
+			MultiByteToWideChar(CP_ACP, 0, Input, -1, &Result[0], CharCount);
+			return Result;
+		}
+
+		static bool FileExists(const char* Path)
+		{
+			DWORD Attr = GetFileAttributesA(Path);
+			return Attr != INVALID_FILE_ATTRIBUTES && ((Attr & FILE_ATTRIBUTE_DIRECTORY) == 0);
+		}
+
+		static void LayoutToolbarExtras(HWND ToolbarWindow)
+		{
+			if (ToolbarWindow == nullptr || IsWindow(ToolbarWindow) == FALSE)
+				return;
+
+			HWND LaunchGameButton = GetDlgItem(ToolbarWindow, IDC_MAINMENU_LAUNCHGAME);
+			HWND TODSlider = GetDlgItem(ToolbarWindow, IDC_TOOLBAR_TODSLIDER);
+			HWND TODEdit = GetDlgItem(ToolbarWindow, IDC_TOOLBAR_TODCURRENT);
+			if (LaunchGameButton == nullptr || TODSlider == nullptr || TODEdit == nullptr)
+				return;
+
+			HWND TODLabel = nullptr;
+			HWND Child = nullptr;
+			char ClassName[32] = { 0 };
+			char Text[64] = { 0 };
+			while ((Child = FindWindowEx(ToolbarWindow, Child, nullptr, nullptr)) != nullptr)
+			{
+				GetClassNameA(Child, ClassName, sizeof(ClassName));
+				if (_stricmp(ClassName, "Static") != 0)
+					continue;
+				GetWindowTextA(Child, Text, sizeof(Text));
+				if (_stricmp(Text, "Time of Day") == 0)
+				{
+					TODLabel = Child;
+					break;
+				}
+			}
+			if (TODLabel == nullptr)
+				return;
+
+			RECT ToolbarRect = { 0 };
+			GetClientRect(ToolbarWindow, &ToolbarRect);
+			const int ToolbarWidth = std::max(1, static_cast<int>(ToolbarRect.right - ToolbarRect.left));
+			const int ToolbarHeight = std::max(1, static_cast<int>(ToolbarRect.bottom - ToolbarRect.top));
+
+			const int GapMajor = 10;
+			const int GapMinor = 4;
+			const int LaunchH = 13;
+			const int LabelH = 9;
+			const int SliderH = 13;
+			const int EditH = 13;
+
+			int LaunchW = 72;
+			int LabelW = 52;
+			int SliderW = 90;
+			int EditW = 30;
+
+			const int MinSliderW = 56;
+			const int MinLaunchW = 56;
+			const int ClusterFixed = GapMajor + (GapMinor * 2);
+			int Needed = LaunchW + LabelW + SliderW + EditW + ClusterFixed;
+			if (Needed > ToolbarWidth - 4)
+			{
+				int Delta = Needed - (ToolbarWidth - 4);
+				int ReduceSlider = std::min(Delta, SliderW - MinSliderW);
+				SliderW -= ReduceSlider;
+				Delta -= ReduceSlider;
+				int ReduceLaunch = std::min(Delta, LaunchW - MinLaunchW);
+				LaunchW -= ReduceLaunch;
+				Delta -= ReduceLaunch;
+				if (Delta > 0)
+					LabelW = std::max(36, LabelW - Delta);
+			}
+
+			const int ClusterWidth = LaunchW + LabelW + SliderW + EditW + ClusterFixed;
+			const int ClusterStartX = std::max(2, (ToolbarWidth - ClusterWidth) / 2);
+			const int CenterY = ToolbarHeight / 2;
+
+			int X = ClusterStartX;
+			MoveWindow(LaunchGameButton, X, std::max(0, CenterY - (LaunchH / 2)), LaunchW, LaunchH, TRUE);
+			X += LaunchW + GapMajor;
+			MoveWindow(TODLabel, X, std::max(0, CenterY - (LabelH / 2)), LabelW, LabelH, TRUE);
+			X += LabelW + GapMinor;
+			MoveWindow(TODSlider, X, std::max(0, CenterY - (SliderH / 2)), SliderW, SliderH, TRUE);
+			X += SliderW + GapMinor;
+			MoveWindow(TODEdit, X, std::max(0, CenterY - (EditH / 2)), EditW, EditH, TRUE);
+		}
+
+		static void ApplyExternalToolbarIcons(HWND ToolbarWindow, bool Force = false)
+		{
+			if (ToolbarWindow == nullptr || IsWindow(ToolbarWindow) == FALSE)
+				return;
+			if (GetGdiPlusToken() == 0)
+				return;
+
+			HIMAGELIST ImageList = reinterpret_cast<HIMAGELIST>(SendMessage(ToolbarWindow, TB_GETIMAGELIST, 0, 0));
+			if (ImageList == nullptr)
+				return;
+
+			int IconW = 16, IconH = 16;
+			ImageList_GetIconSize(ImageList, &IconW, &IconH);
+			UINT Packed = (static_cast<UINT>(IconW) & 0xFFFF) | (static_cast<UINT>(IconH) << 16);
+			const char* kCacheProp = "CSE_ToolbarExternalIconSizeCache";
+			UINT Cached = static_cast<UINT>(reinterpret_cast<UINT_PTR>(GetPropA(ToolbarWindow, kCacheProp)));
+			if (Force == false && Cached == Packed)
+				return;
+
+			char ModulePath[MAX_PATH] = { 0 };
+			GetModuleFileNameA(BGSEEMAIN->GetExtenderHandle(), ModulePath, sizeof(ModulePath));
+			char* LastSlash = strrchr(ModulePath, '\\');
+			if (LastSlash == nullptr)
+				return;
+			*LastSlash = 0;
+
+			int ButtonCount = static_cast<int>(SendMessage(ToolbarWindow, TB_BUTTONCOUNT, 0, 0));
+			int VisualIndex = 0;
+			for (int i = 0; i < ButtonCount; i++)
+			{
+				TBBUTTON Button = { 0 };
+				if (SendMessage(ToolbarWindow, TB_GETBUTTON, i, reinterpret_cast<LPARAM>(&Button)) == FALSE)
+					continue;
+				if (Button.fsStyle & BTNS_SEP)
+					continue;
+				VisualIndex++;
+
+				char IconPath[MAX_PATH] = { 0 };
+				FORMAT_STR(IconPath, "%s\\cse_icons\\_%d.png", ModulePath, VisualIndex);
+				if (FileExists(IconPath) == false || Button.iBitmap < 0)
+					continue;
+
+				std::wstring WidePath = Utf8ToWide(IconPath);
+				if (WidePath.empty())
+					continue;
+				Gdiplus::Bitmap Bitmap(WidePath.c_str());
+				if (Bitmap.GetLastStatus() != Gdiplus::Ok)
+					continue;
+
+				Gdiplus::Bitmap Scaled(IconW, IconH);
+				Gdiplus::Graphics Graphics(&Scaled);
+				Graphics.SetInterpolationMode(Gdiplus::InterpolationModeHighQualityBicubic);
+				Graphics.DrawImage(&Bitmap, 0, 0, IconW, IconH);
+
+				HBITMAP Hbm = nullptr;
+				if (Scaled.GetHBITMAP(Gdiplus::Color(0, 0, 0, 0), &Hbm) == Gdiplus::Ok && Hbm)
+				{
+					ImageList_Replace(ImageList, Button.iBitmap, Hbm, nullptr);
+					DeleteObject(Hbm);
+				}
+			}
+
+			SetPropA(ToolbarWindow, kCacheProp, reinterpret_cast<HANDLE>(static_cast<UINT_PTR>(Packed)));
+			InvalidateRect(ToolbarWindow, nullptr, FALSE);
+		}
+
+		static UINT GetWindowDPI(HWND hWnd)
+		{
+			typedef UINT(WINAPI* GetDpiForWindowProcT)(HWND);
+			static GetDpiForWindowProcT GetDpiForWindowProc = reinterpret_cast<GetDpiForWindowProcT>(GetProcAddress(GetModuleHandleA("user32.dll"), "GetDpiForWindow"));
+
+			if (GetDpiForWindowProc && hWnd)
+				return GetDpiForWindowProc(hWnd);
+
+			return 96;
+		}
+
+		static void UpdateToolbarVisualsForDPIAndTheme(HWND ToolbarWindow, bool ForceRefresh = false)
+		{
+			if (ToolbarWindow == nullptr)
+				return;
+
+			const UINT Dpi = GetWindowDPI(ToolbarWindow);
+
+			const char* kToolbarBaseGlyphWProp = "CSE_MainToolbarBaseGlyphW";
+			const char* kToolbarBaseGlyphHProp = "CSE_MainToolbarBaseGlyphH";
+
+			int BaseGlyphWidth = static_cast<int>(reinterpret_cast<INT_PTR>(GetPropA(ToolbarWindow, kToolbarBaseGlyphWProp)));
+			int BaseGlyphHeight = static_cast<int>(reinterpret_cast<INT_PTR>(GetPropA(ToolbarWindow, kToolbarBaseGlyphHProp)));
+
+			if (BaseGlyphWidth <= 0 || BaseGlyphHeight <= 0)
+			{
+				int ImageWidth = 16, ImageHeight = 16;
+				HIMAGELIST ImageList = reinterpret_cast<HIMAGELIST>(SendMessage(ToolbarWindow, TB_GETIMAGELIST, 0, 0));
+				if (ImageList)
+					ImageList_GetIconSize(ImageList, &ImageWidth, &ImageHeight);
+
+				// Normalize the currently reported size back to 96-DPI logical units once, then cache.
+				BaseGlyphWidth = std::max(16, MulDiv(std::max(ImageWidth, 16), 96, std::max<UINT>(Dpi, 96)));
+				BaseGlyphHeight = std::max(16, MulDiv(std::max(ImageHeight, 16), 96, std::max<UINT>(Dpi, 96)));
+
+				SetPropA(ToolbarWindow, kToolbarBaseGlyphWProp, reinterpret_cast<HANDLE>(static_cast<INT_PTR>(BaseGlyphWidth)));
+				SetPropA(ToolbarWindow, kToolbarBaseGlyphHProp, reinterpret_cast<HANDLE>(static_cast<INT_PTR>(BaseGlyphHeight)));
+			}
+
+			const int ScaledImageWidth = std::max(16, MulDiv(BaseGlyphWidth, Dpi, 96));
+			const int ScaledImageHeight = std::max(16, MulDiv(BaseGlyphHeight, Dpi, 96));
+			const int HorizontalPadding = std::max(4, MulDiv(4, Dpi, 96));
+			const int VerticalPadding = std::max(3, MulDiv(3, Dpi, 96));
+			const int ButtonWidth = std::max(ScaledImageWidth + (HorizontalPadding * 2), MulDiv(24, Dpi, 96));
+			const int ButtonHeight = std::max(ScaledImageHeight + (VerticalPadding * 2), MulDiv(24, Dpi, 96));
+
+			const char* kToolbarVisualCacheProp = "CSE_MainToolbarVisualCache";
+			const UINT PackedMetrics = (ScaledImageWidth & 0x3FF) |
+				((ScaledImageHeight & 0x3FF) << 10) |
+				((ButtonWidth & 0x3FF) << 20);
+			const UINT PackedMetricsEx = (ButtonHeight & 0x3FF) | ((Dpi & 0x3FF) << 10);
+
+			UINT PreviousMetrics = static_cast<UINT>(reinterpret_cast<UINT_PTR>(GetPropA(ToolbarWindow, kToolbarVisualCacheProp)));
+			UINT PreviousMetricsEx = static_cast<UINT>(reinterpret_cast<UINT_PTR>(GetPropA(ToolbarWindow, "CSE_MainToolbarVisualCacheEx")));
+			const bool MetricsChanged = (PreviousMetrics != PackedMetrics) || (PreviousMetricsEx != PackedMetricsEx);
+			const bool RequiresRefresh = ForceRefresh || MetricsChanged;
+			if (RequiresRefresh == false)
+				return;
+
+			SetPropA(ToolbarWindow, kToolbarVisualCacheProp, reinterpret_cast<HANDLE>(static_cast<UINT_PTR>(PackedMetrics)));
+			SetPropA(ToolbarWindow, "CSE_MainToolbarVisualCacheEx", reinterpret_cast<HANDLE>(static_cast<UINT_PTR>(PackedMetricsEx)));
+
+			SendMessage(ToolbarWindow, TB_SETEXTENDEDSTYLE, 0, TBSTYLE_EX_DOUBLEBUFFER);
+			SendMessage(ToolbarWindow, TB_SETBITMAPSIZE, 0, MAKELPARAM(ScaledImageWidth, ScaledImageHeight));
+			SendMessage(ToolbarWindow, TB_SETPADDING, 0, MAKELPARAM(HorizontalPadding, VerticalPadding));
+			SendMessage(ToolbarWindow, TB_SETBUTTONSIZE, 0, MAKELPARAM(ButtonWidth, ButtonHeight));
+			LayoutToolbarExtras(ToolbarWindow);
+
+#ifdef TB_SETMETRICS
+			TBMETRICS Metrics = { 0 };
+			Metrics.cbSize = sizeof(TBMETRICS);
+			Metrics.dwMask = TBMF_PAD | TBMF_BARPAD | TBMF_BUTTONSPACING;
+			Metrics.cxPad = HorizontalPadding;
+			Metrics.cyPad = VerticalPadding;
+			Metrics.cxBarPad = 0;
+			Metrics.cyBarPad = 0;
+			Metrics.cxButtonSpacing = 0;
+			Metrics.cyButtonSpacing = 0;
+			SendMessage(ToolbarWindow, TB_SETMETRICS, 0, reinterpret_cast<LPARAM>(&Metrics));
+#endif
+
+			const bool DarkModeEnabled = BGSEEUI->GetColorThemer() && BGSEEUI->GetColorThemer()->IsEnabled();
+			const COLORREF ToolbarBackColor = DarkModeEnabled ? RGB(45, 45, 48) : CLR_DEFAULT;
+			const COLORREF ToolbarTextColor = DarkModeEnabled ? RGB(220, 220, 220) : CLR_DEFAULT;
+#ifdef TB_SETBKCOLOR
+			SendMessage(ToolbarWindow, TB_SETBKCOLOR, 0, ToolbarBackColor);
+#endif
+#ifdef TB_SETTEXTCOLOR
+			SendMessage(ToolbarWindow, TB_SETTEXTCOLOR, 0, ToolbarTextColor);
+#endif
+
+			auto ApplyImageListBkColor = [ToolbarWindow, ToolbarBackColor](UINT Message)
+			{
+				HIMAGELIST List = reinterpret_cast<HIMAGELIST>(SendMessage(ToolbarWindow, Message, 0, 0));
+				if (List)
+					ImageList_SetBkColor(List, ToolbarBackColor);
+			};
+
+			ApplyImageListBkColor(TB_GETIMAGELIST);
+			ApplyImageListBkColor(TB_GETHOTIMAGELIST);
+			ApplyImageListBkColor(TB_GETDISABLEDIMAGELIST);
+			ApplyExternalToolbarIcons(ToolbarWindow, ForceRefresh);
+
+			typedef HRESULT(WINAPI* SetWindowThemeProcT)(HWND, LPCWSTR, LPCWSTR);
+			static SetWindowThemeProcT SetWindowThemeProc = []() -> SetWindowThemeProcT
+			{
+				HMODULE UXThemeModule = LoadLibraryA("uxtheme.dll");
+				if (UXThemeModule == nullptr)
+					return nullptr;
+
+				return reinterpret_cast<SetWindowThemeProcT>(GetProcAddress(UXThemeModule, "SetWindowTheme"));
+			}();
+
+			if (SetWindowThemeProc)
+				SetWindowThemeProc(ToolbarWindow, L"Explorer", nullptr);
+
+			RedrawWindow(ToolbarWindow, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_NOERASE);
+		}
+
+		static bool SnapPrimaryWindowsIntoMainFrame(HWND MainWindow)
+		{
+			if (MainWindow == nullptr)
+				return false;
+
+			HWND RenderWindow = TESRenderWindow::WindowHandle ? *TESRenderWindow::WindowHandle : nullptr;
+			HWND ObjectWindow = TESObjectWindow::WindowHandle ? *TESObjectWindow::WindowHandle : nullptr;
+			HWND CellViewWindow = TESCellViewWindow::WindowHandle ? *TESCellViewWindow::WindowHandle : nullptr;
+
+			if (RenderWindow == nullptr || ObjectWindow == nullptr || CellViewWindow == nullptr)
+				return false;
+
+			RECT WorkRect = { 0 };
+			if (GetClientRect(MainWindow, &WorkRect) == FALSE)
+				return false;
+
+			auto ExcludeVerticalBandFromClientRect = [MainWindow, &WorkRect](HWND Child)
+			{
+				if (Child == nullptr || IsWindowVisible(Child) == FALSE)
+					return;
+
+				RECT ChildRect = { 0 };
+				if (GetWindowRect(Child, &ChildRect) == FALSE)
+					return;
+
+				POINT ChildTopLeft = { ChildRect.left, ChildRect.top };
+				POINT ChildBottomRight = { ChildRect.right, ChildRect.bottom };
+				ScreenToClient(MainWindow, &ChildTopLeft);
+				ScreenToClient(MainWindow, &ChildBottomRight);
+
+				const int ChildTop = ChildTopLeft.y;
+				const int ChildBottom = ChildBottomRight.y;
+				if (ChildBottom <= WorkRect.top || ChildTop >= WorkRect.bottom)
+					return;
+
+				if (ChildTop <= WorkRect.top + 2)
+					WorkRect.top = std::max<LONG>(WorkRect.top, static_cast<LONG>(ChildBottom + 2));
+				else if (ChildBottom >= WorkRect.bottom - 2)
+					WorkRect.bottom = std::min<LONG>(WorkRect.bottom, static_cast<LONG>(ChildTop - 2));
+			};
+
+			if (TESCSMain::MainToolbarHandle && *TESCSMain::MainToolbarHandle)
+				ExcludeVerticalBandFromClientRect(*TESCSMain::MainToolbarHandle);
+
+			HWND Child = nullptr;
+			char ClassName[64] = { 0 };
+			while ((Child = FindWindowEx(MainWindow, Child, nullptr, nullptr)) != nullptr)
+			{
+				GetClassNameA(Child, ClassName, sizeof(ClassName));
+				if (_stricmp(ClassName, "msctls_statusbar32") == 0)
+					ExcludeVerticalBandFromClientRect(Child);
+			}
+
+			POINT WorkTopLeft = { WorkRect.left, WorkRect.top };
+			ClientToScreen(MainWindow, &WorkTopLeft);
+
+			const int WorkWidth = WorkRect.right - WorkRect.left;
+			const int WorkHeight = WorkRect.bottom - WorkRect.top;
+			if (WorkWidth <= 0 || WorkHeight <= 0)
+				return false;
+
+			const int Gap = 6;
+			const int MinLeftWidth = 320;
+			const int MinRenderWidth = 420;
+			int LeftWidth = std::max(MinLeftWidth, WorkWidth / 3);
+			int RenderWidth = WorkWidth - LeftWidth - Gap;
+			if (RenderWidth < MinRenderWidth)
+			{
+				RenderWidth = MinRenderWidth;
+				LeftWidth = WorkWidth - RenderWidth - Gap;
+			}
+
+			if (LeftWidth < 220)
+			{
+				LeftWidth = std::max(120, WorkWidth / 2 - (Gap / 2));
+				RenderWidth = std::max(120, WorkWidth - LeftWidth - Gap);
+			}
+
+			const int CellHeight = std::max(220, WorkHeight / 3);
+			const int ObjectHeight = std::max(220, WorkHeight - CellHeight - Gap);
+			const int FinalCellHeight = std::max(1, WorkHeight - ObjectHeight - Gap);
+
+			SetWindowPos(ObjectWindow,
+				nullptr,
+				WorkTopLeft.x,
+				WorkTopLeft.y,
+				LeftWidth,
+				ObjectHeight,
+				SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+
+			SetWindowPos(CellViewWindow,
+				nullptr,
+				WorkTopLeft.x,
+				WorkTopLeft.y + ObjectHeight + Gap,
+				LeftWidth,
+				FinalCellHeight,
+				SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+
+			SetWindowPos(RenderWindow,
+				nullptr,
+				WorkTopLeft.x + LeftWidth + Gap,
+				WorkTopLeft.y,
+				RenderWidth,
+				WorkHeight,
+				SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+
+			ApplyModernChromeToPrimaryWindows(true);
+
+			return true;
 		}
 
 		void BatchGenerateLipSyncFiles(HWND hWnd)
@@ -1049,6 +1534,10 @@ namespace cse
 					else
 						BGSEEUI->GetColorThemer()->Enable();
 
+					if (TESCSMain::MainToolbarHandle && *TESCSMain::MainToolbarHandle)
+						UpdateToolbarVisualsForDPIAndTheme(*TESCSMain::MainToolbarHandle, true);
+					ApplyModernChromeToPrimaryWindows(true);
+
 					break;
 				case IDC_MAINMENU_ONEDITORSTARTUP_LOADSTARTUPPLUGIN:
 					settings::startup::kLoadPlugin.ToggleData();
@@ -1093,6 +1582,7 @@ namespace cse
 		}
 
 #define ID_PATHGRIDTOOLBARBUTTION_TIMERID		0x99
+#define ID_MAINWINDOW_SNAPLAYOUT_TIMERID		0x9A
 
 		LRESULT CALLBACK MainWindowMiscSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
 													bgsee::WindowSubclassProcCollection::SubclassProcExtraParams* SubclassParams)
@@ -1111,6 +1601,10 @@ namespace cse
 			case WM_MAINWINDOW_INIT_DIALOG:
 				{
 					SetTimer(hWnd, ID_PATHGRIDTOOLBARBUTTION_TIMERID, 500, nullptr);
+					SetTimer(hWnd, ID_MAINWINDOW_SNAPLAYOUT_TIMERID, 250, nullptr);
+					if (TESCSMain::MainToolbarHandle && *TESCSMain::MainToolbarHandle)
+						LayoutToolbarExtras(*TESCSMain::MainToolbarHandle);
+					ApplyModernChromeToPrimaryWindows(true);
 					SubclassParams->Out.MarkMessageAsHandled = true;
 				}
 
@@ -1118,6 +1612,11 @@ namespace cse
 			case WM_DESTROY:
 				{
 					KillTimer(hWnd, ID_PATHGRIDTOOLBARBUTTION_TIMERID);
+					KillTimer(hWnd, ID_MAINWINDOW_SNAPLAYOUT_TIMERID);
+					RemovePropA(hWnd, "CSE_ModernChromeDarkModeState");
+					RemovePropA(hWnd, "CSE_ToolbarExternalIconSizeCache");
+					if (TESCSMain::MainToolbarHandle && *TESCSMain::MainToolbarHandle)
+						RemovePropA(*TESCSMain::MainToolbarHandle, "CSE_ToolbarExternalIconSizeCache");
 
 					MainWindowMiscData* xData = BGSEE_GETWINDOWXDATA(MainWindowMiscData, SubclassParams->In.ExtraData);
 					if (xData)
@@ -1148,6 +1647,7 @@ namespace cse
 						{
 							SubclassParams->In.Subclasser->RegisterSubclassForWindow(*TESCSMain::MainToolbarHandle, MainWindowToolbarSubClassProc);
 							SendMessage(*TESCSMain::MainToolbarHandle, WM_MAINTOOLBAR_INIT, NULL, NULL);
+							UpdateToolbarVisualsForDPIAndTheme(*TESCSMain::MainToolbarHandle, true);
 
 							HWND TODSlider = GetDlgItem(hWnd, IDC_TOOLBAR_TODSLIDER);
 							HWND TODEdit = GetDlgItem(hWnd, IDC_TOOLBAR_TODCURRENT);
@@ -1159,10 +1659,17 @@ namespace cse
 							SendMessage(TODSlider, TBM_SETPAGESIZE, NULL, 4);
 
 							SendMessage(*TESCSMain::MainToolbarHandle, WM_MAINTOOLBAR_SETTOD, _TES->GetSkyTOD() * 4.0, NULL);
+							if (TESCSMain::MainToolbarHandle && *TESCSMain::MainToolbarHandle)
+								LayoutToolbarExtras(*TESCSMain::MainToolbarHandle);
+							ApplyModernChromeToPrimaryWindows(true);
 						}
 					}
 				}
 
+				break;
+			case WM_THEMECHANGED:
+			case WM_SETTINGCHANGE:
+				ApplyModernChromeToPrimaryWindows(true);
 				break;
 			case WM_TIMER:
 				DlgProcResult = TRUE;
@@ -1188,7 +1695,13 @@ namespace cse
 							PathGridData.fsState |= TBSTATE_CHECKED;
 							SendMessage(*TESCSMain::MainToolbarHandle, TB_SETBUTTONINFO, TESCSMain::kToolbar_PathGridEdit, (LPARAM)&PathGridData);
 						}
+
 					}
+
+					break;
+				case ID_MAINWINDOW_SNAPLAYOUT_TIMERID:
+					if (SnapPrimaryWindowsIntoMainFrame(hWnd))
+						KillTimer(hWnd, ID_MAINWINDOW_SNAPLAYOUT_TIMERID);
 
 					break;
 				}
@@ -1222,6 +1735,13 @@ namespace cse
 				break;
 			case WM_DESTROY:
 				{
+					RemovePropA(hWnd, "CSE_MainToolbarVisualCache");
+					RemovePropA(hWnd, "CSE_MainToolbarVisualCacheEx");
+					RemovePropA(hWnd, "CSE_MainToolbarBaseGlyphW");
+					RemovePropA(hWnd, "CSE_MainToolbarBaseGlyphH");
+					RemovePropA(hWnd, "CSE_ModernChromeDarkModeState");
+					RemovePropA(hWnd, "CSE_ToolbarExternalIconSizeCache");
+
 					MainWindowToolbarData* xData = BGSEE_GETWINDOWXDATA(MainWindowToolbarData, SubclassParams->In.ExtraData);
 					if (xData)
 					{
@@ -1230,6 +1750,17 @@ namespace cse
 					}
 				}
 
+				break;
+			case WM_DPICHANGED:
+			case WM_THEMECHANGED:
+			case WM_SETTINGCHANGE:
+				UpdateToolbarVisualsForDPIAndTheme(hWnd, true);
+				ApplyModernChromeToPrimaryWindows(true);
+				LayoutToolbarExtras(hWnd);
+				break;
+			case WM_SIZE:
+			case WM_WINDOWPOSCHANGED:
+				LayoutToolbarExtras(hWnd);
 				break;
 			case WM_COMMAND:
 				{
