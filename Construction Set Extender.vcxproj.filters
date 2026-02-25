@@ -929,7 +929,7 @@
     <ClInclude Include="EditorAPI\Crt.h">
       <Filter>EditorAPI</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Libraries\SME Sundries\INIEditGUI_Res.h">
+    <ClInclude Include="$(SMESundriesIncludePath)\INIEditGUI_Res.h">
       <Filter>Resources</Filter>
     </ClInclude>
     <ClInclude Include="[BGSEEBase]\BGSEditorExtenderBase_Resource.h">
@@ -1038,7 +1038,7 @@
     <ResourceCompile Include="VersionInfo.rc">
       <Filter>Resources</Filter>
     </ResourceCompile>
-    <ResourceCompile Include="..\..\Libraries\SME Sundries\INIEditGUI_Res.rc">
+    <ResourceCompile Include="$(SMESundriesIncludePath)\INIEditGUI_Res.rc">
       <Filter>Resources</Filter>
     </ResourceCompile>
     <ResourceCompile Include="[BGSEEBase]\BGSEditorExtenderBase.rc">
