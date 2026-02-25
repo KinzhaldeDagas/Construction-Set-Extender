@@ -480,7 +480,7 @@ namespace cse
 								char OutPath[MAX_PATH] = { 0 };
 								FORMAT_STR(OutPath, "Sound\\Voice\\%s\\%s\\%s\\%s_%s_%08X_%u.mp3",
 									_DATAHANDLER->activeFile->fileName,
-									RaceName,
+									(VoiceID && strlen(VoiceID)) ? VoiceID : RaceName,
 									SexToken,
 									Quest->editorID.c_str(),
 									Topic->editorID.c_str(),
