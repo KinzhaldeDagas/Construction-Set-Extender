@@ -291,6 +291,33 @@ namespace cse
 			}
 		}
 
+		LRESULT CALLBACK RegionEditorGeneralDlgSubClassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
+			bgsee::WindowSubclassProcCollection::SubclassProcExtraParams* SubclassParams)
+		{
+			LRESULT DlgProcResult = FALSE;
+			SubclassParams->Out.MarkMessageAsHandled = false;
+
+			switch (uMsg)
+			{
+			case WM_MOUSEMOVE:
+				{
+					HWND HoveredControl = ChildWindowFromPointEx(hWnd,
+						POINT{ GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) },
+						CWP_SKIPINVISIBLE | CWP_SKIPDISABLED);
+
+					if (HoveredControl && GetDlgCtrlID(HoveredControl) == 7)
+					{
+						EnableWindow(HoveredControl, FALSE);
+					}
+				}
+
+				break;
+			}
+
+			return DlgProcResult;
+		}
+
+
 		LRESULT CALLBACK DataDlgSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
 											 bgsee::WindowSubclassProcCollection::SubclassProcExtraParams* SubclassParams)
 		{
@@ -3282,6 +3309,7 @@ namespace cse
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_LandscapeEdit, LandscapeEditDlgSubClassProc);
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_AIPackages, AIPackagesDlgSubClassProc);
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_AIForm, AIFormDlgSubClassProc);
+			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorGeneral, RegionEditorGeneralDlgSubClassProc);
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_NPC, FaceGenDlgSubClassProc);
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_Race, FaceGenDlgSubClassProc);
 
