@@ -9,6 +9,7 @@
 #include "ReferenceEditorOSDLayer.h"
 #include "WorkspaceManager.h"
 #include "RenderWindowFlyCamera.h"
+#include <functional>
 
 //#define OSD_LOAD_ALL_FONTS
 
@@ -1678,139 +1679,187 @@ namespace cse
 		}
 
 		MouseOverPopupProvider::MouseOverPopupProvider() :
-			RegisteredPopups(),
-			ActivePopup(kInvalidID),
-			ActivePopupTimeout(0),
-			CloseActivePopup(false),
-			PreventActivePopupTicking(false)
-		{
-			;//
-		}
-
-		MouseOverPopupProvider::PopupIDT MouseOverPopupProvider::RegisterPopup(const char* Name,
-																			   RenderDelegateT DrawButton, RenderDelegateT DrawPopup,
-																			   UInt8 PositionType, ImVec2& Pos)
-		{
-			// ### TODO this will break if the position of the data inside the vector changes
-			// ### hash the name (it's supposed to be unique) and use it as the ID instead
-			RegisteredPopups.push_back(PopupData(Name, DrawButton, DrawPopup, PositionType, Pos));
-			return RegisteredPopups.size() - 1;
-		}
-
-		void MouseOverPopupProvider::Draw(PopupIDT ID, ImGuiDX9* GUI, void* ParentWindow)
-		{
-			SME_ASSERT(ID != kInvalidID);
-			SME_ASSERT(GUI && ParentWindow);
-			SME_ASSERT(ID < RegisteredPopups.size());
-
-			PopupData& PopupData = RegisteredPopups.at(ID);
-			bool Hovering = false, BeginHover = false, EndHover = false;
-			const char* PopupStrID = PopupData.PopupName.c_str();
-
-			// draw the button
-			PopupData.DrawButton();
-
-			// just render the button if there are open modals
-			if (ModalWindowProviderOSDLayer::Instance.HasOpenModals())
-				return;
-
-			OSDLayerStateData& CurrentState = PopupData.PopupState;
-			bool ActiveStateDragging = false;
-			if (ActivePopup != kInvalidID)
+				RegisteredPopups(),
+				RegisteredPopupIndices(),
+				ActivePopup(kInvalidID),
+				ActivePopupTimeout(0),
+				CloseActivePopup(false),
+				PreventActivePopupTicking(false)
 			{
-				OSDLayerStateData& ActiveState = RegisteredPopups.at(ActivePopup).PopupState;
-				if (ActiveState.DragInput.Active)
-					ActiveStateDragging = true;
+				;//
 			}
 
-			PopupData.CheckButtonHoverChange(GUI, ParentWindow, Hovering, BeginHover, EndHover);
-			if (BeginHover && ActiveStateDragging == false)
+			MouseOverPopupProvider::PopupIDT MouseOverPopupProvider::MakePopupID(const char* Name)
 			{
-				if (ActivePopup != kInvalidID && ActivePopup != ID)
-				{
-					// another popup is active, close it first
-					CloseActivePopup = true;
-					PopupData.ButtonHoverState = false;
-					return;
-				}
+				SME_ASSERT(Name);
 
-				ActivePopup = ID;
-				ActivePopupTimeout = 0.f;
-			}
-			else if (EndHover && ActiveStateDragging == false)
-			{
-				ActivePopupTimeout = kTimeout;
+				auto Hash = static_cast<PopupIDT>(std::hash<std::string>{}(Name) & 0x7FFFFFFF);
+				if (Hash == kInvalidID)
+					Hash = 0;
+
+				return Hash;
 			}
 
-			if (ActivePopup == ID)
+			MouseOverPopupProvider::PopupData* MouseOverPopupProvider::FindPopupData(PopupIDT ID)
 			{
-				// ### HACK HACK
-				// manually update the mouse position to modify the popup's start pos
-				// reset it after the window's created
-				ImGuiIO& io = ImGui::GetIO();
-				ImVec2 MousPosBuffer(io.MousePos);
+				auto Itr = RegisteredPopupIndices.find(ID);
+				if (Itr == RegisteredPopupIndices.end())
+					return nullptr;
 
-				switch (PopupData.PositionType)
+				SME_ASSERT(Itr->second < RegisteredPopups.size());
+				return &RegisteredPopups.at(Itr->second);
+			}
+
+			MouseOverPopupProvider::PopupIDT MouseOverPopupProvider::RegisterPopup(const char* Name,
+											   RenderDelegateT DrawButton, RenderDelegateT DrawPopup,
+											   UInt8 PositionType, ImVec2& Pos)
+			{
+				PopupIDT PopupID = MakePopupID(Name);
+
+				while (true)
 				{
-				case kPosition_Absolute:
-					io.MousePos = PopupData.Position;
-					break;
-				case kPosition_Relative:
-					io.MousePos.x += PopupData.Position.x;
-					io.MousePos.y += PopupData.Position.y;
-					break;
-				}
-
-				if (BeginHover)
-					ImGui::OpenPopup(PopupStrID);
-
-				if (ImGui::BeginPopup(PopupStrID, ImGuiWindowFlags_NoMove))
-				{
-					if (PopupData.PositionType != kPosition_Default)
-						io.MousePos = MousPosBuffer;
-
-					void* PopupID = GUI->GetCurrentWindow();
-					CurrentState.Update(GUI);
-
-					if (CloseActivePopup)
+					auto ExistingItr = RegisteredPopupIndices.find(PopupID);
+					if (ExistingItr == RegisteredPopupIndices.end())
 					{
-						CloseActivePopup = false;
-						ActivePopupTimeout = 0.f;
-						ActivePopup = kInvalidID;
-						ImGui::CloseCurrentPopup();
+						RegisteredPopups.push_back(PopupData(Name, DrawButton, DrawPopup, PositionType, Pos));
+						RegisteredPopupIndices.emplace(PopupID, RegisteredPopups.size() - 1);
+						return PopupID;
+					}
+
+					PopupData& ExistingPopup = RegisteredPopups.at(ExistingItr->second);
+					if (ExistingPopup.PopupName == Name)
+					{
+						ExistingPopup.DrawButton = DrawButton;
+						ExistingPopup.DrawPopup = DrawPopup;
+						ExistingPopup.PositionType = PositionType;
+						ExistingPopup.Position = Pos;
+						return PopupID;
+					}
+
+					++PopupID;
+					if (PopupID == kInvalidID)
+						++PopupID;
+				}
+			}
+
+			void MouseOverPopupProvider::Draw(PopupIDT ID, ImGuiDX9* GUI, void* ParentWindow)
+			{
+				SME_ASSERT(ID != kInvalidID);
+				SME_ASSERT(GUI && ParentWindow);
+
+				PopupData* PopupData = FindPopupData(ID);
+				SME_ASSERT(PopupData);
+				if (PopupData == nullptr)
+					return;
+
+				PopupData& CurrentPopupData = *PopupData;
+				bool Hovering = false, BeginHover = false, EndHover = false;
+				const char* PopupStrID = CurrentPopupData.PopupName.c_str();
+
+				// draw the button
+				CurrentPopupData.DrawButton();
+
+				// just render the button if there are open modals
+				if (ModalWindowProviderOSDLayer::Instance.HasOpenModals())
+					return;
+
+				OSDLayerStateData& CurrentState = CurrentPopupData.PopupState;
+				bool ActiveStateDragging = false;
+				if (ActivePopup != kInvalidID)
+				{
+					PopupData* ActivePopupData = FindPopupData(ActivePopup);
+					if (ActivePopupData && ActivePopupData->PopupState.DragInput.Active)
+						ActiveStateDragging = true;
+				}
+
+				CurrentPopupData.CheckButtonHoverChange(GUI, ParentWindow, Hovering, BeginHover, EndHover);
+				if (BeginHover && ActiveStateDragging == false)
+				{
+					if (ActivePopup != kInvalidID && ActivePopup != ID)
+					{
+						// another popup is active, close it first
+						CloseActivePopup = true;
+						CurrentPopupData.ButtonHoverState = false;
+						return;
+					}
+
+					ActivePopup = ID;
+					ActivePopupTimeout = 0.f;
+				}
+				else if (EndHover && ActiveStateDragging == false)
+				{
+					ActivePopupTimeout = kTimeout;
+				}
+
+				if (ActivePopup == ID)
+				{
+					// ### HACK HACK
+					// manually update the mouse position to modify the popup's start pos
+					// reset it after the window's created
+					ImGuiIO& io = ImGui::GetIO();
+					ImVec2 MousPosBuffer(io.MousePos);
+
+					switch (CurrentPopupData.PositionType)
+					{
+					case kPosition_Absolute:
+						io.MousePos = CurrentPopupData.Position;
+						break;
+					case kPosition_Relative:
+						io.MousePos.x += CurrentPopupData.Position.x;
+						io.MousePos.y += CurrentPopupData.Position.y;
+						break;
+					}
+
+					if (BeginHover)
+						ImGui::OpenPopup(PopupStrID);
+
+					if (ImGui::BeginPopup(PopupStrID, ImGuiWindowFlags_NoMove))
+					{
+						if (CurrentPopupData.PositionType != kPosition_Default)
+							io.MousePos = MousPosBuffer;
+
+						void* PopupID = GUI->GetCurrentWindow();
+						CurrentState.Update(GUI);
+
+						if (CloseActivePopup)
+						{
+							CloseActivePopup = false;
+							ActivePopupTimeout = 0.f;
+							ActivePopup = kInvalidID;
+							ImGui::CloseCurrentPopup();
+						}
+						else
+						{
+							// render the contents of the current popup
+							CurrentPopupData.DrawPopup();
+
+							bool NeedsKeyboard = false, Throwaway = false;
+							GUI->NeedsInput(Throwaway, Throwaway, NeedsKeyboard);
+							if (Hovering == false &&
+								(GUI->IsPopupHovered() || GUI->HasRootWindow(GUI->GetHoveredWindow(), PopupID) || NeedsKeyboard))
+							{
+								// reset the timeout/prevent ticking every frame when the mouse is hovering over the popup or its children or has keyboard input
+								PreventActivePopupTicking = true;
+								ActivePopupTimeout = kTimeout;
+							}
+						}
+
+						ImGui::EndPopup();
 					}
 					else
 					{
-						// render the contents of the current popup
-						PopupData.DrawPopup();
+						// popup was closed through some other event, cleanup
+						CloseActivePopup = false;
+						ActivePopupTimeout = 0.f;
+						ActivePopup = kInvalidID;
 
-						bool NeedsKeyboard = false, Throwaway = false;
-						GUI->NeedsInput(Throwaway, Throwaway, NeedsKeyboard);
-						if (Hovering == false &&
-							(GUI->IsPopupHovered() || GUI->HasRootWindow(GUI->GetHoveredWindow(), PopupID) || NeedsKeyboard))
-						{
-							// reset the timeout/prevent ticking every frame when the mouse is hovering over the popup or its children or has keyboard input
-							PreventActivePopupTicking = true;
-							ActivePopupTimeout = kTimeout;
-						}
+						if (CurrentPopupData.PositionType != kPosition_Default)
+							io.MousePos = MousPosBuffer;
 					}
-
-					ImGui::EndPopup();
-				}
-				else
-				{
-					// popup was closed through some other event, cleanup
-					CloseActivePopup = false;
-					ActivePopupTimeout = 0.f;
-					ActivePopup = kInvalidID;
-
-					if (PopupData.PositionType != kPosition_Default)
-						io.MousePos = MousPosBuffer;
 				}
 			}
-		}
 
-		void MouseOverPopupProvider::Update()
+			void MouseOverPopupProvider::Update()
 		{
 			if (ModalWindowProviderOSDLayer::Instance.HasOpenModals())
 				return;
@@ -1822,9 +1871,16 @@ namespace cse
 
 			if (ActivePopup != kInvalidID && ActivePopupTimeout != 0.f && CloseActivePopup == false)
 			{
-				SME_ASSERT(ActivePopup < RegisteredPopups.size());
+				PopupData* ActivePopupData = FindPopupData(ActivePopup);
+				if (ActivePopupData == nullptr)
+				{
+					CloseActivePopup = false;
+					ActivePopupTimeout = 0.f;
+					ActivePopup = kInvalidID;
+					return;
+				}
 
-				OSDLayerStateData& ActiveState = RegisteredPopups.at(ActivePopup).PopupState;
+				OSDLayerStateData& ActiveState = ActivePopupData->PopupState;
 				if (ActiveState.DragInput.Active == false)
 				{
 					ActivePopupTimeout -= ImGui::GetIO().DeltaTime;

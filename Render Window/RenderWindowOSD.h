@@ -1,6 +1,7 @@
 #pragma once
 #include "IMGUI\imgui.h"
 #include "RenderWindowInput.h"
+#include <unordered_map>
 
 namespace cse
 {
@@ -215,14 +216,19 @@ namespace cse
 			};
 
 			typedef std::vector<PopupData>		PopupDataArrayT;
+			typedef std::unordered_map<PopupIDT, size_t>	PopupIndexMapT;
 
 			PopupDataArrayT	RegisteredPopups;
+			PopupIndexMapT	RegisteredPopupIndices;
 			PopupIDT		ActivePopup;
 			float			ActivePopupTimeout;
 			bool			CloseActivePopup;
 			bool			PreventActivePopupTicking;
 		public:
 			MouseOverPopupProvider();
+
+			static PopupIDT	MakePopupID(const char* Name);
+			PopupData*		FindPopupData(PopupIDT ID);
 
 			PopupIDT	RegisterPopup(const char* Name, RenderDelegateT DrawButton, RenderDelegateT DrawPopup, UInt8 PositionType, ImVec2& Pos);
 		inline PopupIDT	RegisterPopup(const char* Name, RenderDelegateT DrawButton, RenderDelegateT DrawPopup, UInt8 PositionType = kPosition_Default, const ImVec2& Pos = ImVec2(0, 0))
