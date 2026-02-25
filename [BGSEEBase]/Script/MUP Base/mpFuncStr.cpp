@@ -33,6 +33,7 @@
   POSSIBILITY OF SUCH DAMAGE.
 */
 #include "mpFuncStr.h"
+#include <sstream>
 
 // #include <cmath>
 // #include <cassert>
@@ -126,11 +127,10 @@ namespace bgsee { namespace script { namespace mup {
 
 	in = a_pArg[0]->GetString();
 
-#ifndef _UNICODE
-	sscanf(in.c_str(), "%lf", &out);
-#else
-	swscanf(in.c_str(), _T("%lf"), &out);
-#endif
+	std::basic_istringstream<char_type> Parser(in);
+	Parser >> out;
+	if (Parser.fail())
+		out = 0.0;
 
 	*ret = (float_type)out;
   }

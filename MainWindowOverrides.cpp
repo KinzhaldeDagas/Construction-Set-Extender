@@ -156,7 +156,7 @@ namespace cse
 #elif defined(CCM_SETBKCOLOR)
 			SendMessage(ToolbarWindow, CCM_SETBKCOLOR, 0, ToolbarBackColor);
 #endif
-#ifdef TB_SETTEXTCOLOR
+#if defined(TB_SETTEXTCOLOR) && defined(CCM_SETTEXTCOLOR)
 			SendMessage(ToolbarWindow, TB_SETTEXTCOLOR, 0, ToolbarTextColor);
 #endif
 

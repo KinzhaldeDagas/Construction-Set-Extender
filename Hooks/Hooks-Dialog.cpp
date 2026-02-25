@@ -81,10 +81,8 @@ namespace cse
 
 		void PatchDialogHooks(void)
 		{
-			OSVERSIONINFO OSInfo;
-			GetVersionEx(&OSInfo);
-			if (OSInfo.dwMajorVersion >= 6)		// if running Windows Vista/7, fix the list view selection sound
-				RegDeleteKey(HKEY_CURRENT_USER , "AppEvents\\Schemes\\Apps\\.Default\\CCSelect\\.Current");
+			// Windows 10+ is the supported baseline; always apply the selection-sound cleanup.
+			RegDeleteKey(HKEY_CURRENT_USER , "AppEvents\\Schemes\\Apps\\.Default\\CCSelect\\.Current");
 
 			_MemHdlr(NPCFaceGen).WriteJump();
 			_MemHdlr(CreaturePreview).WriteJump();
