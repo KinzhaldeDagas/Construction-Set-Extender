@@ -305,9 +305,18 @@ namespace cse
 						POINT{ GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) },
 						CWP_SKIPINVISIBLE | CWP_SKIPDISABLED);
 
-					if (HoveredControl && GetDlgCtrlID(HoveredControl) == 7)
+					if (HoveredControl)
 					{
-						EnableWindow(HoveredControl, FALSE);
+						char ClassName[0x40] = { 0 };
+						char ControlText[0x200] = { 0 };
+						GetClassName(HoveredControl, ClassName, sizeof(ClassName));
+						GetWindowText(HoveredControl, ControlText, sizeof(ControlText));
+
+						if (!_stricmp(ClassName, "Button") &&
+							!_stricmp(ControlText, "Enable this type of data"))
+						{
+							EnableWindow(HoveredControl, FALSE);
+						}
 					}
 				}
 
