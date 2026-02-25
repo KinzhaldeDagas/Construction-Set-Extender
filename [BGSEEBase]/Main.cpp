@@ -696,7 +696,6 @@ namespace bgsee
 			crUninstall();
 	#endif
 
-		ExitProcess(0);
 	}
 
 	Main::Main(InitializationParams& Params)
