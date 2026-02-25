@@ -297,19 +297,25 @@ namespace cse
 			LRESULT DlgProcResult = FALSE;
 			SubclassParams->Out.MarkMessageAsHandled = false;
 
-			auto IsManualToggleInputActive = [hWnd](HWND CheckBox) -> bool
+			auto IsMouseClickToggleInputActive = [](HWND CheckBox) -> bool
 			{
 				if (CheckBox == nullptr)
 					return false;
 
-				if ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0 ||
-					(GetAsyncKeyState(VK_SPACE) & 0x8000) != 0 ||
-					(GetAsyncKeyState(VK_RETURN) & 0x8000) != 0)
-				{
-					return true;
-				}
+				RECT CheckBoxBounds = { 0 };
+				if (GetWindowRect(CheckBox, &CheckBoxBounds) == FALSE)
+					return false;
 
-				return GetFocus() == CheckBox;
+				POINT CursorPos = { 0 };
+				if (GetCursorPos(&CursorPos) == FALSE)
+					return false;
+
+				const SHORT LeftMouseState = GetAsyncKeyState(VK_LBUTTON);
+				const bool LeftButtonDown = (LeftMouseState & 0x8000) != 0;
+				const bool LeftButtonPressedSinceLastCheck = (LeftMouseState & 0x0001) != 0;
+				const bool CursorOverCheckBox = PtInRect(&CheckBoxBounds, CursorPos) != FALSE;
+
+				return CursorOverCheckBox && (LeftButtonDown || LeftButtonPressedSinceLastCheck);
 			};
 
 			auto GetEnableDataTypeCheckBox = [hWnd]() -> HWND
@@ -379,7 +385,7 @@ namespace cse
 						{
 							RemoveProp(hWnd, kAllowSyntheticToggleCommandProp);
 						}
-						else if (IsManualToggleInputActive(EnableCheckBox) == false)
+						else if (IsMouseClickToggleInputActive(EnableCheckBox) == false)
 						{
 							// Filter out bogus auto-click messages (e.g. hover-triggered toggles).
 							if (SendMessage(EnableCheckBox, BM_GETCHECK, 0, 0) == BST_CHECKED)
@@ -3394,6 +3400,12 @@ namespace cse
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_AIPackages, AIPackagesDlgSubClassProc);
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_AIForm, AIFormDlgSubClassProc);
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorGeneral, RegionEditorGeneralDlgSubClassProc);
+			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorWeatherData, RegionEditorGeneralDlgSubClassProc);
+			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorObjectsData, RegionEditorGeneralDlgSubClassProc);
+			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorMapData, RegionEditorGeneralDlgSubClassProc);
+			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorObjectsExtraData, RegionEditorGeneralDlgSubClassProc);
+			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorGrassData, RegionEditorGeneralDlgSubClassProc);
+			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorSoundData, RegionEditorGeneralDlgSubClassProc);
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_NPC, FaceGenDlgSubClassProc);
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_Race, FaceGenDlgSubClassProc);
 
