@@ -296,12 +296,12 @@ namespace cse
 							continue;
 
 						TESNPC* Speaker = GetSpeakerFromTopicInfo(Info);
-						if (Speaker == nullptr || Speaker->race.race == nullptr)
+						if (Speaker == nullptr || Speaker->race == nullptr)
 							continue;
 
 						const bool IsFemale = (Speaker->actorFlags & TESActorBaseData::kNPCFlag_Female) != 0;
 						const char* SexToken = IsFemale ? "F" : "M";
-						TESRace* SpeakerRace = Speaker->race.race;
+						TESRace* SpeakerRace = Speaker->race;
 						TESRace* VoiceRace = IsFemale ? SpeakerRace->femaleVoiceRace : SpeakerRace->maleVoiceRace;
 						if (VoiceRace == nullptr)
 							VoiceRace = SpeakerRace;
