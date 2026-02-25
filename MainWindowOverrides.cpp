@@ -354,7 +354,7 @@ namespace cse
 			}
 
 			char SelectPath[MAX_PATH] = { 0 };
-			std::string DefaultCSVName = GetDefaultRevoiceCSVName(_DATAHANDLER->activeFile->fileName.c_str());
+			std::string DefaultCSVName = GetDefaultRevoiceCSVName(_DATAHANDLER->activeFile->fileName);
 			strncpy_s(SelectPath, DefaultCSVName.c_str(), _TRUNCATE);
 
 			if (TESDialog::ShowFileSelect(hWnd,
