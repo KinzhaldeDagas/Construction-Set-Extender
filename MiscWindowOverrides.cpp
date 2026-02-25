@@ -291,29 +291,6 @@ namespace cse
 			}
 		}
 
-
-		static const UINT_PTR kRegionEditorEnableDataCheckBoxSubclassID = 0xC5E00001;
-		static const char* kRegionEditorEnableDataCheckBoxMouseClickArmedProp = "CSE_RegionEditorEnableDataCheckBoxMouseClickArmed";
-
-		static LRESULT CALLBACK RegionEditorEnableDataCheckBoxSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData)
-		{
-			HWND ParentDialog = reinterpret_cast<HWND>(dwRefData);
-
-			switch (uMsg)
-			{
-			case WM_LBUTTONUP:
-				if (ParentDialog)
-					SetProp(ParentDialog, kRegionEditorEnableDataCheckBoxMouseClickArmedProp, reinterpret_cast<HANDLE>(1));
-
-				break;
-			case WM_NCDESTROY:
-				RemoveWindowSubclass(hWnd, RegionEditorEnableDataCheckBoxSubclassProc, uIdSubclass);
-				break;
-			}
-
-			return DefSubclassProc(hWnd, uMsg, wParam, lParam);
-		}
-
 		LRESULT CALLBACK RegionEditorGeneralDlgSubClassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
 			bgsee::WindowSubclassProcCollection::SubclassProcExtraParams* SubclassParams)
 		{
@@ -372,16 +349,6 @@ namespace cse
 
 			switch (uMsg)
 			{
-			case WM_INITDIALOG:
-				{
-					HWND EnableCheckBox = GetEnableDataTypeCheckBox();
-					if (EnableCheckBox)
-					{
-						SetWindowSubclass(EnableCheckBox, RegionEditorEnableDataCheckBoxSubclassProc, kRegionEditorEnableDataCheckBoxSubclassID, reinterpret_cast<DWORD_PTR>(hWnd));
-					}
-				}
-
-				break;
 			case WM_NOTIFY:
 				{
 					NMHDR* NotifyData = reinterpret_cast<NMHDR*>(lParam);
@@ -417,14 +384,8 @@ namespace cse
 						if (GetProp(hWnd, kAllowSyntheticToggleCommandProp))
 						{
 							RemoveProp(hWnd, kAllowSyntheticToggleCommandProp);
-							RemoveProp(hWnd, kRegionEditorEnableDataCheckBoxMouseClickArmedProp);
 						}
-						else if (GetProp(hWnd, kRegionEditorEnableDataCheckBoxMouseClickArmedProp))
-						{
-							// This BN_CLICKED originated from an actual mouse release on the checkbox.
-							RemoveProp(hWnd, kRegionEditorEnableDataCheckBoxMouseClickArmedProp);
-						}
-						else
+						else if (IsMouseClickToggleInputActive(EnableCheckBox) == false)
 						{
 							// Filter out bogus auto-click messages (e.g. hover-triggered toggles).
 							if (SendMessage(EnableCheckBox, BM_GETCHECK, 0, 0) == BST_CHECKED)
@@ -438,15 +399,8 @@ namespace cse
 
 				break;
 			case WM_DESTROY:
-				{
-					HWND EnableCheckBox = GetEnableDataTypeCheckBox();
-					if (EnableCheckBox)
-						RemoveWindowSubclass(EnableCheckBox, RegionEditorEnableDataCheckBoxSubclassProc, kRegionEditorEnableDataCheckBoxSubclassID);
-
-					RemoveProp(hWnd, kPreventAutoEnableAfterTabSwitchProp);
-					RemoveProp(hWnd, kAllowSyntheticToggleCommandProp);
-					RemoveProp(hWnd, kRegionEditorEnableDataCheckBoxMouseClickArmedProp);
-				}
+				RemoveProp(hWnd, kPreventAutoEnableAfterTabSwitchProp);
+				RemoveProp(hWnd, kAllowSyntheticToggleCommandProp);
 				break;
 			}
 
