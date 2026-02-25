@@ -297,6 +297,21 @@ namespace cse
 			LRESULT DlgProcResult = FALSE;
 			SubclassParams->Out.MarkMessageAsHandled = false;
 
+			auto IsManualToggleInputActive = [hWnd](HWND CheckBox) -> bool
+			{
+				if (CheckBox == nullptr)
+					return false;
+
+				if ((GetAsyncKeyState(VK_LBUTTON) & 0x8000) != 0 ||
+					(GetAsyncKeyState(VK_SPACE) & 0x8000) != 0 ||
+					(GetAsyncKeyState(VK_RETURN) & 0x8000) != 0)
+				{
+					return true;
+				}
+
+				return GetFocus() == CheckBox;
+			};
+
 			auto GetEnableDataTypeCheckBox = [hWnd]() -> HWND
 			{
 				HWND Child = nullptr;
@@ -324,6 +339,7 @@ namespace cse
 			};
 
 			const char* kPreventAutoEnableAfterTabSwitchProp = "CSE_RegionEditorPreventAutoEnableAfterTabSwitch";
+			const char* kAllowSyntheticToggleCommandProp = "CSE_RegionEditorAllowSyntheticToggleCommand";
 
 			switch (uMsg)
 			{
@@ -341,6 +357,7 @@ namespace cse
 						if (EnableCheckBox && SendMessage(EnableCheckBox, BM_GETCHECK, 0, 0) == BST_CHECKED)
 						{
 							SendMessage(EnableCheckBox, BM_SETCHECK, BST_UNCHECKED, 0);
+							SetProp(hWnd, kAllowSyntheticToggleCommandProp, reinterpret_cast<HANDLE>(1));
 							PostMessage(hWnd,
 								WM_COMMAND,
 								MAKEWPARAM(GetDlgCtrlID(EnableCheckBox), BN_CLICKED),
@@ -352,8 +369,32 @@ namespace cse
 				}
 
 				break;
+			case WM_COMMAND:
+				if (HIWORD(wParam) == BN_CLICKED)
+				{
+					HWND EnableCheckBox = GetEnableDataTypeCheckBox();
+					if (reinterpret_cast<HWND>(lParam) == EnableCheckBox)
+					{
+						if (GetProp(hWnd, kAllowSyntheticToggleCommandProp))
+						{
+							RemoveProp(hWnd, kAllowSyntheticToggleCommandProp);
+						}
+						else if (IsManualToggleInputActive(EnableCheckBox) == false)
+						{
+							// Filter out bogus auto-click messages (e.g. hover-triggered toggles).
+							if (SendMessage(EnableCheckBox, BM_GETCHECK, 0, 0) == BST_CHECKED)
+								SendMessage(EnableCheckBox, BM_SETCHECK, BST_UNCHECKED, 0);
+
+							SubclassParams->Out.MarkMessageAsHandled = true;
+							DlgProcResult = TRUE;
+						}
+					}
+				}
+
+				break;
 			case WM_DESTROY:
 				RemoveProp(hWnd, kPreventAutoEnableAfterTabSwitchProp);
+				RemoveProp(hWnd, kAllowSyntheticToggleCommandProp);
 				break;
 			}
 
