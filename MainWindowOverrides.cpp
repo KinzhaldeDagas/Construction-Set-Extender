@@ -603,11 +603,11 @@ namespace cse
 			};
 
 			LoadedPluginSelectionContext Context;
-			for (UInt32 Index = 0;; Index++)
+			for (tList<TESFile>::Iterator Itr = _DATAHANDLER->fileList.Begin(); !Itr.End(); ++Itr)
 			{
-				TESFile* CurrentPlugin = _DATAHANDLER->LookupPluginByIndex(Index);
+				TESFile* CurrentPlugin = Itr.Get();
 				if (CurrentPlugin == nullptr)
-					break;
+					continue;
 
 				if (_DATAHANDLER->IsPluginLoaded(CurrentPlugin))
 					Context.LoadedPlugins.push_back(CurrentPlugin);
