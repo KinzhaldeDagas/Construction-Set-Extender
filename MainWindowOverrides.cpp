@@ -14,6 +14,10 @@
 #include "Render Window\RenderWindowManager.h"
 #include "CustomDialogProcs.h"
 
+#include <fstream>
+#include <iomanip>
+#include <vector>
+
 #include "[BGSEEBase]\ToolBox.h"
 #include "[BGSEEBase]\Script\CodaVM.h"
 
@@ -194,6 +198,200 @@ namespace cse
 					BatchGenCounter, FailedCounter);
 			else
 				BGSEEUI->MsgBoxI("Batch generation completed successfully!\n\nGenerated: %d files.", BatchGenCounter);
+		}
+
+		static TESNPC* GetSpeakerFromTopicInfo(TESTopicInfo* Info)
+		{
+			if (Info == nullptr)
+				return nullptr;
+
+			for (ConditionListT::Iterator Itr = Info->conditions.Begin(); Itr.End() == false && Itr.Get(); ++Itr)
+			{
+				TESConditionItem* Condition = Itr.Get();
+				SME_ASSERT(Condition);
+
+				const UInt16 FunctionIndex = Condition->functionIndex & 0x0FFF;
+				if (FunctionIndex == 72 || FunctionIndex == 224)
+				{
+					TESNPC* Speaker = CS_CAST(Condition->param1.form, TESForm, TESNPC);
+					if (Speaker)
+						return Speaker;
+				}
+			}
+
+			return nullptr;
+		}
+
+
+		static std::string GetDefaultRevoiceCSVFileName(const char* ActivePluginName)
+		{
+			std::string BaseName = ActivePluginName ? ActivePluginName : "ActivePlugin";
+			if (BaseName.empty())
+				BaseName = "ActivePlugin";
+
+			size_t LastSlash = BaseName.find_last_of("\\/");
+			if (LastSlash != std::string::npos)
+				BaseName.erase(0, LastSlash + 1);
+
+			size_t LastDot = BaseName.find_last_of('.');
+			if (LastDot != std::string::npos)
+				BaseName.erase(LastDot);
+
+			if (BaseName.empty())
+				BaseName = "ActivePlugin";
+
+			return std::string("reVoice_") + BaseName + ".csv";
+		}
+
+		static bool IsAbsoluteRevoicePath(const std::string& Path)
+		{
+			if (Path.size() >= 2 && Path[1] == ':')
+				return true;
+			if (Path.size() >= 2 && Path[0] == '\\' && Path[1] == '\\')
+				return true;
+			return false;
+		}
+
+		static std::string SanitizeTabDelimitedField(const char* Input)
+		{
+			std::string Result = Input ? Input : "";
+			for (auto& Ch : Result)
+			{
+				if (Ch == '\t' || Ch == '\r' || Ch == '\n')
+					Ch = ' ';
+			}
+
+			return Result;
+		}
+
+		void ExportRevoiceCSVForActivePlugin(HWND hWnd)
+		{
+			if (_DATAHANDLER->activeFile == nullptr)
+			{
+				BGSEEUI->MsgBoxE("An active plugin must be set before using this tool.");
+				return;
+			}
+
+			char SelectPath[MAX_PATH] = { 0 };
+			std::string DefaultFileName = GetDefaultRevoiceCSVFileName(_DATAHANDLER->activeFile->fileName);
+			strncpy_s(SelectPath, DefaultFileName.c_str(), _TRUNCATE);
+			if (TESDialog::ShowFileSelect(hWnd,
+				"Data",
+				"CSV Files\0*.csv\0\0",
+				"Export reVoice CSV (Active Plugin)",
+				"csv",
+				nullptr,
+				false,
+				true,
+				SelectPath,
+				MAX_PATH) == false)
+			{
+				return;
+			}
+
+			std::string FilePath(SelectPath);
+			if (FilePath.empty())
+				return;
+
+			for (auto& Ch : FilePath)
+			{
+				if (Ch == '/')
+					Ch = '\\';
+			}
+
+			if (IsAbsoluteRevoicePath(FilePath) == false && _strnicmp(FilePath.c_str(), "Data\\", 5) != 0)
+				FilePath = std::string("Data\\") + FilePath;
+
+			if (FilePath.size() < 4 || _stricmp(FilePath.c_str() + FilePath.size() - 4, ".csv"))
+				FilePath += ".csv";
+
+			std::ofstream Output(FilePath, std::ios::trunc);
+			if (Output.good() == false)
+			{
+				BGSEEUI->MsgBoxE("Couldn't open output file for writing:\n%s", FilePath.c_str());
+				return;
+			}
+
+			Output << "FormID\tVoiceID\tSpeakerInfo\tOutputPath\tDialogue\n";
+
+			UInt32 Rows = 0;
+			for (tList<TESTopic>::Iterator ItrTopic = _DATAHANDLER->topics.Begin(); ItrTopic.End() == false && ItrTopic.Get(); ++ItrTopic)
+			{
+				TESTopic* Topic = ItrTopic.Get();
+				SME_ASSERT(Topic);
+
+				for (TESTopic::TopicDataListT::Iterator ItrTopicData = Topic->topicData.Begin();
+					ItrTopicData.End() == false && ItrTopicData.Get();
+					++ItrTopicData)
+				{
+					TESQuest* Quest = ItrTopicData->parentQuest;
+					if (Quest == nullptr)
+						continue;
+
+					for (int i = 0; i < ItrTopicData->questInfos.numObjs; i++)
+					{
+						TESTopicInfo* Info = ItrTopicData->questInfos.data[i];
+						if (Info == nullptr)
+							continue;
+
+						if ((Info->formFlags & TESForm::kFormFlags_FromActiveFile) == false)
+							continue;
+
+						TESNPC* Speaker = GetSpeakerFromTopicInfo(Info);
+						if (Speaker == nullptr || Speaker->race == nullptr)
+							continue;
+
+						const bool IsFemale = (Speaker->actorFlags & TESActorBaseData::kNPCFlag_Female) != 0;
+						const char* SexToken = IsFemale ? "F" : "M";
+						TESRace* SpeakerRace = Speaker->race;
+						TESRace* VoiceRace = IsFemale ? SpeakerRace->femaleVoiceRace : SpeakerRace->maleVoiceRace;
+						if (VoiceRace == nullptr)
+							VoiceRace = SpeakerRace;
+
+						const char* VoiceID = VoiceRace->GetEditorID() ? VoiceRace->GetEditorID() : "";
+						const char* RaceName = SpeakerRace->name.c_str();
+						if (RaceName == nullptr || strlen(RaceName) == 0)
+							RaceName = "Unknown";
+
+						std::string SpeakerInfo = std::string(RaceName) + "\\" + SexToken;
+
+						for (TESTopicInfo::ResponseListT::Iterator ItrResponse = Info->responseList.Begin();
+							ItrResponse.End() == false && ItrResponse.Get();
+							++ItrResponse)
+						{
+							TESTopicInfo::ResponseData* Response = ItrResponse.Get();
+							if (Response == nullptr)
+								continue;
+
+							const char* ResponseText = Response->responseText.c_str();
+							if (ResponseText == nullptr || strlen(ResponseText) == 0)
+								continue;
+
+							char OutPath[MAX_PATH] = { 0 };
+							FORMAT_STR(OutPath, "Sound\\Voice\\%s\\%s\\%s\\%s_%s_%08X_%u.mp3",
+								_DATAHANDLER->activeFile->fileName,
+								RaceName,
+								SexToken,
+								Quest->editorID.c_str(),
+								Topic->editorID.c_str(),
+								Info->formID,
+								Response->responseNumber);
+
+							Output
+								<< std::uppercase << std::hex << std::setfill('0') << std::setw(8) << Info->formID << std::dec
+								<< "\t" << SanitizeTabDelimitedField(VoiceID)
+								<< "\t" << SanitizeTabDelimitedField(SpeakerInfo.c_str())
+								<< "\t" << SanitizeTabDelimitedField(OutPath)
+								<< "\t" << SanitizeTabDelimitedField(ResponseText)
+								<< "\n";
+							Rows++;
+						}
+					}
+				}
+			}
+
+			Output.flush();
+			BGSEEUI->MsgBoxI("reVoice CSV export complete. Wrote %u dialogue rows to:\n%s", Rows, FilePath.c_str());
 		}
 
 
@@ -564,6 +762,10 @@ namespace cse
 				case IDC_MAINMENU_BATCHLIPGENERATOR:
 					BatchGenerateLipSyncFiles(hWnd);
 					
+					break;
+				case IDC_MAINMENU_EXPORT_REVOICECSV_ACTIVEPLUGIN:
+					ExportRevoiceCSVForActivePlugin(hWnd);
+
 					break;
 				case IDC_MAINMENU_SAVEOPTIONS_CREATEBACKUPBEFORESAVING:
 					settings::versionControl::kBackupOnSave.ToggleData();
