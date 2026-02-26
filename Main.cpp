@@ -671,7 +671,9 @@ extern "C"
 		InitParams.WaitForDebugger = false;
 #endif
 
-#ifdef NDEBUG
+#if defined(CSE_NO_CRASHRPT)
+		InitParams.CrashRptSupport = false;
+#elif defined(NDEBUG)
 	#ifndef WAIT_FOR_DEBUGGER
 		InitParams.CrashRptSupport = true;
 		TODO("Save debug symbols, dammit!")
