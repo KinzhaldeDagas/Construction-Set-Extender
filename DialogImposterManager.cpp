@@ -130,17 +130,10 @@ namespace cse
 
 				// reproduce the relevant bits of the org wnd proc's code
 				CacheOperator CacheBackup(hWnd);
-				std::string WndTitle = "Object Window";
-
 				TESObjectWindow::PerformLimitedInit(hWnd);
 				SendMessage(hWnd, WM_OBJECTWINDOWIMPOSTER_REFRESHTREEVIEW, NULL, NULL);
 
-				if (settings::general::kShowHallOfFameMembersInTitleBar().i != hallOfFame::kDisplayESMember_None)
-				{
-					hallOfFame::GetRandomESMember(WndTitle);
-					WndTitle += " Object Window";
-				}
-				SetWindowText(hWnd, WndTitle.c_str());
+				SetWindowText(hWnd, "Object Window");
 
 				BGSEEUI->GetSubclasser()->RegisterSubclassForWindow(hWnd, uiManager::CommonDialogExtraFittingsSubClassProc);
 				SendMessage(hWnd, WM_OBJECTWINDOWIMPOSTER_INITIALIZEXTRA, NULL, NULL);
