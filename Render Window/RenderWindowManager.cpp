@@ -13,6 +13,27 @@
 
 namespace cse
 {
+	namespace
+	{
+		constexpr UInt32 kNiAVObjectFlag_AppCulled = 1u << 0;
+
+		bool IsAppCulled(const NiAVObject* Object)
+		{
+			return Object && (Object->m_flags & kNiAVObjectFlag_AppCulled);
+		}
+
+		void SetAppCulled(NiAVObject* Object, bool Culled)
+		{
+			if (Object == nullptr)
+				return;
+
+			if (Culled)
+				Object->m_flags |= kNiAVObjectFlag_AppCulled;
+			else
+				Object->m_flags &= ~kNiAVObjectFlag_AppCulled;
+		}
+	}
+
 	namespace renderWindow
 	{
 		IRenderWindowSceneGraphModifier::RenderData::RenderData(NiNode* SceneGraph, NiNode* ExtraNode) :
@@ -225,8 +246,8 @@ namespace cse
 					if (ReferenceVisibilityManager::IsCulled(Itr) == false)
 					{
 						NiNode* Node = Itr->GetNiNode();
-						Node->SetCulled(true);
-						CulledRefBuffer.push_back(Node);
+							SetAppCulled(Node, true);
+							CulledRefBuffer.push_back(Node);
 					}
 				}
 			}
@@ -236,7 +257,7 @@ namespace cse
 		{
 			// reset the culled state
 			for (auto Itr : CulledRefBuffer)
-				Itr->SetCulled(false);
+				SetAppCulled(Itr, false);
 
 			CulledRefBuffer.clear();
 		}
@@ -280,7 +301,7 @@ namespace cse
 		bool ReferenceVisibilityManager::IsCulled(TESObjectREFR* Ref)
 		{
 			NiNode* Node = Ref->GetNiNode();
-			if (Node == nullptr || Node->IsCulled())
+			if (Node == nullptr || IsAppCulled(Node))
 				return true;
 			else
 				return false;

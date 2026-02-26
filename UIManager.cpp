@@ -231,8 +231,9 @@ namespace cse
 				}
 				else
 				{
-					SME::StringHelpers::MakeLower(String);
-					if (String.find(FilterString) != std::string::npos)
+					std::string SearchString = String;
+					SME::StringHelpers::MakeLower(SearchString);
+					if (SearchString.find(FilterString) != std::string::npos)
 						return true;
 				}
 

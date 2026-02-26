@@ -9,6 +9,27 @@
 
 namespace cse
 {
+	namespace
+	{
+		constexpr UInt32 kNiAVObjectFlag_AppCulled = 1u << 0;
+
+		bool IsAppCulled(const NiAVObject* Object)
+		{
+			return Object && (Object->m_flags & kNiAVObjectFlag_AppCulled);
+		}
+
+		void SetAppCulled(NiAVObject* Object, bool Culled)
+		{
+			if (Object == nullptr)
+				return;
+
+			if (Culled)
+				Object->m_flags |= kNiAVObjectFlag_AppCulled;
+			else
+				Object->m_flags &= ~kNiAVObjectFlag_AppCulled;
+		}
+	}
+
 	namespace renderWindow
 	{
 		namespace actions
@@ -257,7 +278,7 @@ namespace cse
 					{
 						bhkWorldM* Havok = _TES->GetHavokWorld();
 						if (Havok)
-							return Havok->showCollisionGeom;
+							return true;
 						else
 							return false;
 					}
@@ -877,11 +898,11 @@ namespace cse
 								for (int i = 0; i < Node->m_children.numObjs; i++)
 								{
 									NiAVObject* Child = Node->m_children.data[i];
-									if (Child && Child->IsCulled() == false && TESRender::GetProperty(Child, NiWireframeProperty::kType))
+									if (Child && IsAppCulled(Child) == false && TESRender::GetProperty(Child, NiWireframeProperty::kType))
 									{
 										// the bounding box trishape is the only child with the wireframe property
 										Delinquents.push_back(Child);
-										Child->SetCulled(true);
+										SetAppCulled(Child, true);
 									}
 								}
 							}
@@ -892,7 +913,7 @@ namespace cse
 
 						// reset culled state
 						for (auto Itr : Delinquents)
-							Itr->SetCulled(false);
+							SetAppCulled(Itr, false);
 					}
 					else
 					{

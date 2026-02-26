@@ -10,6 +10,22 @@
 
 namespace cse
 {
+	namespace
+	{
+		constexpr UInt32 kNiAVObjectFlag_AppCulled = 1u << 0;
+
+		void SetAppCulled(NiAVObject* Object, bool Culled)
+		{
+			if (Object == nullptr)
+				return;
+
+			if (Culled)
+				Object->m_flags |= kNiAVObjectFlag_AppCulled;
+			else
+				Object->m_flags &= ~kNiAVObjectFlag_AppCulled;
+		}
+	}
+
 	using namespace renderWindow;
 
 	namespace hooks
@@ -192,52 +208,6 @@ namespace cse
 
 		void __cdecl ShadowLightShaderSetAmbientColorShaderConstantDetour(UInt16 ConstantIndex, float R, float G, float B, float A)
 		{
-			auto IsGeometryMasked = [](NiAVObject* Geom, NiColor* OutMaskColor) -> bool {
-				// exclude terrain geom
-				if (Geom->m_pcName && strstr(Geom->m_pcName, "Block") == Geom->m_pcName)
-					return false;
-
-				NiAVObject* Parent = Geom->m_parent;
-				while (Parent)
-				{
-					auto Node = NI_CAST(Parent, NiNode);
-					if (Node)
-					{
-						auto RefProp = NI_CAST(TESRender::GetExtraData(Node, "REF"), TESObjectExtraData);
-						if (RefProp)
-						{
-							auto HasMask = _RENDERWIN_MGR.GetColorMaskManager()->GetActiveMaskForRef(RefProp->refr, OutMaskColor);
-							if (HasMask)
-								return true;
-						}
-					}
-
-					Parent = Parent->m_parent;
-				}
-
-				return false;
-			};
-
-			// modify the ambient color according to the active mask
-			if (ConstantIndex == 0 && _RENDERWIN_MGR.GetColorMaskManager()->IsAnyMaskEnabled())
-			{
-				auto CurrentRenderPass = *TESRender::CurrentRenderPassData;
-				if (CurrentRenderPass)
-				{
-					NiColor MaskColor;
-					if (IsGeometryMasked(CurrentRenderPass->geom, &MaskColor))
-					{
-						cdeclCall<void>(0x0079AC60,
-										ConstantIndex,
-										MaskColor.r,
-										MaskColor.g,
-										MaskColor.b,
-										1.f);
-						return;
-					}
-				}
-			}
-
 			cdeclCall<void>(0x0079AC60, ConstantIndex, R, G, B, A);
 		}
 
@@ -867,7 +837,7 @@ namespace cse
 
 		void __stdcall DoTESPathGridPointDtorHook(TESPathGridPoint* Point)
 		{
-			PathGridPointListT* DeletionList = (PathGridPointListT*)PathGridPointListT::Create(&FormHeap_Allocate);
+			PathGridPointListT* DeletionList = (PathGridPointListT*)PathGridPointListT::Create();
 			DeletionList->AddAt(Point, eListEnd);
 			_RENDERWIN_MGR.GetPathGridUndoManager()->HandlePathGridPointDeletion(DeletionList);
 			DeletionList->RemoveAll();
@@ -1319,7 +1289,7 @@ namespace cse
 			if (settings::renderer::kPathGridLinkedRefIndicator().i == 0)
 			{
 				if ((settings::renderer::kPathGridLinkedRefIndicatorFlags().u & settings::renderer::kPathGridLinkedRefIndicatorFlag_HideLineConnector))
-					Connector->SetCulled(true);
+					SetAppCulled(Connector, true);
 			}
 		}
 
@@ -1346,7 +1316,7 @@ namespace cse
 			if (settings::renderer::kPathGridLinkedRefIndicator().i == 0)
 			{
 				if ((settings::renderer::kPathGridLinkedRefIndicatorFlags().u & settings::renderer::kPathGridLinkedRefIndicatorFlag_HidePointBoundingBox))
-					BoundingBox->SetCulled(true);
+					SetAppCulled(BoundingBox, true);
 			}
 		}
 
@@ -1374,7 +1344,7 @@ namespace cse
 			{
 				if ((settings::renderer::kPathGridLinkedRefIndicatorFlags().u & settings::renderer::kPathGridLinkedRefIndicatorFlag_HideLinkedRefNode))
 				{
-					RefNode->SetCulled(true);
+					SetAppCulled(RefNode, true);
 				}
 			}
 		}

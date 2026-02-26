@@ -557,12 +557,12 @@ TESPathGridPoint* TESRender::PickPathGridPointAtCoords(int X, int Y)
 			NiAVObject* Pick = TESRenderWindow::PickBuffer->pickRecords.data[0]->picked;
 			if (Pick && Pick->m_parent)
 			{
-				if (Pick->m_parent->m_extraDataListLen)
-				{
-					NiIntegerExtraData* xData = NI_CAST(Pick->m_parent->m_extraDataList[0], NiIntegerExtraData);
-					if (xData)
-						Result = (TESPathGridPoint*)xData->m_iValue;
-				}
+				NiIntegerExtraData* xData = NI_CAST(TESRender::GetExtraData(Pick, "PathGridPoint"), NiIntegerExtraData);
+				if (xData == nullptr)
+					xData = NI_CAST(TESRender::GetExtraData(Pick->m_parent, "PathGridPoint"), NiIntegerExtraData);
+
+				if (xData)
+					Result = reinterpret_cast<TESPathGridPoint*>(xData->m_iValue);
 			}
 		}
 	}
@@ -614,4 +614,3 @@ bool TESRender::PickData::PerformPick(Vector3* RayOrigin, Vector3* RayDir, bool 
 {
 	return thisCall<bool>(0x005E6030, this, RayOrigin, RayDir, KeepExisting);
 }
-
