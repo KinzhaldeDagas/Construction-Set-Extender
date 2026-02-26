@@ -14,6 +14,7 @@
 #include "Render Window\RenderWindowManager.h"
 #include "CustomDialogProcs.h"
 
+#include <algorithm>
 #include <fstream>
 #include <vector>
 
@@ -275,6 +276,35 @@ namespace cse
 			return Result;
 		}
 
+		static bool WriteRevoiceCSVFile(const std::string& FilePath,
+			const std::vector<std::string>& Rows,
+			size_t StartIndex,
+			size_t EndIndexExclusive)
+		{
+			std::ofstream Output(FilePath, std::ios::trunc);
+			if (Output.good() == false)
+				return false;
+
+			Output << "FormID,VoiceID,SpeakerInfo,OutputPath,Dialogue\n";
+			for (size_t i = StartIndex; i < EndIndexExclusive; i++)
+				Output << Rows[i] << "\n";
+
+			Output.flush();
+			return Output.good();
+		}
+
+		static std::string BuildRevoicePartFilePath(const std::string& FilePath, UInt32 PartIndex)
+		{
+			std::string Base = FilePath;
+			size_t LastDot = Base.find_last_of('.');
+			if (LastDot != std::string::npos)
+				Base.erase(LastDot);
+
+			char Suffix[32] = { 0 };
+			FORMAT_STR(Suffix, "_part%03u.csv", PartIndex);
+			return Base + Suffix;
+		}
+
 		void ExportRevoiceCSVForActivePlugin(HWND hWnd)
 		{
 			if (_DATAHANDLER->activeFile == nullptr)
@@ -316,16 +346,12 @@ namespace cse
 			if (FilePath.size() < 4 || _stricmp(FilePath.c_str() + FilePath.size() - 4, ".csv"))
 				FilePath += ".csv";
 
-			std::ofstream Output(FilePath, std::ios::trunc);
-			if (Output.good() == false)
-			{
-				BGSEEUI->MsgBoxE("Couldn't open output file for writing:\n%s", FilePath.c_str());
-				return;
-			}
-
-			Output << "FormID,VoiceID,SpeakerInfo,OutputPath,Dialogue\n";
+			const bool SplitIntoParts = BGSEEUI->MsgBoxI(hWnd,
+				MB_YESNO,
+				"Do you want to split the CSV into Multiple for reVoice?") == IDYES;
 
 			UInt32 Rows = 0;
+			std::vector<std::string> CSVRows;
 			for (tList<TESTopic>::Iterator ItrTopic = _DATAHANDLER->topics.Begin(); ItrTopic.End() == false && ItrTopic.Get(); ++ItrTopic)
 			{
 				TESTopic* Topic = ItrTopic.Get();
@@ -399,21 +425,50 @@ namespace cse
 							char FormID[9] = { 0 };
 							FORMAT_STR(FormID, "%08X", Info->formID);
 
-							Output
-								<< EscapeCSVField(FormID)
-								<< "," << EscapeCSVField(VoiceID)
-								<< "," << EscapeCSVField(SpeakerInfo.c_str())
-								<< "," << EscapeCSVField(OutPath)
-								<< "," << EscapeCSVField(ResponseText)
-								<< "\n";
+							std::string Row =
+								EscapeCSVField(FormID)
+								+ "," + EscapeCSVField(VoiceID)
+								+ "," + EscapeCSVField(SpeakerInfo.c_str())
+								+ "," + EscapeCSVField(OutPath)
+								+ "," + EscapeCSVField(ResponseText);
+							CSVRows.push_back(Row);
 							Rows++;
 						}
 					}
 				}
 			}
 
-			Output.flush();
-			BGSEEUI->MsgBoxI("reVoice CSV export complete. Wrote %u dialogue rows to:\n%s", Rows, FilePath.c_str());
+			if (SplitIntoParts)
+			{
+				const size_t kPartSize = 24;
+				const size_t PartCount = std::max<size_t>(1, (CSVRows.size() + kPartSize - 1) / kPartSize);
+				for (size_t Part = 0; Part < PartCount; Part++)
+				{
+					const size_t StartIndex = Part * kPartSize;
+					const size_t EndIndex = std::min(CSVRows.size(), StartIndex + kPartSize);
+					std::string PartFilePath = BuildRevoicePartFilePath(FilePath, static_cast<UInt32>(Part + 1));
+					if (WriteRevoiceCSVFile(PartFilePath, CSVRows, StartIndex, EndIndex) == false)
+					{
+						BGSEEUI->MsgBoxE("Couldn't open output file for writing:\n%s", PartFilePath.c_str());
+						return;
+					}
+				}
+
+				BGSEEUI->MsgBoxI("reVoice CSV export complete. Wrote %u dialogue rows across %u files.\nFirst file:\n%s",
+					Rows,
+					static_cast<UInt32>(PartCount),
+					BuildRevoicePartFilePath(FilePath, 1).c_str());
+			}
+			else
+			{
+				if (WriteRevoiceCSVFile(FilePath, CSVRows, 0, CSVRows.size()) == false)
+				{
+					BGSEEUI->MsgBoxE("Couldn't open output file for writing:\n%s", FilePath.c_str());
+					return;
+				}
+
+				BGSEEUI->MsgBoxI("reVoice CSV export complete. Wrote %u dialogue rows to:\n%s", Rows, FilePath.c_str());
+			}
 		}
 
 
