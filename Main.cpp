@@ -1,6 +1,7 @@
 #include "Main.h"
 #include "PluginAPIManager.h"
 #include "VersionInfo.h"
+#include <PluginAPI.h>
 
 #include "[Common]\CLIWrapper.h"
 #include "Hooks\Hooks-Dialog.h"

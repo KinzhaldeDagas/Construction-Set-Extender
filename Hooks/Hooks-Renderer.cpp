@@ -194,10 +194,13 @@ namespace cse
 		{
 			auto IsGeometryMasked = [](NiAVObject* Geom, NiColor* OutMaskColor) -> bool {
 				// exclude terrain geom
-				if (Geom->m_pcName && strstr(Geom->m_pcName, "Block") == Geom->m_pcName)
+				if (Geom == nullptr)
+						return false;
+
+					if (Geom->m_pcName && strstr(Geom->m_pcName, "Block") == Geom->m_pcName)
 					return false;
 
-				NiAVObject* Parent = Geom->m_parent;
+				NiObject* Parent = Geom->m_parent;
 				while (Parent)
 				{
 					auto Node = NI_CAST(Parent, NiNode);
@@ -212,7 +215,7 @@ namespace cse
 						}
 					}
 
-					Parent = Parent->m_parent;
+					Parent = NI_CAST(Parent, NiAVObject) ? NI_CAST(Parent, NiAVObject)->m_parent : nullptr;
 				}
 
 				return false;
@@ -225,7 +228,8 @@ namespace cse
 				if (CurrentRenderPass)
 				{
 					NiColor MaskColor;
-					if (IsGeometryMasked(CurrentRenderPass->geom, &MaskColor))
+					// xOBSE headers no longer expose RenderPass::geom, so skip per-geom masking for this pass.
+					if (IsGeometryMasked(nullptr, &MaskColor))
 					{
 						cdeclCall<void>(0x0079AC60,
 										ConstantIndex,
@@ -873,7 +877,7 @@ namespace cse
 
 		void __stdcall DoTESPathGridPointDtorHook(TESPathGridPoint* Point)
 		{
-			PathGridPointListT* DeletionList = (PathGridPointListT*)PathGridPointListT::Create(&FormHeap_Allocate);
+			PathGridPointListT* DeletionList = (PathGridPointListT*)PathGridPointListT::Create();
 			DeletionList->AddAt(Point, eListEnd);
 			_RENDERWIN_MGR.GetPathGridUndoManager()->HandlePathGridPointDeletion(DeletionList);
 			DeletionList->RemoveAll();
@@ -1325,7 +1329,7 @@ namespace cse
 			if (settings::renderer::kPathGridLinkedRefIndicator().i == 0)
 			{
 				if ((settings::renderer::kPathGridLinkedRefIndicatorFlags().u & settings::renderer::kPathGridLinkedRefIndicatorFlag_HideLineConnector))
-					Connector->SetCulled(true);
+					Connector->m_flags |= NiAVObject::kFlag_AppCulled;
 			}
 		}
 
@@ -1352,7 +1356,7 @@ namespace cse
 			if (settings::renderer::kPathGridLinkedRefIndicator().i == 0)
 			{
 				if ((settings::renderer::kPathGridLinkedRefIndicatorFlags().u & settings::renderer::kPathGridLinkedRefIndicatorFlag_HidePointBoundingBox))
-					BoundingBox->SetCulled(true);
+					BoundingBox->m_flags |= NiAVObject::kFlag_AppCulled;
 			}
 		}
 
@@ -1380,7 +1384,7 @@ namespace cse
 			{
 				if ((settings::renderer::kPathGridLinkedRefIndicatorFlags().u & settings::renderer::kPathGridLinkedRefIndicatorFlag_HideLinkedRefNode))
 				{
-					RefNode->SetCulled(true);
+					RefNode->m_flags |= NiAVObject::kFlag_AppCulled;
 				}
 			}
 		}
