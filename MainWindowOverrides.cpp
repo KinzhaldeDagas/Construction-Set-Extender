@@ -276,6 +276,14 @@ namespace cse
 			return Result;
 		}
 
+		static const char* GetNonEmptyToken(const char* Value, const char* Fallback)
+		{
+			if (Value && Value[0])
+				return Value;
+
+			return Fallback;
+		}
+
 		static bool WriteRevoiceCSVFile(const std::string& FilePath,
 			const std::vector<std::string>& Rows,
 			size_t StartIndex,
@@ -348,7 +356,7 @@ namespace cse
 
 			const bool SplitIntoParts = BGSEEUI->MsgBoxI(hWnd,
 				MB_YESNO,
-				"Do you want to split the CSV into Multiple for reVoice?") == IDYES;
+				"Split the export into multiple reVoice CSV files?\n\n(24 dialogue rows per file)") == IDYES;
 
 			UInt32 Rows = 0;
 			std::vector<std::string> CSVRows;
@@ -413,12 +421,15 @@ namespace cse
 							if (VoiceFolder == nullptr || strlen(VoiceFolder) == 0)
 								VoiceFolder = RaceName;
 
+							const char* QuestToken = GetNonEmptyToken(Quest->editorID.c_str(), "Quest");
+							const char* TopicToken = GetNonEmptyToken(Topic->editorID.c_str(), "Topic");
+
 							FORMAT_STR(OutPath, "Sound\\Voice\\%s\\%s\\%s\\%s_%s_%08X_%u.mp3",
 								_DATAHANDLER->activeFile->fileName,
 								VoiceFolder,
 								SexToken,
-								Quest->editorID.c_str(),
-								Topic->editorID.c_str(),
+								QuestToken,
+								TopicToken,
 								Info->formID,
 								Response->responseNumber);
 
