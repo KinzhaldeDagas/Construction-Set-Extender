@@ -7,7 +7,7 @@
     <DirectXIncludePath>$(DXSDK_DIR)Include</DirectXIncludePath>
     <DirectXLibPath>$(DXSDK_DIR)Lib\x86</DirectXLibPath>
     <SMESundriesIncludePath>C:\src\SME-Sundries-master</SMESundriesIncludePath>
-    <XSECommonIncludePath>C:\Libraries\common;C:\Libraries</XSECommonIncludePath>
+    <XSECommonIncludePath>C:\Libraries</XSECommonIncludePath>
   </PropertyGroup>
   <PropertyGroup />
   <ItemDefinitionGroup />
