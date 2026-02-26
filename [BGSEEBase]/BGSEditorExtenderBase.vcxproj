@@ -250,7 +250,7 @@
       <PrecompiledHeader>Use</PrecompiledHeader>
       <Optimization>MaxSpeed</Optimization>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>NOMINMAX;WIN32_LEAN_AND_MEAN;WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NOMINMAX;WIN32_LEAN_AND_MEAN;WIN32;NDEBUG;_LIB;CSE_NO_CRASHRPT;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)Script;$(ProjectDir)Script\MUP Base;$(ProjectDir)Script\MUP Implementation;$(ProjectDir)..\[Common];$(ProjectDir)..;C:\Libraries;C:\Libraries\common;C:\src\SME-Sundries-master;C:\src\SME-Sundries-master\SME Sundries;C:\src\SME-Sundries-master\include;C:\src\SME-Sundries-master\Common;C:\src\CrashRpt-main\include;$(DXSDK_DIR)Include;%(AdditionalIncludeDirectories);$(SolutionDir);$(SolutionDir)\..\..</AdditionalIncludeDirectories>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <InlineFunctionExpansion>Default</InlineFunctionExpansion>
@@ -258,7 +258,7 @@
       <OmitFramePointers>false</OmitFramePointers>
       <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
       <StringPooling>true</StringPooling>
-      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <EnableEnhancedInstructionSet>StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
       <RuntimeTypeInfo>true</RuntimeTypeInfo>
