@@ -2,12 +2,13 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ImportGroup Label="PropertySheets" />
   <PropertyGroup Label="UserMacros">
-    <CrashRptIncludePath>C:\Users\shadeMe\Documents\VC++ LIB\CrashRpt\include</CrashRptIncludePath>
-    <CrashRptLibPath>C:\Users\shadeMe\Documents\VC++ LIB\CrashRpt\lib</CrashRptLibPath>
+    <CrashRptIncludePath>C:\src\CrashRpt-main\include</CrashRptIncludePath>
+    <CrashRptLibPath>C:\src\CrashRpt-main\lib</CrashRptLibPath>
     <DirectXIncludePath>C:\Users\shadeMe\Documents\VC++ LIB\DirectX\Include</DirectXIncludePath>
     <DirectXLibPath>C:\Users\shadeMe\Documents\VC++ LIB\DirectX\Lib\x86</DirectXLibPath>
-    <SMESundriesIncludePath>C:\Users\shadeMe\Documents\BGS Dev\Code\Libraries\SME Sundries</SMESundriesIncludePath>
-    <XSECommonIncludePath>C:\Users\shadeMe\Documents\BGS Dev\Code\Libraries\xSE Common</XSECommonIncludePath>
+    <SMESundriesIncludePath>C:\src\SME-Sundries-master</SMESundriesIncludePath>
+    <XSECommonIncludePath>C:\Libraries</XSECommonIncludePath>
+    <XSECommonLibPath>C:\Libraries\common\Win32_v143\Release</XSECommonLibPath>
   </PropertyGroup>
   <PropertyGroup />
   <ItemDefinitionGroup />
@@ -34,6 +35,10 @@
     </BuildMacro>
     <BuildMacro Include="XSECommonIncludePath">
       <Value>$(XSECommonIncludePath)</Value>
+      <EnvironmentVariable>true</EnvironmentVariable>
+    </BuildMacro>
+    <BuildMacro Include="XSECommonLibPath">
+      <Value>$(XSECommonLibPath)</Value>
       <EnvironmentVariable>true</EnvironmentVariable>
     </BuildMacro>
   </ItemGroup>
