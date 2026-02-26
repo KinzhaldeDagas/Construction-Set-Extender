@@ -200,7 +200,7 @@ namespace cse
 					if (Geom->m_pcName && strstr(Geom->m_pcName, "Block") == Geom->m_pcName)
 					return false;
 
-				NiAVObject* Parent = Geom->m_parent;
+				auto Parent = NI_CAST(Geom->m_parent, NiAVObject);
 				while (Parent)
 				{
 					auto Node = NI_CAST(Parent, NiNode);
@@ -215,7 +215,7 @@ namespace cse
 						}
 					}
 
-					Parent = Parent->m_parent;
+					Parent = NI_CAST(Parent->m_parent, NiAVObject);
 				}
 
 				return false;
