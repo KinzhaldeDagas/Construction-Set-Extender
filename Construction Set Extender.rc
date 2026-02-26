@@ -578,7 +578,6 @@ BEGIN
         MENUITEM "Export NPC Face Textures",    40516
         MENUITEM SEPARATOR
         MENUITEM "Batch Generate LIP Files",    IDC_MAINMENU_BATCHLIPGENERATOR
-        MENUITEM "Export reVoice CSV (Active Plugin)...", IDC_MAINMENU_EXPORT_REVOICECSV_ACTIVEPLUGIN
     END
     POPUP "&Gameplay"
     BEGIN
