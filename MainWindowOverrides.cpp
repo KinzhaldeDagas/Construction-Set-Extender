@@ -1152,6 +1152,7 @@ namespace cse
 				{
 					SetTimer(hWnd, ID_PATHGRIDTOOLBARBUTTION_TIMERID, 500, nullptr);
 					SetTimer(hWnd, ID_HALLOFFAME_MAINWINDOW_TIMERID, 8000, nullptr);
+					UpdateMainWindowCaption(hWnd);
 					SubclassParams->Out.MarkMessageAsHandled = true;
 				}
 
