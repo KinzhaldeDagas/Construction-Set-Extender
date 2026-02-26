@@ -360,6 +360,10 @@ namespace cse
 							VoiceRace = SpeakerRace;
 
 						const char* VoiceID = VoiceRace->GetEditorID() ? VoiceRace->GetEditorID() : "";
+						if (VoiceID == nullptr || strlen(VoiceID) == 0)
+						{
+							VoiceID = SpeakerRace->GetEditorID() ? SpeakerRace->GetEditorID() : "";
+						}
 						const char* RaceName = SpeakerRace->name.c_str();
 						if (RaceName == nullptr || strlen(RaceName) == 0)
 							RaceName = "Unknown";
@@ -379,9 +383,13 @@ namespace cse
 								continue;
 
 							char OutPath[MAX_PATH] = { 0 };
+							const char* VoiceFolder = VoiceID;
+							if (VoiceFolder == nullptr || strlen(VoiceFolder) == 0)
+								VoiceFolder = RaceName;
+
 							FORMAT_STR(OutPath, "Sound\\Voice\\%s\\%s\\%s\\%s_%s_%08X_%u.mp3",
 								_DATAHANDLER->activeFile->fileName,
-								RaceName,
+								VoiceFolder,
 								SexToken,
 								Quest->editorID.c_str(),
 								Topic->editorID.c_str(),
