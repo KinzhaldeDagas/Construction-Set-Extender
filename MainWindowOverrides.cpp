@@ -15,7 +15,6 @@
 #include "CustomDialogProcs.h"
 
 #include <fstream>
-#include <iomanip>
 #include <vector>
 
 #include "[BGSEEBase]\ToolBox.h"
@@ -252,14 +251,26 @@ namespace cse
 			return false;
 		}
 
-		static std::string SanitizeTabDelimitedField(const char* Input)
+		static std::string EscapeCSVField(const char* Input)
 		{
-			std::string Result = Input ? Input : "";
-			for (auto& Ch : Result)
+			std::string Value = Input ? Input : "";
+			for (auto& Ch : Value)
 			{
-				if (Ch == '\t' || Ch == '\r' || Ch == '\n')
+				if (Ch == '\r' || Ch == '\n')
 					Ch = ' ';
 			}
+
+			std::string Result;
+			Result.reserve(Value.size() + 2);
+			Result.push_back('"');
+			for (const auto Ch : Value)
+			{
+				if (Ch == '"')
+					Result += "\"\"";
+				else
+					Result.push_back(Ch);
+			}
+			Result.push_back('"');
 
 			return Result;
 		}
@@ -312,7 +323,7 @@ namespace cse
 				return;
 			}
 
-			Output << "FormID\tVoiceID\tSpeakerInfo\tOutputPath\tDialogue\n";
+			Output << "FormID,VoiceID,SpeakerInfo,OutputPath,Dialogue\n";
 
 			UInt32 Rows = 0;
 			for (tList<TESTopic>::Iterator ItrTopic = _DATAHANDLER->topics.Begin(); ItrTopic.End() == false && ItrTopic.Get(); ++ItrTopic)
@@ -377,12 +388,15 @@ namespace cse
 								Info->formID,
 								Response->responseNumber);
 
+							char FormID[9] = { 0 };
+							FORMAT_STR(FormID, "%08X", Info->formID);
+
 							Output
-								<< std::uppercase << std::hex << std::setfill('0') << std::setw(8) << Info->formID << std::dec
-								<< "\t" << SanitizeTabDelimitedField(VoiceID)
-								<< "\t" << SanitizeTabDelimitedField(SpeakerInfo.c_str())
-								<< "\t" << SanitizeTabDelimitedField(OutPath)
-								<< "\t" << SanitizeTabDelimitedField(ResponseText)
+								<< EscapeCSVField(FormID)
+								<< "," << EscapeCSVField(VoiceID)
+								<< "," << EscapeCSVField(SpeakerInfo.c_str())
+								<< "," << EscapeCSVField(OutPath)
+								<< "," << EscapeCSVField(ResponseText)
 								<< "\n";
 							Rows++;
 						}
