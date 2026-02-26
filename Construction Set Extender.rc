@@ -446,60 +446,74 @@ BEGIN
     END
     POPUP "&View"
     BEGIN
-        MENUITEM "Custom Color Theme Mode",     IDC_MAINMENU_CUSTOMCOLORTHEMEMODE
-        MENUITEM SEPARATOR
-        MENUITEM "&Toolbar",                    40102, CHECKED
-        MENUITEM "&Statusbar",                  40026, CHECKED
-        MENUITEM SEPARATOR
-        MENUITEM "&Render Window",              40423
-        MENUITEM "&Object Window",              40199
-        MENUITEM "Cell &View Window",           40200
-        MENUITEM "&Preview Window",             40121
-        MENUITEM SEPARATOR
-        MENUITEM "Multiple Preview Windows",    IDC_MAINMENU_MULTIPLEPREVIEWWINDOWS
-        MENUITEM "Spawn Extra Object Window",   IDC_MAINMENU_SPAWNEXTRAOBJECTWINDOW
-        MENUITEM SEPARATOR
-        MENUITEM "Memory Usage Window",         40439
-        MENUITEM "Open Windows...",             40455
-        MENUITEM "Global Clipboard Contents...", IDC_MAINMENU_GLOBALCLIPBOARDCONTENTS
-        MENUITEM SEPARATOR
-        MENUITEM "Console Window",              IDC_MAINMENU_CONSOLE
-        MENUITEM "Auxiliary Viewport Window",   IDC_MAINMENU_AUXVIEWPORT
-        MENUITEM "Tag Browser...",              IDC_MAINMENU_TAGBROWSER
-        MENUITEM "Centralized Use Info Listing...", IDC_MAINMENU_USEINFOLISTING
-        MENUITEM SEPARATOR
-        MENUITEM "Hide Unmodified Records",     IDC_MAINMENU_HIDEUNMODIFIEDFORMS
-        MENUITEM "Hide Deleted Records",        IDC_MAINMENU_HIDEDELETEDFORMS
-        MENUITEM SEPARATOR
-        MENUITEM "Sort Active Records First",   IDC_MAINMENU_SORTACTIVEFORMSFIRST
-        MENUITEM "Colorize Active Records",     IDC_MAINMENU_COLORIZEACTIVEFORMS
-        MENUITEM "Colorize Record Overrides",   IDC_MAINMENU_COLORIZEFORMOVERRIDES
-        MENUITEM SEPARATOR
-        MENUITEM "Markers",                     40030, CHECKED
-        MENUITEM "Light Radius",                40031, CHECKED
-        MENUITEM "Wireframe",                   40118
-        MENUITEM "Bright Light",                40206
-        MENUITEM "Sky",                         40223
-        MENUITEM "Solid Subspaces",             40482
-        MENUITEM "Collision Geometry",          40189
-        MENUITEM "Leaves",                      290, CHECKED
-        MENUITEM "Trees",                       40480, CHECKED
-        MENUITEM "Parent-Child Indicator",      IDC_MAINMENU_PARENTCHILDINDICATORS
-        MENUITEM "Path Grid Linked Ref Indicator", IDC_MAINMENU_PATHGRIDLINKEDREFINDICATORS
-        POPUP "Path Grid Linked Ref Indicator Visibility..."
+        POPUP "Window Visibility"
         BEGIN
-            MENUITEM "Elements to hide when the global toggle is off", ID_PATHGRIDLINKEDREFINDICATORVISIBILITY_ELEMENTSTOHIDE, INACTIVE
+            MENUITEM "&Toolbar",                    40102, CHECKED
+            MENUITEM "&Statusbar",                  40026, CHECKED
             MENUITEM SEPARATOR
-            MENUITEM "Hide Path Grid Point Bounding Box", IDC_MAINMENU_PATHGRIDLINKEDREFINDICATORSETTINGS_HIDEBOUNDINGBOX
-            MENUITEM "Hide Linked Ref Node",        IDC_MAINMENU_PATHGRIDLINKEDREFINDICATORSETTINGS_HIDELINKEDREFNODE
-            MENUITEM "Hide Line Connector",         IDC_MAINMENU_PATHGRIDLINKEDREFINDICATORSETTINGS_HIDELINECONNECTOR
+            MENUITEM "&Render Window",              40423
+            MENUITEM "&Object Window",              40199
+            MENUITEM "Cell &View Window",           40200
+            MENUITEM "&Preview Window",             40121
+            MENUITEM SEPARATOR
+            MENUITEM "Multiple Preview Windows",    IDC_MAINMENU_MULTIPLEPREVIEWWINDOWS
+            MENUITEM "Spawn Extra Object Window",   IDC_MAINMENU_SPAWNEXTRAOBJECTWINDOW
+            MENUITEM SEPARATOR
+            MENUITEM "Memory Usage Window",         40439
+            MENUITEM "Open Windows...",             40455
+            MENUITEM "Console Window",              IDC_MAINMENU_CONSOLE
+            MENUITEM "Auxiliary Viewport Window",   IDC_MAINMENU_AUXVIEWPORT
         END
-        MENUITEM SEPARATOR
-        MENUITEM "Initially Disabled References", IDC_MAINMENU_INITIALLYDISABLEDREFERENCES
-        MENUITEM "Initially Disabled References' Children", IDC_MAINMENU_CHILDREFERENCESOFTHEDISABLED
-        MENUITEM SEPARATOR
-        MENUITEM "&Isometric",                  40032
-        MENUITEM "Top",                         40033
+        POPUP "Data && Record Presentation"
+        BEGIN
+            MENUITEM "Tag Browser...",              IDC_MAINMENU_TAGBROWSER
+            MENUITEM "Centralized Use Info Listing...", IDC_MAINMENU_USEINFOLISTING
+            MENUITEM "Global Clipboard Contents...", IDC_MAINMENU_GLOBALCLIPBOARDCONTENTS
+            MENUITEM SEPARATOR
+            MENUITEM "Hide Unmodified Records",     IDC_MAINMENU_HIDEUNMODIFIEDFORMS
+            MENUITEM "Hide Deleted Records",        IDC_MAINMENU_HIDEDELETEDFORMS
+            MENUITEM SEPARATOR
+            MENUITEM "Sort Active Records First",   IDC_MAINMENU_SORTACTIVEFORMSFIRST
+            MENUITEM "Colorize Active Records",     IDC_MAINMENU_COLORIZEACTIVEFORMS
+            MENUITEM "Colorize Record Overrides",   IDC_MAINMENU_COLORIZEFORMOVERRIDES
+        END
+        POPUP "Render Display"
+        BEGIN
+            MENUITEM "Markers",                     40030, CHECKED
+            MENUITEM "Light Radius",                40031, CHECKED
+            MENUITEM "Wireframe",                   40118
+            MENUITEM "Bright Light",                40206
+            MENUITEM "Sky",                         40223
+            MENUITEM "Solid Subspaces",             40482
+            MENUITEM "Collision Geometry",          40189
+            MENUITEM "Leaves",                      290, CHECKED
+            MENUITEM "Trees",                       40480, CHECKED
+        END
+        POPUP "Relationship Overlays"
+        BEGIN
+            MENUITEM "Parent-Child Indicator",      IDC_MAINMENU_PARENTCHILDINDICATORS
+            MENUITEM "Path Grid Linked Ref Indicator", IDC_MAINMENU_PATHGRIDLINKEDREFINDICATORS
+            POPUP "Path Grid Linked Ref Indicator Visibility..."
+            BEGIN
+                MENUITEM "Elements to hide when the global toggle is off", ID_PATHGRIDLINKEDREFINDICATORVISIBILITY_ELEMENTSTOHIDE, INACTIVE
+                MENUITEM SEPARATOR
+                MENUITEM "Hide Path Grid Point Bounding Box", IDC_MAINMENU_PATHGRIDLINKEDREFINDICATORSETTINGS_HIDEBOUNDINGBOX
+                MENUITEM "Hide Linked Ref Node",        IDC_MAINMENU_PATHGRIDLINKEDREFINDICATORSETTINGS_HIDELINKEDREFNODE
+                MENUITEM "Hide Line Connector",         IDC_MAINMENU_PATHGRIDLINKEDREFINDICATORSETTINGS_HIDELINECONNECTOR
+            END
+            MENUITEM SEPARATOR
+            MENUITEM "Initially Disabled References", IDC_MAINMENU_INITIALLYDISABLEDREFERENCES
+            MENUITEM "Initially Disabled References' Children", IDC_MAINMENU_CHILDREFERENCESOFTHEDISABLED
+        END
+        POPUP "Camera"
+        BEGIN
+            MENUITEM "&Isometric",                  40032
+            MENUITEM "Top",                         40033
+        END
+        POPUP "Appearance"
+        BEGIN
+            MENUITEM "Custom Color Theme Mode",     IDC_MAINMENU_CUSTOMCOLORTHEMEMODE
+        END
     END
     POPUP "Worl&d"
     BEGIN
@@ -826,4 +840,3 @@ END
 
 /////////////////////////////////////////////////////////////////////////////
 #endif    // not APSTUDIO_INVOKED
-
