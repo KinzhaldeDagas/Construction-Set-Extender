@@ -653,7 +653,7 @@ extern "C"
 		InitParams.ReleaseName = ReleaseNameTable::Instance.LookupRelease(VERSION_MAJOR, VERSION_MINOR);
 		InitParams.Version = PACKED_SME_VERSION;
 		InitParams.EditorID = bgsee::Main::kExtenderParentEditor_TES4CS;
-		InitParams.EditorSupportedVersion = CS_VERSION_1_2;
+		InitParams.EditorSupportedVersion = obse->editorVersion;
 		InitParams.EditorCurrentVersion = obse->editorVersion;
 		InitParams.APPPath = obse->GetOblivionDirectory();
 		InitParams.SEPluginHandle = XSEPluginHandle;
