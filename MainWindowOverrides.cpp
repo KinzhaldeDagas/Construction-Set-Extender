@@ -1118,6 +1118,21 @@ namespace cse
 		}
 
 #define ID_PATHGRIDTOOLBARBUTTION_TIMERID		0x99
+#define ID_HALLOFFAME_MAINWINDOW_TIMERID		0x9A
+
+		static void UpdateMainWindowCaption(HWND hWnd)
+		{
+			std::string WndTitle = BGSEEMAIN_WINDOWTITLE;
+
+			if (settings::general::kShowHallOfFameMembersInTitleBar().i != hallOfFame::kDisplayESMember_None)
+			{
+				std::string HallOfFameMember;
+				hallOfFame::GetRandomESMember(HallOfFameMember, false);
+				WndTitle = HallOfFameMember + " - " + WndTitle;
+			}
+
+			SetWindowText(hWnd, WndTitle.c_str());
+		}
 
 		LRESULT CALLBACK MainWindowMiscSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
 													bgsee::WindowSubclassProcCollection::SubclassProcExtraParams* SubclassParams)
@@ -1136,6 +1151,8 @@ namespace cse
 			case WM_MAINWINDOW_INIT_DIALOG:
 				{
 					SetTimer(hWnd, ID_PATHGRIDTOOLBARBUTTION_TIMERID, 500, nullptr);
+					SetTimer(hWnd, ID_HALLOFFAME_MAINWINDOW_TIMERID, 8000, nullptr);
+					UpdateMainWindowCaption(hWnd);
 					SubclassParams->Out.MarkMessageAsHandled = true;
 				}
 
@@ -1143,6 +1160,7 @@ namespace cse
 			case WM_DESTROY:
 				{
 					KillTimer(hWnd, ID_PATHGRIDTOOLBARBUTTION_TIMERID);
+					KillTimer(hWnd, ID_HALLOFFAME_MAINWINDOW_TIMERID);
 
 					MainWindowMiscData* xData = BGSEE_GETWINDOWXDATA(MainWindowMiscData, SubclassParams->In.ExtraData);
 					if (xData)
@@ -1215,6 +1233,9 @@ namespace cse
 						}
 					}
 
+					break;
+				case ID_HALLOFFAME_MAINWINDOW_TIMERID:
+					UpdateMainWindowCaption(hWnd);
 					break;
 				}
 
