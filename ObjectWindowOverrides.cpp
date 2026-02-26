@@ -113,7 +113,13 @@ namespace cse
 					Params.ColumnTextCallback = ObjectWindowFormListGetColumnText;
 					uiManager::FilterableFormListManager::Instance.Register(Params);
 
-					SetWindowText(hWnd, "Object Window");
+					std::string WndTitle = "Object Window";
+					if (settings::general::kShowHallOfFameMembersInTitleBar().i != hallOfFame::kDisplayESMember_None)
+					{
+						hallOfFame::GetRandomESMember(WndTitle);
+						WndTitle += " Object Window";
+					}
+					SetWindowText(hWnd, WndTitle.c_str());
 
 					TESObjectWindow::PrimaryObjectWindowHandle = hWnd;
 				}
