@@ -1078,7 +1078,7 @@ ScriptCompileData* AllocateCompileData(void)
 template <typename tData>
 void AddLinkedListContentsToFormList(tList<tData>* List, FormListData* FormList, UInt32& CurrentIndex)
 {
-	for (tList<tData>::Iterator Itr = List->Begin(); !Itr.End() && Itr.Get(); ++Itr)
+	for (typename tList<tData>::Iterator Itr = List->Begin(); !Itr.End() && Itr.Get(); ++Itr)
 	{
 		FormData* ThisForm = &FormList->FormListHead[CurrentIndex];
 		ThisForm->FillFormData(Itr.Get());

@@ -205,7 +205,8 @@ namespace cse
 			}
 
 			BGSEECONSOLE->InitializeUI(BGSEEUI->GetMainWindow(), BGSEEMAIN->GetExtenderHandle());
-			BGSEECONSOLE->InitializeWarningManager(BGSEEMAIN->INIGetter(), BGSEEMAIN->INISetter(), ConsoleWarningRegistrar());
+			static ConsoleWarningRegistrar WarningRegistrar;
+			BGSEECONSOLE->InitializeWarningManager(BGSEEMAIN->INIGetter(), BGSEEMAIN->INISetter(), WarningRegistrar);
 
 			BGSEECONSOLE->RegisterConsoleCommand(&kBGSEEConsoleCmd_88MPH);
 			BGSEECONSOLE->RegisterConsoleCommand(&kBGSEEConsoleCmd_Wubble);
