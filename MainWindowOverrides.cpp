@@ -222,6 +222,36 @@ namespace cse
 			return nullptr;
 		}
 
+
+		static std::string GetDefaultRevoiceCSVFileName(const char* ActivePluginName)
+		{
+			std::string BaseName = ActivePluginName ? ActivePluginName : "ActivePlugin";
+			if (BaseName.empty())
+				BaseName = "ActivePlugin";
+
+			size_t LastSlash = BaseName.find_last_of("\\/");
+			if (LastSlash != std::string::npos)
+				BaseName.erase(0, LastSlash + 1);
+
+			size_t LastDot = BaseName.find_last_of('.');
+			if (LastDot != std::string::npos)
+				BaseName.erase(LastDot);
+
+			if (BaseName.empty())
+				BaseName = "ActivePlugin";
+
+			return std::string("reVoice_") + BaseName + ".csv";
+		}
+
+		static bool IsAbsoluteRevoicePath(const std::string& Path)
+		{
+			if (Path.size() >= 2 && Path[1] == ':')
+				return true;
+			if (Path.size() >= 2 && Path[0] == '\\' && Path[1] == '\\')
+				return true;
+			return false;
+		}
+
 		static std::string SanitizeTabDelimitedField(const char* Input)
 		{
 			std::string Result = Input ? Input : "";
@@ -243,6 +273,8 @@ namespace cse
 			}
 
 			char SelectPath[MAX_PATH] = { 0 };
+			std::string DefaultFileName = GetDefaultRevoiceCSVFileName(_DATAHANDLER->activeFile->fileName);
+			strncpy_s(SelectPath, DefaultFileName.c_str(), _TRUNCATE);
 			if (TESDialog::ShowFileSelect(hWnd,
 				"Data",
 				"CSV Files\0*.csv\0\0",
@@ -260,6 +292,16 @@ namespace cse
 			std::string FilePath(SelectPath);
 			if (FilePath.empty())
 				return;
+
+			for (auto& Ch : FilePath)
+			{
+				if (Ch == '/')
+					Ch = '\\';
+			}
+
+			if (IsAbsoluteRevoicePath(FilePath) == false && _strnicmp(FilePath.c_str(), "Data\\", 5) != 0)
+				FilePath = std::string("Data\\") + FilePath;
+
 			if (FilePath.size() < 4 || _stricmp(FilePath.c_str() + FilePath.size() - 4, ".csv"))
 				FilePath += ".csv";
 
