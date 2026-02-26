@@ -1,4 +1,7 @@
-# Construction Set Extender
+AI-Construction Set Extender
+
+WARNING: Testing-Purposes only do not use for production.
+
 
 The Construction Set Extender is an [OBSE](https://www.nexusmods.com/oblivion/mods/37952) plugin that 
 enhances the [TES4 Construction Set](https://www.nexusmods.com/oblivion/mods/11367) by fixing various bugs and adding new tools.
