@@ -7,8 +7,8 @@
     <DirectXIncludePath>$(DXSDK_DIR)Include</DirectXIncludePath>
     <DirectXLibPath>$(DXSDK_DIR)Lib\x86</DirectXLibPath>
 
-    <!-- Need BOTH for <ITypes.h> and <common/IErrors.h> -->
-    <XSECommonIncludePath>C:\Libraries\common;C:\Libraries</XSECommonIncludePath>
+    <!-- C:\Libraries contains ITypes.h and common\* headers -->
+    <XSECommonIncludePath>C:\Libraries</XSECommonIncludePath>
     <XSECommonLibPath>C:\Libraries\common\Win32_v143\Release</XSECommonLibPath>
 
     <SMESundriesIncludePath>C:\src\SME-Sundries-master</SMESundriesIncludePath>

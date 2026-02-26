@@ -164,7 +164,7 @@
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir);C:\src\xOBSE-Plugins-main\obse\obse;C:\src\CrashRpt-main\include;C:\src\xOBSE-Plugins-main\obse;$(DXSDK_DIR)Include;$(SolutionDir);$(SolutionDir)\..\obse\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);C:\Libraries;C:\Libraries\common;C:\src\SME-Sundries-master;C:\src\xOBSE-Plugins-main\obse\obse;C:\src\CrashRpt-main\include;C:\src\xOBSE-Plugins-main\obse;$(DXSDK_DIR)Include;$(SolutionDir);$(SolutionDir)\..\obse\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_WINDOWS;_USRDLL;NDEBUG;CS_VERSION=0x01020000;OBLIVION_VERSION=0x010201A0;CSE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessToFile>false</PreprocessToFile>
       <PreprocessSuppressLineNumbers>false</PreprocessSuppressLineNumbers>
@@ -220,7 +220,7 @@ if not "$(DropboxPath)"=="" if exist "$(DropboxPath)\CSE Once-In-Awhile'lies\Dat
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release - Skip Dev Channel|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir);C:\src\xOBSE-Plugins-main\obse\obse;C:\src\CrashRpt-main\include;C:\src\xOBSE-Plugins-main\obse;$(DXSDK_DIR)Include;$(SolutionDir);$(SolutionDir)\..\obse\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);C:\Libraries;C:\Libraries\common;C:\src\SME-Sundries-master;C:\src\xOBSE-Plugins-main\obse\obse;C:\src\CrashRpt-main\include;C:\src\xOBSE-Plugins-main\obse;$(DXSDK_DIR)Include;$(SolutionDir);$(SolutionDir)\..\obse\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_WINDOWS;_USRDLL;NDEBUG;CS_VERSION=0x01020000;OBLIVION_VERSION=0x010201A0;CSE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessToFile>false</PreprocessToFile>
       <PreprocessSuppressLineNumbers>false</PreprocessSuppressLineNumbers>
@@ -274,7 +274,7 @@ if not "$(DropboxPath)"=="" if exist "$(DropboxPath)\CSE Once-In-Awhile'lies\Dat
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release - No CrashRpt, Attach Debugger|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir);C:\src\xOBSE-Plugins-main\obse\obse;C:\src\CrashRpt-main\include;C:\src\xOBSE-Plugins-main\obse;$(DXSDK_DIR)Include;$(SolutionDir);$(SolutionDir)\..\obse\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);C:\Libraries;C:\Libraries\common;C:\src\SME-Sundries-master;C:\src\xOBSE-Plugins-main\obse\obse;C:\src\CrashRpt-main\include;C:\src\xOBSE-Plugins-main\obse;$(DXSDK_DIR)Include;$(SolutionDir);$(SolutionDir)\..\obse\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_WINDOWS;_USRDLL;NDEBUG;CS_VERSION=0x01020000;OBLIVION_VERSION=0x010201A0;CSE;WAIT_FOR_DEBUGGER;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessToFile>false</PreprocessToFile>
       <PreprocessSuppressLineNumbers>false</PreprocessSuppressLineNumbers>
@@ -331,7 +331,7 @@ if not "$(DropboxPath)"=="" if exist "$(DropboxPath)\CSE Once-In-Awhile'lies\Dat
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir);C:\src\xOBSE-Plugins-main\obse\obse;C:\src\CrashRpt-main\include;C:\src\xOBSE-Plugins-main\obse;$(DXSDK_DIR)Include;$(SolutionDir);$(SolutionDir)\..\obse\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);C:\Libraries;C:\Libraries\common;C:\src\SME-Sundries-master;C:\src\xOBSE-Plugins-main\obse\obse;C:\src\CrashRpt-main\include;C:\src\xOBSE-Plugins-main\obse;$(DXSDK_DIR)Include;$(SolutionDir);$(SolutionDir)\..\obse\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_DEBUG;WIN32;_WINDOWS;_USRDLL;CS_VERSION=0x01020000;OBLIVION_VERSION=0x010201A0;CSE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <IgnoreStandardIncludePath>false</IgnoreStandardIncludePath>
       <PreprocessToFile>false</PreprocessToFile>
@@ -393,7 +393,7 @@ if not "$(DropboxPath)"=="" if exist "$(DropboxPath)\CSE Once-In-Awhile'lies\Dat
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug - Attach Debugger|Win32'">
     <ClCompile>
-      <AdditionalIncludeDirectories>$(ProjectDir);C:\src\xOBSE-Plugins-main\obse\obse;C:\src\CrashRpt-main\include;C:\src\xOBSE-Plugins-main\obse;$(DXSDK_DIR)Include;$(SolutionDir);$(SolutionDir)\..\obse\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);C:\Libraries;C:\Libraries\common;C:\src\SME-Sundries-master;C:\src\xOBSE-Plugins-main\obse\obse;C:\src\CrashRpt-main\include;C:\src\xOBSE-Plugins-main\obse;$(DXSDK_DIR)Include;$(SolutionDir);$(SolutionDir)\..\obse\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>_DEBUG;WIN32;_WINDOWS;_USRDLL;CS_VERSION=0x01020000;OBLIVION_VERSION=0x010201A0;CSE;WAIT_FOR_DEBUGGER;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <IgnoreStandardIncludePath>false</IgnoreStandardIncludePath>
       <PreprocessToFile>false</PreprocessToFile>
