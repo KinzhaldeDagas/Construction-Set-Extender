@@ -514,7 +514,14 @@ namespace bgsee
 
 	HWND UIManager::GetMainWindow() const
 	{
-		SME_ASSERT(EditorWindowHandle);
+		if (EditorWindowHandle == nullptr || IsWindow(EditorWindowHandle) == FALSE)
+		{
+			HWND Window = FindWindow(EditorWindowClassName.c_str(), nullptr);
+			if (Window)
+				const_cast<UIManager*>(this)->EditorWindowHandle = Window;
+		}
+
+		SME_ASSERT(EditorWindowHandle && IsWindow(EditorWindowHandle));
 		return EditorWindowHandle;
 	}
 
