@@ -799,7 +799,9 @@ namespace bgsee
 						   MB_TASKMODAL | MB_SETFOREGROUND | MB_ICONERROR | MB_OK);
 
 				BGSEECONSOLE_MESSAGE("CrashRpt failed to initialize; Error Message: %s", Buffer);
-				Initialized = false;
+
+				// CrashRpt support is optional; keep loading the extender even if crash reporting can't be initialized.
+				CrashRptSupport = false;
 			}
 			else
 			{
