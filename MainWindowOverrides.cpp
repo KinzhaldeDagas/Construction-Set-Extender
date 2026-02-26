@@ -48,6 +48,61 @@ namespace cse
 			;//
 		}
 
+		void SnapMainChildWindowsToLayout(HWND MainWindow)
+		{
+			if (IsWindow(MainWindow) == FALSE)
+				return;
+
+			RECT ClientRect = { 0 };
+			if (GetClientRect(MainWindow, &ClientRect) == FALSE)
+				return;
+
+			POINT ClientTopLeft = { 0, 0 };
+			ClientToScreen(MainWindow, &ClientTopLeft);
+
+			const int kPadding = 6;
+			const int kGap = 6;
+
+			int MainClientWidth = ClientRect.right - ClientRect.left;
+			int MainClientHeight = ClientRect.bottom - ClientRect.top;
+
+			if (MainClientWidth < 900 || MainClientHeight < 500)
+				return;
+
+			int WorkspaceX = ClientTopLeft.x + kPadding;
+			int WorkspaceY = ClientTopLeft.y + kPadding;
+			int WorkspaceWidth = MainClientWidth - (kPadding * 2);
+			int WorkspaceHeight = MainClientHeight - (kPadding * 2);
+
+			int LeftPaneWidth = (WorkspaceWidth * 36) / 100;
+			if (LeftPaneWidth < 500)
+				LeftPaneWidth = 500;
+			if (LeftPaneWidth > 620)
+				LeftPaneWidth = 620;
+			if (LeftPaneWidth > WorkspaceWidth - 380)
+				LeftPaneWidth = WorkspaceWidth - 380;
+
+			int ObjectWindowHeight = (WorkspaceHeight * 66) / 100;
+			if (ObjectWindowHeight < 300)
+				ObjectWindowHeight = 300;
+			if (ObjectWindowHeight > WorkspaceHeight - 220)
+				ObjectWindowHeight = WorkspaceHeight - 220;
+
+			int CellViewHeight = WorkspaceHeight - ObjectWindowHeight - kGap;
+			int RightPaneX = WorkspaceX + LeftPaneWidth + kGap;
+			int RightPaneWidth = WorkspaceWidth - LeftPaneWidth - kGap;
+
+			auto SnapWindow = [](HWND Window, int X, int Y, int W, int H)
+			{
+				if (IsWindow(Window) && IsWindowVisible(Window))
+					SetWindowPos(Window, nullptr, X, Y, W, H, SWP_NOACTIVATE | SWP_NOZORDER);
+			};
+
+			SnapWindow(*TESObjectWindow::WindowHandle, WorkspaceX, WorkspaceY, LeftPaneWidth, ObjectWindowHeight);
+			SnapWindow(*TESCellViewWindow::WindowHandle, WorkspaceX, WorkspaceY + ObjectWindowHeight + kGap, LeftPaneWidth, CellViewHeight);
+			SnapWindow(*TESRenderWindow::WindowHandle, RightPaneX, WorkspaceY, RightPaneWidth, WorkspaceHeight);
+		}
+
 		void BatchGenerateLipSyncFiles(HWND hWnd)
 		{
 			if (*TESQuest::WindowHandle != NULL || *TESQuest::FilteredDialogWindowHandle != NULL)
@@ -420,6 +475,13 @@ namespace cse
 
 				switch (LOWORD(wParam))
 				{
+				case TESCSMain::kMainMenu_View_RenderWindow:
+				case TESCSMain::kMainMenu_View_ObjectWindow:
+				case TESCSMain::kMainMenu_View_CellViewWindow:
+					SubclassParams->Out.MarkMessageAsHandled = false;
+					PostMessage(hWnd, WM_MAINWINDOW_SNAP_LAYOUT, NULL, NULL);
+
+					break;
 				case TESCSMain::kMainMenu_View_PreviewWindow:
 					if (PreviewWindowImposterManager::Instance.GetEnabled())
 						BGSEEUI->MsgBoxI("Use the Object Window's context menu to preview objects when multiple preview windows are enabled.");
@@ -760,6 +822,7 @@ namespace cse
 		}
 
 #define ID_PATHGRIDTOOLBARBUTTION_TIMERID		0x99
+#define ID_MAINWINDOWSNAP_TIMERID				0x9A
 
 		LRESULT CALLBACK MainWindowMiscSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
 													bgsee::WindowSubclassProcCollection::SubclassProcExtraParams* SubclassParams)
@@ -778,13 +841,19 @@ namespace cse
 			case WM_MAINWINDOW_INIT_DIALOG:
 				{
 					SetTimer(hWnd, ID_PATHGRIDTOOLBARBUTTION_TIMERID, 500, nullptr);
+					SetTimer(hWnd, ID_MAINWINDOWSNAP_TIMERID, 1000, nullptr);
 					SubclassParams->Out.MarkMessageAsHandled = true;
 				}
+
+				break;
+			case WM_MAINWINDOW_SNAP_LAYOUT:
+				SnapMainChildWindowsToLayout(hWnd);
 
 				break;
 			case WM_DESTROY:
 				{
 					KillTimer(hWnd, ID_PATHGRIDTOOLBARBUTTION_TIMERID);
+					KillTimer(hWnd, ID_MAINWINDOWSNAP_TIMERID);
 
 					MainWindowMiscData* xData = BGSEE_GETWINDOWXDATA(MainWindowMiscData, SubclassParams->In.ExtraData);
 					if (xData)
@@ -856,6 +925,11 @@ namespace cse
 							SendMessage(*TESCSMain::MainToolbarHandle, TB_SETBUTTONINFO, TESCSMain::kToolbar_PathGridEdit, (LPARAM)&PathGridData);
 						}
 					}
+
+					break;
+				case ID_MAINWINDOWSNAP_TIMERID:
+					SnapMainChildWindowsToLayout(hWnd);
+					KillTimer(hWnd, ID_MAINWINDOWSNAP_TIMERID);
 
 					break;
 				}

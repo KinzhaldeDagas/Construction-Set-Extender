@@ -47,3 +47,4 @@ namespace cse
 
 // wParam = position
 #define WM_MAINTOOLBAR_SETTOD					(WM_USER + 2006)
+#define WM_MAINWINDOW_SNAP_LAYOUT				(WM_USER + 2007)
