@@ -426,6 +426,25 @@ namespace cse
 			return false;
 		}
 
+		static UInt32 ComputeFNV1a(const std::string& Value)
+		{
+			UInt32 Hash = 2166136261u;
+			for (unsigned char Ch : Value)
+			{
+				Hash ^= Ch;
+				Hash *= 16777619u;
+			}
+
+			return Hash;
+		}
+
+		static std::string FormatHex32(UInt32 Value)
+		{
+			char Buffer[16] = { 0 };
+			FORMAT_STR(Buffer, "%08X", Value);
+			return Buffer;
+		}
+
 		template <typename tData>
 		static void AddLinkedListFormsForPlugin(tList<tData>* List, TESFile* Plugin, std::set<UInt32>& SeenFormIDs, std::vector<TESForm*>& Out)
 		{
@@ -497,24 +516,123 @@ namespace cse
 		{
 			SME_ASSERT(OutPlugin);
 			*OutPlugin = nullptr;
-			char FileName[MAX_PATH] = { 0 };
-			if (TESDialog::SelectTESFileCommonDialog(hWnd,
-				INISettingCollection::Instance->LookupByName("sLocalMasterPath:General")->value.s,
-				0,
-				FileName,
-				sizeof(FileName)) == false)
+
+			struct LoadedPluginSelectionContext
 			{
+				std::vector<TESFile*>	LoadedPlugins;
+				TESFile*				SelectedPlugin = nullptr;
+			};
+
+			auto DialogProc = [](HWND Dialog, UINT Message, WPARAM wParam, LPARAM lParam) -> INT_PTR
+			{
+				enum
+				{
+					kCtrlId_Label = 1001,
+					kCtrlId_Combo = 1002,
+				};
+
+				auto* Context = reinterpret_cast<LoadedPluginSelectionContext*>(GetWindowLongPtr(Dialog, DWLP_USER));
+				switch (Message)
+				{
+				case WM_INITDIALOG:
+					{
+						Context = reinterpret_cast<LoadedPluginSelectionContext*>(lParam);
+						SetWindowLongPtr(Dialog, DWLP_USER, reinterpret_cast<LONG_PTR>(Context));
+
+						CreateWindowExA(0, "STATIC", "List of loaded plugins",
+							WS_CHILD | WS_VISIBLE,
+							12, 12, 220, 16,
+							Dialog, reinterpret_cast<HMENU>(kCtrlId_Label), *TESCSMain::Instance, nullptr);
+
+						HWND Combo = CreateWindowExA(WS_EX_CLIENTEDGE,
+							"COMBOBOX",
+							nullptr,
+							WS_CHILD | WS_VISIBLE | WS_TABSTOP | CBS_DROPDOWNLIST | WS_VSCROLL,
+							12, 32, 316, 160,
+							Dialog,
+							reinterpret_cast<HMENU>(kCtrlId_Combo),
+							*TESCSMain::Instance,
+							nullptr);
+
+						for (auto* Plugin : Context->LoadedPlugins)
+						{
+							if (Plugin == nullptr)
+								continue;
+
+							LRESULT ItemIndex = SendMessageA(Combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(Plugin->fileName));
+							SendMessageA(Combo, CB_SETITEMDATA, ItemIndex, reinterpret_cast<LPARAM>(Plugin));
+						}
+
+						if (SendMessageA(Combo, CB_GETCOUNT, 0, 0) > 0)
+							SendMessageA(Combo, CB_SETCURSEL, 0, 0);
+
+						CreateWindowExA(0, "BUTTON", "OK",
+							WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_DEFPUSHBUTTON,
+							172, 72, 75, 24,
+							Dialog, reinterpret_cast<HMENU>(IDOK), *TESCSMain::Instance, nullptr);
+
+						CreateWindowExA(0, "BUTTON", "Cancel",
+							WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
+							253, 72, 75, 24,
+							Dialog, reinterpret_cast<HMENU>(IDCANCEL), *TESCSMain::Instance, nullptr);
+
+						SetFocus(Combo);
+						return FALSE;
+					}
+				case WM_COMMAND:
+					if (LOWORD(wParam) == IDOK)
+					{
+						HWND Combo = GetDlgItem(Dialog, kCtrlId_Combo);
+						LRESULT Selection = SendMessageA(Combo, CB_GETCURSEL, 0, 0);
+						if (Selection == CB_ERR)
+							return TRUE;
+
+						Context->SelectedPlugin = reinterpret_cast<TESFile*>(SendMessageA(Combo, CB_GETITEMDATA, Selection, 0));
+						EndDialog(Dialog, IDOK);
+						return TRUE;
+					}
+					else if (LOWORD(wParam) == IDCANCEL)
+					{
+						EndDialog(Dialog, IDCANCEL);
+						return TRUE;
+					}
+					break;
+				}
+
+				return FALSE;
+			};
+
+			LoadedPluginSelectionContext Context;
+			for (UInt32 Index = 0;; Index++)
+			{
+				TESFile* CurrentPlugin = _DATAHANDLER->LookupPluginByIndex(Index);
+				if (CurrentPlugin == nullptr)
+					break;
+
+				if (_DATAHANDLER->IsPluginLoaded(CurrentPlugin))
+					Context.LoadedPlugins.push_back(CurrentPlugin);
+			}
+
+			if (Context.LoadedPlugins.empty())
+			{
+				BGSEEUI->MsgBoxE("No loaded plugins are currently available.");
 				return false;
 			}
 
-			TESFile* File = _DATAHANDLER->LookupPluginByName(FileName);
-			if (File == nullptr || _DATAHANDLER->IsPluginLoaded(File) == false)
-			{
-				BGSEEUI->MsgBoxE("The selected plugin is not currently loaded:\n%s", FileName);
-				return false;
-			}
+			DLGTEMPLATE Template = {};
+			Template.style = WS_POPUP | WS_CAPTION | WS_SYSMENU | DS_MODALFRAME | DS_SETFONT;
+			Template.dwExtendedStyle = 0;
+			Template.cdit = 0;
+			Template.x = 0;
+			Template.y = 0;
+			Template.cx = 340;
+			Template.cy = 108;
 
-			*OutPlugin = File;
+			const INT_PTR Result = DialogBoxIndirectParamA(*TESCSMain::Instance, &Template, hWnd, DialogProc, reinterpret_cast<LPARAM>(&Context));
+			if (Result != IDOK || Context.SelectedPlugin == nullptr)
+				return false;
+
+			*OutPlugin = Context.SelectedPlugin;
 			return true;
 		}
 
@@ -525,14 +643,13 @@ namespace cse
 				return;
 
 			std::string BaseName = GetBasePluginName(Plugin->fileName);
-			std::string OutDir = std::string("Data\\JSONs\\") + BaseName;
-			CreateDirectoryA("Data\\JSONs", nullptr);
-			CreateDirectoryA(OutDir.c_str(), nullptr);
+			std::string OutDir = "Data";
 
 			std::vector<TESForm*> Forms;
 			CollectFormsOwnedByPlugin(Plugin, Forms);
+			TESCSMain::WriteToStatusBar(0, "JSON export in progress...");
 
-			std::string ManifestPath = OutDir + "\\manifest.json";
+			std::string ManifestPath = OutDir + "\\" + BaseName + "_manifest.json";
 			std::ofstream ManifestOut(ManifestPath, std::ios::trunc);
 			if (ManifestOut.good() == false)
 			{
@@ -540,7 +657,8 @@ namespace cse
 				return;
 			}
 
-			std::string FormsPath = OutDir + "\\forms.jsonl";
+			std::string FormsFileName = BaseName + "_forms.jsonl";
+			std::string FormsPath = OutDir + "\\" + FormsFileName;
 			std::ofstream Out(FormsPath, std::ios::trunc);
 			if (Out.good() == false)
 			{
@@ -563,24 +681,35 @@ namespace cse
 				char FormIDHex[16] = { 0 };
 				FORMAT_STR(FormIDHex, "%08X", Form->formID);
 
-				Out << "{\"plugin\":\"" << EscapeJSONString(Plugin->fileName) << "\","
+				const UInt32 TokenHash = ComputeFNV1a(FormToken);
+
+				Out << "{\"schema\":\"cse-plugin-json-row-v2\","
+					<< "\"plugin\":\"" << EscapeJSONString(Plugin->fileName) << "\","
 					<< "\"formToken\":\"" << EscapeJSONString(FormToken) << "\","
+					<< "\"formTokenHash\":\"" << FormatHex32(TokenHash) << "\","
 					<< "\"editorID\":\"" << EscapeJSONString(Data.EditorID ? Data.EditorID : "") << "\","
 					<< "\"parentPlugin\":\"" << EscapeJSONString(Data.ParentPluginName ? Data.ParentPluginName : "") << "\","
 					<< "\"formType\":\"" << EscapeJSONString(Form->GetFormTypeIDLongName(Form->formType)) << "\","
 					<< "\"formID\":\"" << FormIDHex << "\"}\n";
 				Exported++;
+				if ((Exported % 50) == 0)
+				{
+					char ProgressMessage[256] = { 0 };
+					FORMAT_STR(ProgressMessage, "JSON export: %u / %u forms", Exported, static_cast<UInt32>(Forms.size()));
+					TESCSMain::WriteToStatusBar(0, ProgressMessage);
+				}
 			}
 
 			ManifestOut << "{\n"
-				<< "  \"schema\": \"cse-plugin-json-v1\",\n"
+				<< "  \"schema\": \"cse-plugin-json-v2\",\n"
 				<< "  \"plugin\": \"" << EscapeJSONString(Plugin->fileName) << "\",\n"
 				<< "  \"formCount\": " << Exported << ",\n"
-				<< "  \"formsFile\": \"forms.jsonl\"\n"
+				<< "  \"formsFile\": \"" << EscapeJSONString(FormsFileName) << "\"\n"
 				<< "}\n";
 
 			Out.flush();
 			ManifestOut.flush();
+			TESCSMain::WriteToStatusBar(0, "JSON export complete.");
 			BGSEEUI->MsgBoxI("Plugin export complete.\nPlugin: %s\nExported forms: %u\nFolder: %s", Plugin->fileName, Exported, OutDir.c_str());
 		}
 
@@ -591,20 +720,24 @@ namespace cse
 				return;
 
 			std::string BaseName = GetBasePluginName(Plugin->fileName);
-			std::string OutDir = std::string("Data\\JSONs\\") + BaseName;
-			std::string ManifestPath = OutDir + "\\manifest.json";
-			std::string FormsPath = OutDir + "\\forms.jsonl";
+			std::string OutDir = "Data";
+			std::string ManifestPath = OutDir + "\\" + BaseName + "_manifest.json";
+			std::string FormsPath = OutDir + "\\" + BaseName + "_forms.jsonl";
 
 			std::ifstream ManifestIn(ManifestPath);
 			if (ManifestIn.good())
 			{
 				std::string Manifest((std::istreambuf_iterator<char>(ManifestIn)), std::istreambuf_iterator<char>());
 				std::string ManifestPlugin;
+				std::string ManifestFormsFile;
 				if (ExtractJSONStringField(Manifest, "plugin", ManifestPlugin) && _stricmp(ManifestPlugin.c_str(), Plugin->fileName) != 0)
 				{
 					BGSEEUI->MsgBoxE("Manifest plugin mismatch.\nSelected: %s\nManifest: %s", Plugin->fileName, ManifestPlugin.c_str());
 					return;
 				}
+
+				if (ExtractJSONStringField(Manifest, "formsFile", ManifestFormsFile) && ManifestFormsFile.empty() == false)
+					FormsPath = OutDir + "\\" + ManifestFormsFile;
 			}
 
 			std::ifstream In(FormsPath);
@@ -620,9 +753,10 @@ namespace cse
 			_DATAHANDLER->activeFile = Plugin;
 			Plugin->SetActive(true);
 
-			UInt32 Imported = 0, Failed = 0, SkippedPluginMismatch = 0, SkippedMalformed = 0;
+			UInt32 Imported = 0, Failed = 0, SkippedPluginMismatch = 0, SkippedMalformed = 0, SkippedHashMismatch = 0;
 			std::string Line;
 			serialization::TESForm2Text Serializer;
+			TESCSMain::WriteToStatusBar(0, "JSON import in progress...");
 			while (std::getline(In, Line))
 			{
 				if (Line.empty())
@@ -647,6 +781,16 @@ namespace cse
 					continue;
 				}
 
+				std::string TokenHash;
+				if (ExtractJSONStringField(Line, "formTokenHash", TokenHash) && TokenHash.empty() == false)
+				{
+					if (_stricmp(TokenHash.c_str(), FormatHex32(ComputeFNV1a(FormToken)).c_str()) != 0)
+					{
+						SkippedHashMismatch++;
+						continue;
+					}
+				}
+
 				TESForm* Form = nullptr;
 				if (Serializer.Deserialize(FormToken, &Form) == false || Form == nullptr)
 				{
@@ -663,19 +807,27 @@ namespace cse
 
 				Form->SetFromActiveFile(true);
 				Imported++;
+				if ((Imported % 50) == 0)
+				{
+					char ProgressMessage[256] = { 0 };
+					FORMAT_STR(ProgressMessage, "JSON import: %u forms applied", Imported);
+					TESCSMain::WriteToStatusBar(0, ProgressMessage);
+				}
 			}
 
 			Plugin->SetActive(false);
 			_DATAHANDLER->activeFile = OldActive;
 			if (OldActive)
 				OldActive->SetActive(true);
+			TESCSMain::WriteToStatusBar(0, "JSON import complete.");
 
-			BGSEEUI->MsgBoxI("JSON import complete.\nPlugin: %s\nImported forms: %u\nResolve failures: %u\nSkipped malformed rows: %u\nSkipped plugin mismatches: %u\nPath: %s",
+			BGSEEUI->MsgBoxI("JSON import complete.\nPlugin: %s\nImported forms: %u\nResolve failures: %u\nSkipped malformed rows: %u\nSkipped plugin mismatches: %u\nSkipped hash mismatches: %u\nPath: %s",
 				Plugin->fileName,
 				Imported,
 				Failed,
 				SkippedMalformed,
 				SkippedPluginMismatch,
+				SkippedHashMismatch,
 				FormsPath.c_str());
 		}
 
