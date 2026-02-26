@@ -88,7 +88,6 @@ namespace cse
 
 #define BGSEEMAIN_EXTENDERLONGNAME		"Construction Set Extender"
 #define BGSEEMAIN_EXTENDERSHORTNAME		"CSE"
-#define BGSEEMAIN_WINDOWTITLE			"TES Construction Set Extender"
 
 // bgsee::ResourceLocation paths
 #define CSE_CODADEPOT					"Coda\\"

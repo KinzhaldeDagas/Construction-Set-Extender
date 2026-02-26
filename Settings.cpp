@@ -200,7 +200,7 @@ namespace cse
 			INISetting		kFaceGenPreviewResponseWindow("FaceGenPreviewResponseWindow", GENERAL_INISECTION, "Preview voice/lip file playback in NPC dialogs", (SInt32)0);
 			INISetting		kFaceGenPreviewVoiceDelay("FaceGenPreviewVoiceDelay", GENERAL_INISECTION, "Delay, in milliseconds, between voice file and lip sync file playback during previews", (SInt32)50);
 			INISetting		kDisableSplashScreen("DisableSplashScreen", GENERAL_INISECTION, "Disables the startup splash screen", (SInt32)0);
-			INISetting		kShowHallOfFameMembersInTitleBar("ShowHallOfFameMembersInTitleBar", GENERAL_INISECTION, "Displays names of various ES modding community members in title bars. 0 - Disable | 1 - Main Window + Preview Windows | 2 - Main Window + Preview Windows + Edit Dialogs", (SInt32)1);
+			INISetting		kShowHallOfFameMembersInTitleBar("ShowHallOfFameMembersInTitleBar", GENERAL_INISECTION, "Displays names of various ES modding community members in dialog title bars. 0 - Disable | 1 - Object Windows + Preview Windows | 2 - Object Windows + Preview Windows + Edit Dialogs", (SInt32)1);
 		}
 
 		namespace lod
