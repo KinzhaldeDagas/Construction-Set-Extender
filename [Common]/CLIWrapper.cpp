@@ -1,4 +1,5 @@
 #include "CLIWrapper.h"
+#include <vector>
 
 namespace cse
 {
@@ -16,6 +17,19 @@ namespace cse
 		componentDLLInterface::QueryInterface USEQueryInterfaceProc = nullptr;
 		componentDLLInterface::QueryInterface BSAQueryInterfaceProc = nullptr;
 		componentDLLInterface::QueryInterface TAGQueryInterfaceProc = nullptr;
+		std::vector<HMODULE> LoadedComponentModules;
+
+		void UnloadImportedModules()
+		{
+			for (auto Itr = LoadedComponentModules.rbegin(); Itr != LoadedComponentModules.rend(); ++Itr)
+				FreeLibrary(*Itr);
+
+			LoadedComponentModules.clear();
+			SEQueryInterfaceProc = nullptr;
+			USEQueryInterfaceProc = nullptr;
+			BSAQueryInterfaceProc = nullptr;
+			TAGQueryInterfaceProc = nullptr;
+		}
 
 		enum
 		{
@@ -31,6 +45,7 @@ namespace cse
 
 		bool cliWrapper::ImportInterfaces(const OBSEInterface * obse)
 		{
+			UnloadImportedModules();
 			SetErrorMode(0);
 			std::string DLLName = "";
 			void** Interface = nullptr;
@@ -63,6 +78,7 @@ namespace cse
 				if (hMod == nullptr)
 				{
 					BGSEECONSOLE_ERROR("Couldn't load %s", DLLPath.c_str());
+					UnloadImportedModules();
 					return false;
 				}
 
@@ -70,9 +86,12 @@ namespace cse
 				if (ExportedProc == nullptr)
 				{
 					BGSEECONSOLE_ERROR("Couldn't import interface from %s", DLLName.c_str());
+					FreeLibrary(hMod);
+					UnloadImportedModules();
 					return false;
 				}
 
+				LoadedComponentModules.push_back(hMod);
 				*Interface = ExportedProc;
 			}
 

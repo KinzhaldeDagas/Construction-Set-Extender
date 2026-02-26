@@ -1,4 +1,5 @@
 #include "OldCSInteropManager.h"
+#include <cstdint>
 #include "Construction Set Extender_Resource.h"
 #include "[Common]\OldCSInteropData.h"
 
@@ -80,25 +81,33 @@ namespace cse
 
 		if (process)
 		{
-			UInt32	hookBase = (UInt32)VirtualAllocEx(process, nullptr, 8192, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
-			if(hookBase)
+			uintptr_t	hookBase = reinterpret_cast<uintptr_t>(VirtualAllocEx(process, nullptr, 8192, MEM_COMMIT, PAGE_EXECUTE_READWRITE));
+			if (hookBase)
 			{
 				// safe because kernel32 is loaded at the same address in all processes
 				// (can change across restarts)
-				UInt32	loadLibraryAAddr = (UInt32)GetProcAddress(GetModuleHandle("kernel32.dll"), "LoadLibraryA");
+				auto	LoadLibraryAAddress = reinterpret_cast<uintptr_t>(GetProcAddress(GetModuleHandle("kernel32.dll"), "LoadLibraryA"));
+				if (LoadLibraryAAddress == 0)
+				{
+					BGSEECONSOLE_ERROR("Process::InstallHook: couldn't resolve LoadLibraryA");
+					VirtualFreeEx(process, reinterpret_cast<LPVOID>(hookBase), 0, MEM_RELEASE);
+					CloseHandle(process);
+					return false;
+				}
 
-				UInt32	bytesWritten;
-				WriteProcessMemory(process, (LPVOID)(hookBase + 5), DLLPath.c_str(), strlen(DLLPath.c_str()) + 1, &bytesWritten);
+
+				SIZE_T	bytesWritten = 0;
+				WriteProcessMemory(process, reinterpret_cast<LPVOID>(hookBase + 5), DLLPath.c_str(), strlen(DLLPath.c_str()) + 1, &bytesWritten);
 
 				UInt8	hookCode[5];
 
 				hookCode[0] = 0xE9;
-				*((UInt32 *)&hookCode[1]) = loadLibraryAAddr - (hookBase + 5);
+				*reinterpret_cast<UInt32*>(&hookCode[1]) = static_cast<UInt32>(LoadLibraryAAddress - (hookBase + 5));
 
-				WriteProcessMemory(process, (LPVOID)(hookBase), hookCode, sizeof(hookCode), &bytesWritten);
+				WriteProcessMemory(process, reinterpret_cast<LPVOID>(hookBase), hookCode, sizeof(hookCode), &bytesWritten);
 
-				HANDLE	thread = CreateRemoteThread(process, nullptr, 0, (LPTHREAD_START_ROUTINE)hookBase, (void *)(hookBase + 5), 0, nullptr);
-				if(thread)
+				HANDLE	thread = CreateRemoteThread(process, nullptr, 0, reinterpret_cast<LPTHREAD_START_ROUTINE>(hookBase), reinterpret_cast<void*>(hookBase + 5), 0, nullptr);
+				if (thread)
 				{
 					switch(WaitForSingleObject(thread, 5000))
 					{
@@ -118,7 +127,7 @@ namespace cse
 				else
 					BGSEECONSOLE_ERROR("CreateRemoteThread failed!");
 
-				VirtualFreeEx(process, (LPVOID)hookBase, 8192, MEM_RELEASE);
+				VirtualFreeEx(process, reinterpret_cast<LPVOID>(hookBase), 0, MEM_RELEASE);
 			}
 			else
 				BGSEECONSOLE_MESSAGE("Process::InstallHook: couldn't allocate memory in target process");

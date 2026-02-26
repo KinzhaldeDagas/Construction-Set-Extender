@@ -25,8 +25,12 @@ namespace cse
 			SIZE_T GetProcessWorkingSetMB()
 			{
 				auto Psapi = GetModuleHandleA("psapi.dll");
+				bool ReleasePsapiOnExit = false;
 				if (!Psapi)
+				{
 					Psapi = LoadLibraryA("psapi.dll");
+					ReleasePsapiOnExit = (Psapi != nullptr);
+				}
 
 				if (!Psapi)
 					return 0;
@@ -34,10 +38,20 @@ namespace cse
 				using GetProcessMemoryInfoT = BOOL(WINAPI*)(HANDLE, PPROCESS_MEMORY_COUNTERS, DWORD);
 				auto GetProcessMemoryInfoPtr = reinterpret_cast<GetProcessMemoryInfoT>(GetProcAddress(Psapi, "GetProcessMemoryInfo"));
 				if (!GetProcessMemoryInfoPtr)
+				{
+					if (ReleasePsapiOnExit)
+						FreeLibrary(Psapi);
+
 					return 0;
+				}
 
 				PROCESS_MEMORY_COUNTERS MemCounters = {};
-				if (!GetProcessMemoryInfoPtr(GetCurrentProcess(), &MemCounters, sizeof(MemCounters)))
+				const BOOL Result = GetProcessMemoryInfoPtr(GetCurrentProcess(), &MemCounters, sizeof(MemCounters));
+
+				if (ReleasePsapiOnExit)
+					FreeLibrary(Psapi);
+
+				if (!Result)
 					return 0;
 
 				return MemCounters.WorkingSetSize / (1024 * 1024);
