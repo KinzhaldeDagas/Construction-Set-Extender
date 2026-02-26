@@ -392,6 +392,10 @@ BEGIN
             MENUITEM "Books",                       40491
             MENUITEM "Descriptions",                40494
             MENUITEM "Faction Rank Names",          40537
+            POPUP "reVoice CSV"
+            BEGIN
+                MENUITEM "Active Plugin",               IDC_MAINMENU_EXPORTREVOICECSV_ACTIVEPLUGIN
+            END
         END
         POPUP "Import"
         BEGIN
@@ -403,6 +407,10 @@ BEGIN
             MENUITEM "Books",                       40535
             MENUITEM "Descriptions",                40493
             MENUITEM "Faction Rank Names",          40538
+            POPUP "reVoice CSV"
+            BEGIN
+                MENUITEM "Active Plugin",               IDC_MAINMENU_IMPORTREVOICECSV
+            END
         END
         MENUITEM SEPARATOR
         POPUP "On Editor Startup..."

@@ -17,6 +17,12 @@
 #include "[BGSEEBase]\ToolBox.h"
 #include "[BGSEEBase]\Script\CodaVM.h"
 
+#include <algorithm>
+#include <cctype>
+#include <fstream>
+#include <sstream>
+#include <vector>
+
 namespace cse
 {
 	namespace uiManager
@@ -46,6 +52,463 @@ namespace cse
 		MainWindowToolbarData::~MainWindowToolbarData()
 		{
 			;//
+		}
+
+		namespace
+		{
+			struct RevoiceRow
+			{
+				UInt32 FormID = 0;
+				std::string VoiceID;
+				std::string SpeakerInfo;
+				std::string OutputPath;
+				std::string Dialogue;
+				UInt32 Line = 0;
+				UInt32 ResponseNumber = 0;
+			};
+
+			struct SpeakerContext
+			{
+				bool Concrete = false;
+				std::string VoiceID = "ob_unknown";
+				std::string SpeakerInfo = "Unknown\\M";
+				std::string OutputFolder = "Unknown\\M";
+			};
+
+			std::string Trim(const std::string& In)
+			{
+				auto Begin = In.find_first_not_of(" \t\r\n");
+				if (Begin == std::string::npos)
+					return "";
+				auto End = In.find_last_not_of(" \t\r\n");
+				return In.substr(Begin, End - Begin + 1);
+			}
+
+			std::string SanitizePathComponent(const std::string& In)
+			{
+				std::string Out;
+				Out.reserve(In.size());
+				for (auto Ch : In)
+				{
+					if (isalnum(static_cast<unsigned char>(Ch)) || Ch == '_' || Ch == '-' || Ch == ' ')
+						Out.push_back(Ch);
+					else
+						Out.push_back('_');
+				}
+				if (Trim(Out).empty())
+					return "Unknown";
+				return Trim(Out);
+			}
+
+			std::vector<std::string> ParseDelimitedLine(const std::string& Line, char Delimiter)
+			{
+				std::vector<std::string> Out;
+				std::string Current;
+				bool InQuotes = false;
+				for (size_t i = 0; i < Line.size(); i++)
+				{
+					char Ch = Line[i];
+					if (Ch == '"')
+					{
+						if (InQuotes && i + 1 < Line.size() && Line[i + 1] == '"')
+						{
+							Current.push_back('"');
+							i++;
+						}
+						else
+							InQuotes = !InQuotes;
+					}
+					else if (Ch == Delimiter && !InQuotes)
+					{
+						Out.emplace_back(Current);
+						Current.clear();
+					}
+					else
+						Current.push_back(Ch);
+				}
+				Out.emplace_back(Current);
+				return Out;
+			}
+
+			bool ParseHexFormID(const std::string& Text, UInt32& OutFormID)
+			{
+				auto Clean = Trim(Text);
+				if (Clean.size() != 8)
+					return false;
+				for (auto Ch : Clean)
+					if (!std::isxdigit(static_cast<unsigned char>(Ch)))
+						return false;
+				OutFormID = strtoul(Clean.c_str(), nullptr, 16);
+				return true;
+			}
+
+			std::string NormalizeVoiceOutputPath(const std::string& Raw)
+			{
+				std::string Path = Trim(Raw);
+				std::replace(Path.begin(), Path.end(), '/', '\\');
+				while (!Path.empty() && (Path[0] == '\\' || Path[0] == '/'))
+					Path.erase(Path.begin());
+				if (Path.size() > 1 && std::isalpha(static_cast<unsigned char>(Path[0])) && Path[1] == ':')
+					Path = Path.substr(2);
+				while (!Path.empty() && (Path[0] == '\\' || Path[0] == '/'))
+					Path.erase(Path.begin());
+				std::string Collapsed;
+				Collapsed.reserve(Path.size());
+				bool PrevSlash = false;
+				for (auto Ch : Path)
+				{
+					bool Slash = (Ch == '\\');
+					if (Slash && PrevSlash)
+						continue;
+					Collapsed.push_back(Ch);
+					PrevSlash = Slash;
+				}
+				Path = Collapsed;
+				if (_strnicmp(Path.c_str(), "Data\\", 5) == 0)
+					Path = Path.substr(5);
+				if (_strnicmp(Path.c_str(), "Sound\\Voice\\", 12) != 0)
+					return "";
+				if (Path.find("..") != std::string::npos)
+					return "";
+				return Path;
+			}
+
+			UInt32 ParseResponseNumberFromPath(const std::string& OutputPath)
+			{
+				auto Dot = OutputPath.find_last_of('.');
+				auto Base = Dot == std::string::npos ? OutputPath : OutputPath.substr(0, Dot);
+				auto Under = Base.find_last_of('_');
+				if (Under == std::string::npos)
+					return 0;
+				auto Tail = Base.substr(Under + 1);
+				if (Tail.empty())
+					return 0;
+				for (auto Ch : Tail)
+					if (!isdigit(static_cast<unsigned char>(Ch)))
+						return 0;
+				return atoi(Tail.c_str());
+			}
+
+			SpeakerContext BuildSpeakerContext(TESTopicInfo* Info)
+			{
+				SpeakerContext Ctx;
+				if (Info == nullptr)
+					return Ctx;
+
+				TESForm* IsRaceForm = nullptr;
+				TESForm* IsIDForm = nullptr;
+				int Sex = -1;
+
+				for (ConditionListT::Iterator Itr = Info->conditions.Begin(); !Itr.End() && Itr.Get(); ++Itr)
+				{
+					auto* Cond = Itr.Get();
+					if (!Cond)
+						continue;
+					auto Fn = Cond->functionIndex;
+					if (Fn == (224 & 0x0FFF) && Cond->param1.form)
+						IsRaceForm = Cond->param1.form;
+					else if (Fn == (72 & 0x0FFF) && Cond->param1.form)
+						IsIDForm = Cond->param1.form;
+					else if (Fn == (69 & 0x0FFF))
+					{
+						int SexVal = static_cast<int>(Cond->comparisonValue);
+						if (SexVal == 0 || SexVal == 1)
+							Sex = SexVal;
+					}
+				}
+
+				if (IsRaceForm && IsRaceForm->formType == TESForm::kFormType_Race)
+				{
+					Ctx.Concrete = true;
+					auto RaceLabel = SanitizePathComponent(IsRaceForm->editorID.c_str());
+					auto SexLabel = Sex == 1 ? "F" : "M";
+					Ctx.SpeakerInfo = RaceLabel + "\\" + SexLabel;
+					Ctx.OutputFolder = Ctx.SpeakerInfo;
+				}
+				if (IsIDForm && (IsIDForm->formType == TESForm::kFormType_NPC || IsIDForm->formType == TESForm::kFormType_Creature))
+				{
+					Ctx.Concrete = true;
+					auto IdLabel = SanitizePathComponent(IsIDForm->editorID.c_str());
+					auto SexLabel = Sex == 1 ? "F" : "M";
+					Ctx.SpeakerInfo = std::string("NPC\\") + IdLabel + "\\" + SexLabel;
+					if (Ctx.OutputFolder == "Unknown\\M")
+						Ctx.OutputFolder = std::string("NPC\\") + IdLabel + "\\" + SexLabel;
+				}
+
+				return Ctx;
+			}
+
+			std::string BuildRevoiceOutputPath(TESTopicInfo* Info, TESTopic* Topic, TESQuest* Quest, TESTopicInfo::ResponseData* Response, const SpeakerContext& Ctx)
+			{
+				if (!Info || !Topic || !Quest || !Response || _DATAHANDLER->activeFile == nullptr)
+					return "";
+				if (!Ctx.Concrete)
+					return "";
+
+				auto QuestID = SanitizePathComponent(Quest->editorID.c_str());
+				auto TopicID = SanitizePathComponent(Topic->editorID.c_str());
+				char Buffer[MAX_PATH * 2] = { 0 };
+				FORMAT_STR(Buffer,
+					"Sound\\Voice\\%s\\%s\\%s_%s_%08X_%u.mp3",
+					_DATAHANDLER->activeFile->fileName,
+					Ctx.OutputFolder.c_str(),
+					QuestID.c_str(),
+					TopicID.c_str(),
+					(Info->formID & 0xFFFFFF),
+					Response->responseNumber);
+				return NormalizeVoiceOutputPath(Buffer);
+			}
+
+			void ImportRevoiceCsvToActivePlugin(HWND hWnd)
+			{
+				if (_DATAHANDLER->activeFile == nullptr)
+				{
+					BGSEEUI->MsgBoxE("An active plugin must be set before using this tool.");
+					return;
+				}
+
+				char FilePath[MAX_PATH] = { 0 };
+				OPENFILENAME SelectFile = { 0 };
+				SelectFile.lStructSize = sizeof(OPENFILENAME);
+				SelectFile.hwndOwner = hWnd;
+				SelectFile.lpstrFilter = "reVoice CSV/TSV\0*.csv;*.tsv;*.txt\0All Files\0*.*\0\0";
+				SelectFile.lpstrFile = FilePath;
+				SelectFile.nMaxFile = sizeof(FilePath);
+				SelectFile.lpstrTitle = "Select reVoice export CSV/TSV";
+				SelectFile.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY | OFN_NOCHANGEDIR;
+				if (!GetOpenFileName(&SelectFile))
+					return;
+
+				std::ifstream Input(FilePath, std::ios::binary);
+				if (!Input.good())
+				{
+					BGSEEUI->MsgBoxE("Couldn't open the selected file.");
+					return;
+				}
+
+				std::vector<RevoiceRow> Rows;
+				std::string Line;
+				UInt32 LineNo = 0;
+				int ParseErrors = 0;
+				while (std::getline(Input, Line))
+				{
+					LineNo++;
+					if (LineNo == 1 && Line.size() >= 3 && (unsigned char)Line[0] == 0xEF && (unsigned char)Line[1] == 0xBB && (unsigned char)Line[2] == 0xBF)
+						Line = Line.substr(3);
+					if (!Line.empty() && Line.back() == '\r')
+						Line.pop_back();
+					if (Trim(Line).empty())
+						continue;
+
+					auto Fields = ParseDelimitedLine(Line, '\t');
+					if (Fields.size() < 5)
+						Fields = ParseDelimitedLine(Line, ',');
+					if (Fields.size() < 5)
+					{
+						ParseErrors++;
+						continue;
+					}
+
+					if (LineNo == 1)
+					{
+						auto H = Trim(Fields[0]);
+						if (_stricmp(H.c_str(), "FormID") == 0)
+							continue;
+					}
+
+					RevoiceRow Row;
+					Row.Line = LineNo;
+					if (!ParseHexFormID(Fields[0], Row.FormID))
+					{
+						ParseErrors++;
+						continue;
+					}
+
+					Row.VoiceID = Trim(Fields[1]);
+					Row.SpeakerInfo = Trim(Fields[2]);
+					Row.OutputPath = NormalizeVoiceOutputPath(Fields[3]);
+					Row.Dialogue = Trim(Fields[4]);
+					Row.ResponseNumber = ParseResponseNumberFromPath(Row.OutputPath);
+					if (Row.OutputPath.empty() || Row.Dialogue.empty() || Row.ResponseNumber == 0)
+					{
+						ParseErrors++;
+						continue;
+					}
+					Rows.emplace_back(std::move(Row));
+				}
+
+				int Applied = 0, Skipped = 0, Mismatch = 0, PathMismatch = 0;
+				for (const auto& Row : Rows)
+				{
+					auto* Form = TESForm::LookupByFormID(Row.FormID);
+					if (!Form || Form->formType != TESForm::kFormType_TopicInfo)
+					{
+						Skipped++;
+						continue;
+					}
+
+					auto* Info = CS_CAST(Form, TESForm, TESTopicInfo);
+					if (!Info || (Info->formFlags & TESForm::kFormFlags_FromActiveFile) == 0)
+					{
+						Skipped++;
+						continue;
+					}
+
+					auto Ctx = BuildSpeakerContext(Info);
+					if (!Ctx.Concrete)
+					{
+						Skipped++;
+						continue;
+					}
+
+					TESTopicInfo::ResponseData* TargetResponse = nullptr;
+					for (TESTopicInfo::ResponseListT::Iterator Itr = Info->responseList.Begin(); !Itr.End() && Itr.Get(); ++Itr)
+					{
+						auto* Resp = Itr.Get();
+						if (!Resp)
+							continue;
+						if (Resp->responseNumber == Row.ResponseNumber)
+						{
+							TargetResponse = Resp;
+							break;
+						}
+					}
+
+					if (!TargetResponse)
+					{
+						Skipped++;
+						continue;
+					}
+
+					TESTopic* ParentTopic = nullptr;
+					TESQuest* ParentQuest = nullptr;
+					for (tList<TESTopic>::Iterator ItrTopic = _DATAHANDLER->topics.Begin(); !ItrTopic.End() && ItrTopic.Get() && ParentTopic == nullptr; ++ItrTopic)
+					{
+						auto* Topic = ItrTopic.Get();
+						for (TESTopic::TopicDataListT::Iterator ItrData = Topic->topicData.Begin(); !ItrData.End() && ItrData.Get(); ++ItrData)
+						{
+							for (int i = 0; i < ItrData->questInfos.numObjs; i++)
+							{
+								auto* Candidate = ItrData->questInfos.data[i];
+								if (Candidate == Info)
+								{
+									ParentTopic = Topic;
+									ParentQuest = ItrData->parentQuest;
+									break;
+								}
+							}
+							if (ParentTopic)
+								break;
+						}
+					}
+
+					auto ExpectedPath = BuildRevoiceOutputPath(Info, ParentTopic, ParentQuest, TargetResponse, Ctx);
+					if (!ExpectedPath.empty() && _stricmp(ExpectedPath.c_str(), Row.OutputPath.c_str()) != 0)
+						PathMismatch++;
+
+					if (_stricmp(Trim(TargetResponse->responseText.c_str()).c_str(), Row.Dialogue.c_str()) != 0)
+						Mismatch++;
+					TargetResponse->responseText.Set(Row.Dialogue.c_str());
+					Info->SetFromActiveFile(true);
+					Applied++;
+				}
+
+				BGSEEUI->MsgBoxI(hWnd, 0,
+					"reVoice import complete.\n\nParsed rows: %d\nUpdated responses: %d\nSkipped rows: %d\nWarnings (dialogue mismatch): %d\nWarnings (output path mismatch): %d\nParse errors: %d",
+					(int)Rows.size(), Applied, Skipped, Mismatch, PathMismatch, ParseErrors);
+			}
+
+			void ExportRevoiceCsvForActivePlugin(HWND hWnd)
+			{
+				if (_DATAHANDLER->activeFile == nullptr)
+				{
+					BGSEEUI->MsgBoxE("An active plugin must be set before using this tool.");
+					return;
+				}
+
+				char FilePath[MAX_PATH] = { 0 };
+				FORMAT_STR(FilePath, "%s_revoice.csv", _DATAHANDLER->activeFile->fileName);
+
+				OPENFILENAME SelectFile = { 0 };
+				SelectFile.lStructSize = sizeof(OPENFILENAME);
+				SelectFile.hwndOwner = hWnd;
+				SelectFile.lpstrFilter = "CSV Files\0*.csv\0All Files\0*.*\0\0";
+				SelectFile.lpstrFile = FilePath;
+				SelectFile.nMaxFile = sizeof(FilePath);
+				SelectFile.lpstrTitle = "Export reVoice CSV for active plugin";
+				SelectFile.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY | OFN_NOCHANGEDIR;
+				if (!GetSaveFileName(&SelectFile))
+					return;
+
+				std::ofstream Out(FilePath, std::ios::binary | std::ios::trunc);
+				if (!Out.good())
+				{
+					BGSEEUI->MsgBoxE("Couldn't create output CSV file.");
+					return;
+				}
+
+				Out << "FormID\tVoiceID\tSpeakerInfo\tOutputPath\tDialogue\n";
+				int Exported = 0;
+				int Skipped = 0;
+
+				for (tList<TESTopic>::Iterator ItrTopic = _DATAHANDLER->topics.Begin(); !ItrTopic.End() && ItrTopic.Get(); ++ItrTopic)
+				{
+					auto* Topic = ItrTopic.Get();
+					for (TESTopic::TopicDataListT::Iterator ItrData = Topic->topicData.Begin(); !ItrData.End() && ItrData.Get(); ++ItrData)
+					{
+						auto* Quest = ItrData->parentQuest;
+						if (!Quest)
+							continue;
+
+						for (int i = 0; i < ItrData->questInfos.numObjs; i++)
+						{
+							auto* Info = ItrData->questInfos.data[i];
+							if (!Info || (Info->formFlags & TESForm::kFormFlags_FromActiveFile) == 0)
+								continue;
+
+							auto Ctx = BuildSpeakerContext(Info);
+							if (!Ctx.Concrete)
+							{
+								Skipped++;
+								continue;
+							}
+
+							for (TESTopicInfo::ResponseListT::Iterator ItrResp = Info->responseList.Begin(); !ItrResp.End() && ItrResp.Get(); ++ItrResp)
+							{
+								auto* Response = ItrResp.Get();
+								if (!Response)
+									continue;
+
+								auto OutPath = BuildRevoiceOutputPath(Info, Topic, Quest, Response, Ctx);
+								if (OutPath.empty())
+								{
+									Skipped++;
+									continue;
+								}
+
+								auto Text = Response->responseText.c_str();
+								std::string Dialogue = Text ? Text : "";
+								for (auto& Ch : Dialogue)
+									if (Ch == '\t' || Ch == '\r' || Ch == '\n')
+										Ch = ' ';
+
+								char FormIDBuffer[16] = { 0 };
+								FORMAT_STR(FormIDBuffer, "%08X", Info->formID);
+								Out << FormIDBuffer << '\t'
+									<< Ctx.VoiceID << '\t'
+									<< Ctx.SpeakerInfo << '\t'
+									<< OutPath << '\t'
+									<< Dialogue << '\n';
+								Exported++;
+							}
+						}
+					}
+				}
+
+				BGSEEUI->MsgBoxI(hWnd, 0,
+					"reVoice export complete.\n\nExported rows: %d\nSkipped rows: %d\nOutput: %s",
+					Exported, Skipped, FilePath);
+			}
 		}
 
 		void BatchGenerateLipSyncFiles(HWND hWnd)
@@ -564,6 +1027,14 @@ namespace cse
 				case IDC_MAINMENU_BATCHLIPGENERATOR:
 					BatchGenerateLipSyncFiles(hWnd);
 					
+					break;
+				case IDC_MAINMENU_IMPORTREVOICECSV:
+					ImportRevoiceCsvToActivePlugin(hWnd);
+
+					break;
+				case IDC_MAINMENU_EXPORTREVOICECSV_ACTIVEPLUGIN:
+					ExportRevoiceCsvForActivePlugin(hWnd);
+
 					break;
 				case IDC_MAINMENU_SAVEOPTIONS_CREATEBACKUPBEFORESAVING:
 					settings::versionControl::kBackupOnSave.ToggleData();
