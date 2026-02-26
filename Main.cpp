@@ -139,7 +139,7 @@ namespace cse
 
 		BGSEECONSOLE_MESSAGE("Initializing UI Manager");
 		BGSEECONSOLE->Indent();
-		bool ComponentInitialized = bgsee::UIManager::Initialize("TES Construction Set",
+		bool ComponentInitialized = bgsee::UIManager::Initialize(BGSEEMAIN_WINDOWTITLE,
 																 LoadMenu(BGSEEMAIN->GetExtenderHandle(), MAKEINTRESOURCE(IDR_MAINMENU)));
 		BGSEECONSOLE->Outdent();
 
