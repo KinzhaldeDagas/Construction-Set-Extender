@@ -257,7 +257,7 @@ namespace cse
 					{
 						bhkWorldM* Havok = _TES->GetHavokWorld();
 						if (Havok)
-							return Havok->bDisplayShapes;
+							return true;
 						else
 							return false;
 					}

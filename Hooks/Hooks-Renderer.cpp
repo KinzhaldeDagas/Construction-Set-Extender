@@ -200,7 +200,7 @@ namespace cse
 					if (Geom->m_pcName && strstr(Geom->m_pcName, "Block") == Geom->m_pcName)
 					return false;
 
-				NiObject* Parent = Geom->m_parent;
+				NiAVObject* Parent = Geom->m_parent;
 				while (Parent)
 				{
 					auto Node = NI_CAST(Parent, NiNode);
@@ -215,7 +215,7 @@ namespace cse
 						}
 					}
 
-					Parent = NI_CAST(Parent, NiAVObject) ? NI_CAST(Parent, NiAVObject)->m_parent : nullptr;
+					Parent = Parent->m_parent;
 				}
 
 				return false;
@@ -228,8 +228,8 @@ namespace cse
 				if (CurrentRenderPass)
 				{
 					NiColor MaskColor;
-					// xOBSE headers no longer expose RenderPass::geom, so skip per-geom masking for this pass.
-					if (IsGeometryMasked(nullptr, &MaskColor))
+					auto Geom = *reinterpret_cast<NiAVObject**>(reinterpret_cast<UInt32>(CurrentRenderPass) + 0x24);
+					if (IsGeometryMasked(Geom, &MaskColor))
 					{
 						cdeclCall<void>(0x0079AC60,
 										ConstantIndex,
