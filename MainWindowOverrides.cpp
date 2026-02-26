@@ -16,6 +16,8 @@
 
 #include <algorithm>
 #include <fstream>
+#include <iterator>
+#include <set>
 #include <vector>
 
 #include "[BGSEEBase]\ToolBox.h"
@@ -151,7 +153,7 @@ namespace cse
 												(Info->formID & 0xFFFFFF),
 												Response->responseNumber);
 
-											CandidateInputs.emplace_back(VoiceFilePath, Response->responseText.c_str());														
+											CandidateInputs.emplace_back(VoiceFilePath, Response->responseText.c_str());
 										}
 									}
 								}
@@ -341,6 +343,342 @@ namespace cse
 
 			return false;
 		}
+
+		static std::string GetBasePluginName(const char* FileName)
+		{
+			std::string Name = FileName ? FileName : "Plugin";
+			if (Name.empty())
+				Name = "Plugin";
+
+			size_t LastSlash = Name.find_last_of("\\/");
+			if (LastSlash != std::string::npos)
+				Name.erase(0, LastSlash + 1);
+
+			size_t LastDot = Name.find_last_of('.');
+			if (LastDot != std::string::npos)
+				Name.erase(LastDot);
+			return Name;
+		}
+
+		static std::string EscapeJSONString(const std::string& In)
+		{
+			std::string Out;
+			Out.reserve(In.size() + 8);
+			for (char Ch : In)
+			{
+				switch (Ch)
+				{
+				case '\\': Out += "\\\\"; break;
+				case '"': Out += "\\\""; break;
+				case '\n': Out += "\\n"; break;
+				case '\r': Out += "\\r"; break;
+				case '\t': Out += "\\t"; break;
+				default: Out.push_back(Ch); break;
+				}
+			}
+			return Out;
+		}
+
+		static std::string UnescapeJSONString(const std::string& In)
+		{
+			std::string Out;
+			Out.reserve(In.size());
+			for (size_t i = 0; i < In.size(); i++)
+			{
+				char Ch = In[i];
+				if (Ch == '\\' && i + 1 < In.size())
+				{
+					char Next = In[++i];
+					switch (Next)
+					{
+					case 'n': Out.push_back('\n'); break;
+					case 'r': Out.push_back('\r'); break;
+					case 't': Out.push_back('\t'); break;
+					case '\\': Out.push_back('\\'); break;
+					case '"': Out.push_back('"'); break;
+					default: Out.push_back(Next); break;
+					}
+				}
+				else
+					Out.push_back(Ch);
+			}
+			return Out;
+		}
+
+		static bool ExtractJSONStringField(const std::string& Json, const char* Key, std::string& OutValue)
+		{
+			std::string Prefix = std::string("\"") + Key + "\":\"";
+			size_t Start = Json.find(Prefix);
+			if (Start == std::string::npos)
+				return false;
+			Start += Prefix.size();
+			std::string Raw;
+			for (size_t i = Start; i < Json.size(); i++)
+			{
+				char Ch = Json[i];
+				if (Ch == '"' && (i == Start || Json[i - 1] != '\\'))
+				{
+					OutValue = UnescapeJSONString(Raw);
+					return true;
+				}
+				Raw.push_back(Ch);
+			}
+			return false;
+		}
+
+		template <typename tData>
+		static void AddLinkedListFormsForPlugin(tList<tData>* List, TESFile* Plugin, std::set<UInt32>& SeenFormIDs, std::vector<TESForm*>& Out)
+		{
+			for (typename tList<tData>::Iterator Itr = List->Begin(); !Itr.End() && Itr.Get(); ++Itr)
+			{
+				TESForm* Form = Itr.Get();
+				if (Form == nullptr)
+					continue;
+
+				TESFile* Parent = Form->GetOverrideFile(-1);
+				if (Parent != Plugin)
+					continue;
+
+				if (SeenFormIDs.insert(Form->formID).second)
+					Out.push_back(Form);
+			}
+		}
+
+		static void AddObjectFormsForPlugin(TESFile* Plugin, std::set<UInt32>& SeenFormIDs, std::vector<TESForm*>& Out)
+		{
+			for (TESObject* Itr = _DATAHANDLER->objects->first; Itr; Itr = Itr->next)
+			{
+				TESForm* Form = Itr;
+				if (Form == nullptr)
+					continue;
+
+				TESFile* Parent = Form->GetOverrideFile(-1);
+				if (Parent != Plugin)
+					continue;
+
+				if (SeenFormIDs.insert(Form->formID).second)
+					Out.push_back(Form);
+			}
+		}
+
+		static void CollectFormsOwnedByPlugin(TESFile* Plugin, std::vector<TESForm*>& Out)
+		{
+			SME_ASSERT(Plugin);
+			std::set<UInt32> SeenFormIDs;
+			Out.clear();
+
+			AddObjectFormsForPlugin(Plugin, SeenFormIDs, Out);
+			AddLinkedListFormsForPlugin(&_DATAHANDLER->packages, Plugin, SeenFormIDs, Out);
+			AddLinkedListFormsForPlugin(&_DATAHANDLER->worldSpaces, Plugin, SeenFormIDs, Out);
+			AddLinkedListFormsForPlugin(&_DATAHANDLER->climates, Plugin, SeenFormIDs, Out);
+			AddLinkedListFormsForPlugin(&_DATAHANDLER->weathers, Plugin, SeenFormIDs, Out);
+			AddLinkedListFormsForPlugin(&_DATAHANDLER->enchantmentItems, Plugin, SeenFormIDs, Out);
+			AddLinkedListFormsForPlugin(&_DATAHANDLER->spellItems, Plugin, SeenFormIDs, Out);
+			AddLinkedListFormsForPlugin(&_DATAHANDLER->hairs, Plugin, SeenFormIDs, Out);
+			AddLinkedListFormsForPlugin(&_DATAHANDLER->eyes, Plugin, SeenFormIDs, Out);
+			AddLinkedListFormsForPlugin(&_DATAHANDLER->races, Plugin, SeenFormIDs, Out);
+			AddLinkedListFormsForPlugin(&_DATAHANDLER->landTextures, Plugin, SeenFormIDs, Out);
+			AddLinkedListFormsForPlugin(&_DATAHANDLER->classes, Plugin, SeenFormIDs, Out);
+			AddLinkedListFormsForPlugin(&_DATAHANDLER->factions, Plugin, SeenFormIDs, Out);
+			AddLinkedListFormsForPlugin(&_DATAHANDLER->scripts, Plugin, SeenFormIDs, Out);
+			AddLinkedListFormsForPlugin(&_DATAHANDLER->sounds, Plugin, SeenFormIDs, Out);
+			AddLinkedListFormsForPlugin(&_DATAHANDLER->globals, Plugin, SeenFormIDs, Out);
+			AddLinkedListFormsForPlugin(&_DATAHANDLER->topics, Plugin, SeenFormIDs, Out);
+			AddLinkedListFormsForPlugin(&_DATAHANDLER->quests, Plugin, SeenFormIDs, Out);
+			AddLinkedListFormsForPlugin(&_DATAHANDLER->birthsigns, Plugin, SeenFormIDs, Out);
+			AddLinkedListFormsForPlugin(&_DATAHANDLER->combatStyles, Plugin, SeenFormIDs, Out);
+			AddLinkedListFormsForPlugin(&_DATAHANDLER->loadScreens, Plugin, SeenFormIDs, Out);
+			AddLinkedListFormsForPlugin(&_DATAHANDLER->waterForms, Plugin, SeenFormIDs, Out);
+			AddLinkedListFormsForPlugin(&_DATAHANDLER->effectShaders, Plugin, SeenFormIDs, Out);
+			AddLinkedListFormsForPlugin(&_DATAHANDLER->objectAnios, Plugin, SeenFormIDs, Out);
+		}
+
+		static bool ChooseLoadedPluginFromDialog(HWND hWnd, TESFile** OutPlugin)
+		{
+			SME_ASSERT(OutPlugin);
+			*OutPlugin = nullptr;
+			char FileName[MAX_PATH] = { 0 };
+			if (TESDialog::SelectTESFileCommonDialog(hWnd,
+				INISettingCollection::Instance->LookupByName("sLocalMasterPath:General")->value.s,
+				0,
+				FileName,
+				sizeof(FileName)) == false)
+			{
+				return false;
+			}
+
+			TESFile* File = _DATAHANDLER->LookupPluginByName(FileName);
+			if (File == nullptr || _DATAHANDLER->IsPluginLoaded(File) == false)
+			{
+				BGSEEUI->MsgBoxE("The selected plugin is not currently loaded:\n%s", FileName);
+				return false;
+			}
+
+			*OutPlugin = File;
+			return true;
+		}
+
+		static void ExportPluginToJSON(HWND hWnd)
+		{
+			TESFile* Plugin = nullptr;
+			if (ChooseLoadedPluginFromDialog(hWnd, &Plugin) == false)
+				return;
+
+			std::string BaseName = GetBasePluginName(Plugin->fileName);
+			std::string OutDir = std::string("Data\\JSONs\\") + BaseName;
+			CreateDirectoryA("Data\\JSONs", nullptr);
+			CreateDirectoryA(OutDir.c_str(), nullptr);
+
+			std::vector<TESForm*> Forms;
+			CollectFormsOwnedByPlugin(Plugin, Forms);
+
+			std::string ManifestPath = OutDir + "\\manifest.json";
+			std::ofstream ManifestOut(ManifestPath, std::ios::trunc);
+			if (ManifestOut.good() == false)
+			{
+				BGSEEUI->MsgBoxE("Couldn't open output file for writing:\n%s", ManifestPath.c_str());
+				return;
+			}
+
+			std::string FormsPath = OutDir + "\\forms.jsonl";
+			std::ofstream Out(FormsPath, std::ios::trunc);
+			if (Out.good() == false)
+			{
+				BGSEEUI->MsgBoxE("Couldn't open output file for writing:\n%s", FormsPath.c_str());
+				return;
+			}
+
+			UInt32 Exported = 0;
+			serialization::TESForm2Text Serializer;
+			for (auto* Form : Forms)
+			{
+				if (Form == nullptr)
+					continue;
+
+				std::string FormToken;
+				if (Serializer.Serialize(Form, FormToken) == false)
+					continue;
+
+				componentDLLInterface::FormData Data(Form);
+				char FormIDHex[16] = { 0 };
+				FORMAT_STR(FormIDHex, "%08X", Form->formID);
+
+				Out << "{\"plugin\":\"" << EscapeJSONString(Plugin->fileName) << "\","
+					<< "\"formToken\":\"" << EscapeJSONString(FormToken) << "\","
+					<< "\"editorID\":\"" << EscapeJSONString(Data.EditorID ? Data.EditorID : "") << "\","
+					<< "\"parentPlugin\":\"" << EscapeJSONString(Data.ParentPluginName ? Data.ParentPluginName : "") << "\","
+					<< "\"formType\":\"" << EscapeJSONString(Form->GetFormTypeIDLongName(Form->formType)) << "\","
+					<< "\"formID\":\"" << FormIDHex << "\"}\n";
+				Exported++;
+			}
+
+			ManifestOut << "{\n"
+				<< "  \"schema\": \"cse-plugin-json-v1\",\n"
+				<< "  \"plugin\": \"" << EscapeJSONString(Plugin->fileName) << "\",\n"
+				<< "  \"formCount\": " << Exported << ",\n"
+				<< "  \"formsFile\": \"forms.jsonl\"\n"
+				<< "}\n";
+
+			Out.flush();
+			ManifestOut.flush();
+			BGSEEUI->MsgBoxI("Plugin export complete.\nPlugin: %s\nExported forms: %u\nFolder: %s", Plugin->fileName, Exported, OutDir.c_str());
+		}
+
+		static void ImportJSONToPlugin(HWND hWnd)
+		{
+			TESFile* Plugin = nullptr;
+			if (ChooseLoadedPluginFromDialog(hWnd, &Plugin) == false)
+				return;
+
+			std::string BaseName = GetBasePluginName(Plugin->fileName);
+			std::string OutDir = std::string("Data\\JSONs\\") + BaseName;
+			std::string ManifestPath = OutDir + "\\manifest.json";
+			std::string FormsPath = OutDir + "\\forms.jsonl";
+
+			std::ifstream ManifestIn(ManifestPath);
+			if (ManifestIn.good())
+			{
+				std::string Manifest((std::istreambuf_iterator<char>(ManifestIn)), std::istreambuf_iterator<char>());
+				std::string ManifestPlugin;
+				if (ExtractJSONStringField(Manifest, "plugin", ManifestPlugin) && _stricmp(ManifestPlugin.c_str(), Plugin->fileName) != 0)
+				{
+					BGSEEUI->MsgBoxE("Manifest plugin mismatch.\nSelected: %s\nManifest: %s", Plugin->fileName, ManifestPlugin.c_str());
+					return;
+				}
+			}
+
+			std::ifstream In(FormsPath);
+			if (In.good() == false)
+			{
+				BGSEEUI->MsgBoxE("Couldn't open import file:\n%s", FormsPath.c_str());
+				return;
+			}
+
+			TESFile* OldActive = _DATAHANDLER->activeFile;
+			if (OldActive)
+				OldActive->SetActive(false);
+			_DATAHANDLER->activeFile = Plugin;
+			Plugin->SetActive(true);
+
+			UInt32 Imported = 0, Failed = 0, SkippedPluginMismatch = 0, SkippedMalformed = 0;
+			std::string Line;
+			serialization::TESForm2Text Serializer;
+			while (std::getline(In, Line))
+			{
+				if (Line.empty())
+					continue;
+
+				std::string PluginName;
+				if (ExtractJSONStringField(Line, "plugin", PluginName) == false)
+				{
+					SkippedMalformed++;
+					continue;
+				}
+				if (_stricmp(PluginName.c_str(), Plugin->fileName) != 0)
+				{
+					SkippedPluginMismatch++;
+					continue;
+				}
+
+				std::string FormToken;
+				if (ExtractJSONStringField(Line, "formToken", FormToken) == false)
+				{
+					SkippedMalformed++;
+					continue;
+				}
+
+				TESForm* Form = nullptr;
+				if (Serializer.Deserialize(FormToken, &Form) == false || Form == nullptr)
+				{
+					Failed++;
+					continue;
+				}
+
+				TESFile* Parent = Form->GetOverrideFile(-1);
+				if (Parent != Plugin)
+				{
+					SkippedPluginMismatch++;
+					continue;
+				}
+
+				Form->SetFromActiveFile(true);
+				Imported++;
+			}
+
+			Plugin->SetActive(false);
+			_DATAHANDLER->activeFile = OldActive;
+			if (OldActive)
+				OldActive->SetActive(true);
+
+			BGSEEUI->MsgBoxI("JSON import complete.\nPlugin: %s\nImported forms: %u\nResolve failures: %u\nSkipped malformed rows: %u\nSkipped plugin mismatches: %u\nPath: %s",
+				Plugin->fileName,
+				Imported,
+				Failed,
+				SkippedMalformed,
+				SkippedPluginMismatch,
+				FormsPath.c_str());
+		}
+
 
 		void ExportRevoiceCSVForActivePlugin(HWND hWnd)
 		{
@@ -917,10 +1255,18 @@ namespace cse
 					break;
 				case IDC_MAINMENU_BATCHLIPGENERATOR:
 					BatchGenerateLipSyncFiles(hWnd);
-					
+
 					break;
 				case IDC_MAINMENU_EXPORT_REVOICECSV_ACTIVEPLUGIN:
 					ExportRevoiceCSVForActivePlugin(hWnd);
+
+					break;
+				case IDC_MAINMENU_EXPORT_PLUGINTOJSON:
+					ExportPluginToJSON(hWnd);
+
+					break;
+				case IDC_MAINMENU_IMPORT_JSONTOPLUGIN:
+					ImportJSONToPlugin(hWnd);
 
 					break;
 				case IDC_MAINMENU_SAVEOPTIONS_CREATEBACKUPBEFORESAVING:
