@@ -215,6 +215,7 @@ namespace bgsee
 		}
 
 
+#ifndef CSE_NO_CRASHRPT
 		CR_EXCEPTION_INFO ExceptionInfo;
 		memset(&ExceptionInfo, 0, sizeof(CR_EXCEPTION_INFO));
 		ExceptionInfo.cb = sizeof(CR_EXCEPTION_INFO);
@@ -237,6 +238,9 @@ namespace bgsee
 		}
 
 		BGSEECONSOLE_MESSAGE("Generated crash report for external crash and terminated process for crash type %d", Type);
+#else
+		BGSEECONSOLE_MESSAGE("CrashRpt support is disabled; terminating process for crash type %d", Type);
+#endif
 
 		// Manually terminate program
 		ExitProcess(0);
@@ -687,8 +691,10 @@ namespace bgsee
 
 		Singleton = nullptr;
 
+#ifndef CSE_NO_CRASHRPT
 		if (CrashRptSupport)
 			crUninstall();
+#endif
 
 		ExitProcess(0);
 	}
@@ -757,9 +763,14 @@ namespace bgsee
 
 		BGSEEDAEMON->RegisterInitCallback(Daemon::kInitCallback_Query, InitCallback);
 
+#ifdef CSE_NO_CRASHRPT
+		CrashRptSupport = false;
+#else
 		CrashRptSupport = Params.CrashRptSupport;
+#endif
 		Initialized = true;
 
+#ifndef CSE_NO_CRASHRPT
 		if (CrashRptSupport)
 		{
 			CR_INSTALL_INFO CrashRptData = { 0 };
@@ -817,6 +828,7 @@ namespace bgsee
 				crAddScreenshot2(CR_AS_PROCESS_WINDOWS, 0);
 			}
 		}
+#endif
 	}
 
 
