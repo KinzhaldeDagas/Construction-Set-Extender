@@ -313,6 +313,35 @@ namespace cse
 			return Base + Suffix;
 		}
 
+		enum class RevoiceParentMasterExportMode
+		{
+			IncludeAll,
+			ActivePluginOnly,
+			IgnoreOblivion
+		};
+
+		static bool ShouldExportDialogueFromFile(TESFile* SourceFile,
+			RevoiceParentMasterExportMode ExportMode,
+			const std::vector<TESFile*>& AllowedParentMasters)
+		{
+			if (SourceFile == nullptr)
+				return false;
+
+			if (SourceFile == _DATAHANDLER->activeFile)
+				return true;
+
+			if (ExportMode == RevoiceParentMasterExportMode::ActivePluginOnly)
+				return false;
+
+			for (auto* MasterFile : AllowedParentMasters)
+			{
+				if (SourceFile == MasterFile)
+					return true;
+			}
+
+			return false;
+		}
+
 		void ExportRevoiceCSVForActivePlugin(HWND hWnd)
 		{
 			if (_DATAHANDLER->activeFile == nullptr)
@@ -358,6 +387,44 @@ namespace cse
 				MB_YESNO,
 				"Split the export into multiple reVoice CSV files?\n\n(24 dialogue rows per file)") == IDYES;
 
+			const int ParentMasterChoice = BGSEEUI->MsgBoxI(hWnd,
+				MB_YESNOCANCEL,
+				"Export with Parent Master Dialogue?\n\n"
+				"Yes = Export Active Plugin + all Parent Masters (including Oblivion.esm)\n"
+				"No = Export Active Plugin only\n"
+				"Cancel = Ignore Oblivion.esm but export other Parent Masters");
+
+			RevoiceParentMasterExportMode ExportMode = RevoiceParentMasterExportMode::ActivePluginOnly;
+			switch (ParentMasterChoice)
+			{
+			case IDYES:
+				ExportMode = RevoiceParentMasterExportMode::IncludeAll;
+				break;
+			case IDCANCEL:
+				ExportMode = RevoiceParentMasterExportMode::IgnoreOblivion;
+				break;
+			case IDNO:
+			default:
+				ExportMode = RevoiceParentMasterExportMode::ActivePluginOnly;
+				break;
+			}
+
+			std::vector<TESFile*> AllowedParentMasters;
+			for (UInt32 i = 0; i < _DATAHANDLER->activeFile->masterCount; i++)
+			{
+				TESFile* MasterFile = _DATAHANDLER->activeFile->masterFiles[i];
+				if (MasterFile == nullptr)
+					continue;
+
+				if (ExportMode == RevoiceParentMasterExportMode::IgnoreOblivion &&
+					_stricmp(MasterFile->fileName, "Oblivion.esm") == 0)
+				{
+					continue;
+				}
+
+				AllowedParentMasters.push_back(MasterFile);
+			}
+
 			UInt32 Rows = 0;
 			std::vector<std::string> CSVRows;
 			for (tList<TESTopic>::Iterator ItrTopic = _DATAHANDLER->topics.Begin(); ItrTopic.End() == false && ItrTopic.Get(); ++ItrTopic)
@@ -379,7 +446,8 @@ namespace cse
 						if (Info == nullptr)
 							continue;
 
-						if ((Info->formFlags & TESForm::kFormFlags_FromActiveFile) == false)
+						TESFile* SourceFile = Info->GetOverrideFile(-1);
+						if (ShouldExportDialogueFromFile(SourceFile, ExportMode, AllowedParentMasters) == false)
 							continue;
 
 						TESNPC* Speaker = GetSpeakerFromTopicInfo(Info);
@@ -425,7 +493,7 @@ namespace cse
 							const char* TopicToken = GetNonEmptyToken(Topic->editorID.c_str(), "Topic");
 
 							FORMAT_STR(OutPath, "Sound\\Voice\\%s\\%s\\%s\\%s_%s_%08X_%u.mp3",
-								_DATAHANDLER->activeFile->fileName,
+								SourceFile->fileName,
 								VoiceFolder,
 								SexToken,
 								QuestToken,
