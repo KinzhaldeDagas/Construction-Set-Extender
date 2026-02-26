@@ -471,15 +471,10 @@ namespace bgsee
 		SYSTEM_INFO SysInfo = {0};
 		GetSystemInfo(&SysInfo);
 
-		if (!IsWindows7OrGreater())
+		if (!IsWindows10OrGreater())
 		{
-			BGSEECONSOLE_MESSAGE("OS version too old - Windows 7 or greater required");
+			BGSEECONSOLE_MESSAGE("OS version too old - Windows 10 or greater required");
 			return false;
-		}
-		else if (IsWindows10OrGreater())
-		{
-			BGSEECONSOLE_MESSAGE("Your current version of Windows is not officially supported - Expect general weirdness such as collapsing time vortexes and code cannibalism");
-			BGSEECONSOLE_MESSAGE("You may attempt to run the editor in Windows' Compatibility Mode. This can be done by opening the 'File Properties' dialog for the xSE loader and editor executables and enabling the 'Run this program in compatibility mode for:' option from the 'Compatibility' tab, and setting the option to 'Windows 7 Service Pack 1' ");
 		}
 
 		char NativeProgramFilesFolder[MAX_PATH] = {0};
