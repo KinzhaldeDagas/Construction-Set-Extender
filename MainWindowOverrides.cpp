@@ -256,18 +256,24 @@ namespace cse
 
 		static std::string EscapeCSVField(const char* Input)
 		{
-			std::string Value = Input ? Input : "";
-			for (auto& Ch : Value)
+			const char* Value = Input ? Input : "";
+			size_t Length = strlen(Value);
+			size_t QuoteCount = 0;
+			for (const char* Cursor = Value; *Cursor; ++Cursor)
 			{
-				if (Ch == '\r' || Ch == '\n')
-					Ch = ' ';
+				if (*Cursor == '"')
+					QuoteCount++;
 			}
 
 			std::string Result;
-			Result.reserve(Value.size() + 2);
+			Result.reserve(Length + QuoteCount + 2);
 			Result.push_back('"');
-			for (const auto Ch : Value)
+			for (const char* Cursor = Value; *Cursor; ++Cursor)
 			{
+				char Ch = *Cursor;
+				if (Ch == '\r' || Ch == '\n')
+					Ch = ' ';
+
 				if (Ch == '"')
 					Result += "\"\"";
 				else
@@ -900,6 +906,7 @@ namespace cse
 			}
 
 			std::vector<TESFile*> AllowedParentMasters;
+			AllowedParentMasters.reserve(_DATAHANDLER->activeFile->masterCount);
 			for (UInt32 i = 0; i < _DATAHANDLER->activeFile->masterCount; i++)
 			{
 				TESFile* MasterFile = _DATAHANDLER->activeFile->masterFiles[i];
@@ -917,6 +924,7 @@ namespace cse
 
 			UInt32 Rows = 0;
 			std::vector<std::string> CSVRows;
+			CSVRows.reserve(512);
 			for (tList<TESTopic>::Iterator ItrTopic = _DATAHANDLER->topics.Begin(); ItrTopic.End() == false && ItrTopic.Get(); ++ItrTopic)
 			{
 				TESTopic* Topic = ItrTopic.Get();
@@ -994,12 +1002,24 @@ namespace cse
 							char FormID[9] = { 0 };
 							FORMAT_STR(FormID, "%08X", Info->formID);
 
-							std::string Row =
-								EscapeCSVField(FormID)
-								+ "," + EscapeCSVField(VoiceID)
-								+ "," + EscapeCSVField(SpeakerInfo.c_str())
-								+ "," + EscapeCSVField(OutPath)
-								+ "," + EscapeCSVField(ResponseText);
+							std::string EscapedFormID = EscapeCSVField(FormID);
+							std::string EscapedVoiceID = EscapeCSVField(VoiceID);
+							std::string EscapedSpeakerInfo = EscapeCSVField(SpeakerInfo.c_str());
+							std::string EscapedOutPath = EscapeCSVField(OutPath);
+							std::string EscapedResponseText = EscapeCSVField(ResponseText);
+
+							std::string Row;
+							Row.reserve(EscapedFormID.size() + EscapedVoiceID.size() + EscapedSpeakerInfo.size() +
+								EscapedOutPath.size() + EscapedResponseText.size() + 4);
+							Row += EscapedFormID;
+							Row += ",";
+							Row += EscapedVoiceID;
+							Row += ",";
+							Row += EscapedSpeakerInfo;
+							Row += ",";
+							Row += EscapedOutPath;
+							Row += ",";
+							Row += EscapedResponseText;
 							CSVRows.push_back(Row);
 							Rows++;
 						}
