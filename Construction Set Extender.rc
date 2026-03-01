@@ -392,13 +392,9 @@ BEGIN
             MENUITEM "Books",                       40491
             MENUITEM "Descriptions",                40494
             MENUITEM "Faction Rank Names",          40537
-            POPUP "reVoice CSVs"
+            POPUP "reVoice CSV"
             BEGIN
                 MENUITEM "Active Plugin",               IDC_MAINMENU_EXPORT_REVOICECSV_ACTIVEPLUGIN
-            END
-            POPUP "ESM/ESP to JSON"
-            BEGIN
-                MENUITEM "Loaded list of plugins",      IDC_MAINMENU_EXPORT_PLUGINTOJSON
             END
         END
         POPUP "Import"
