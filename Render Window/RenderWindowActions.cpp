@@ -254,13 +254,7 @@ namespace cse
 				case kType_SolidSubspaces:
 					return INISettingCollection::Instance->LookupByName("bDrawFullSubSpaceBox:General")->value.b;
 				case kType_CollisionGeom:
-					{
-						bhkWorldM* Havok = _TES->GetHavokWorld();
-						if (Havok)
-							return true;
-						else
-							return false;
-					}
+					return false;
 				case kType_Leaves:
 					return (*BSTreeManager::Singleton)->drawLeaves;
 				case kType_Trees:
@@ -877,7 +871,7 @@ namespace cse
 								for (int i = 0; i < Node->m_children.numObjs; i++)
 								{
 									NiAVObject* Child = Node->m_children.data[i];
-									if (Child && ((Child->m_flags & NiAVObject::kFlag_AppCulled) == 0) && TESRender::GetProperty(Child, NiWireframeProperty::kType))
+									if (Child && (Child->m_flags & NiAVObject::kFlag_AppCulled) == 0 && TESRender::GetProperty(Child, NiWireframeProperty::kType))
 									{
 										// the bounding box trishape is the only child with the wireframe property
 										Delinquents.push_back(Child);

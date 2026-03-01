@@ -127,13 +127,13 @@
     <CodeAnalysisRuleAssemblies Condition="'$(Configuration)|$(Platform)'=='Release - No CrashRpt, Attach Debugger|Win32'" />
     <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(BGSEEBaseLibPath_DEBUG);$(DirectXLibPath);$(CrashRptLibPath);$(BoostLibPath);$(LibraryPath)</LibraryPath>
     <LibraryPath Condition="'$(Configuration)|$(Platform)'=='Debug - Attach Debugger|Win32'">$(BGSEEBaseLibPath_DEBUG);$(DirectXLibPath);$(CrashRptLibPath);$(BoostLibPath);$(LibraryPath)</LibraryPath>
-    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir);$(BGSEEBaseIncludePath);$(XSECommonIncludePath);$(DirectXIncludePath);$(SMESundriesIncludePath);$(BoostIncludePath);$(CrashRptIncludePath);$(NETFXKitsDir)\include\um;$(IncludePath)</IncludePath>
-    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug - Attach Debugger|Win32'">$(BGSEEBaseIncludePath);$(XSECommonIncludePath);$(DirectXIncludePath);$(SMESundriesIncludePath);$(BoostIncludePath);$(CrashRptIncludePath);$(NETFXKitsDir)\include\um;$(IncludePath)</IncludePath>
+    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir);$(BGSEEBaseIncludePath);$(XSECommonIncludePath);C:\Libraries;C:\src\SME-Sundries-master;C:\src\SME-Sundries-master\SME Sundries;C:\src\CrashRpt-main\include;$(DirectXIncludePath);$(SMESundriesIncludePath);$(BoostIncludePath);$(CrashRptIncludePath);$(NETFXKitsDir)\include\um;$(IncludePath)</IncludePath>
+    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Debug - Attach Debugger|Win32'">$(BGSEEBaseIncludePath);$(XSECommonIncludePath);C:\Libraries;C:\src\SME-Sundries-master;C:\src\SME-Sundries-master\SME Sundries;C:\src\CrashRpt-main\include;$(DirectXIncludePath);$(SMESundriesIncludePath);$(BoostIncludePath);$(CrashRptIncludePath);$(NETFXKitsDir)\include\um;$(IncludePath)</IncludePath>
     <SourcePath Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SourcePath)</SourcePath>
     <SourcePath Condition="'$(Configuration)|$(Platform)'=='Debug - Attach Debugger|Win32'">$(SourcePath)</SourcePath>
-    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(BGSEEBaseIncludePath);$(XSECommonIncludePath);$(DirectXIncludePath);$(SMESundriesIncludePath);$(BoostIncludePath);$(CrashRptIncludePath);$(NETFXKitsDir)\include\um;$(IncludePath)</IncludePath>
-    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Release - Skip Dev Channel|Win32'">$(BGSEEBaseIncludePath);$(XSECommonIncludePath);$(DirectXIncludePath);$(SMESundriesIncludePath);$(BoostIncludePath);$(CrashRptIncludePath);$(NETFXKitsDir)\include\um;$(IncludePath)</IncludePath>
-    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Release - No CrashRpt, Attach Debugger|Win32'">$(BGSEEBaseIncludePath);$(XSECommonIncludePath);$(DirectXIncludePath);$(SMESundriesIncludePath);$(BoostIncludePath);$(CrashRptIncludePath);$(NETFXKitsDir)\include\um;$(IncludePath)</IncludePath>
+    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectDir);$(BGSEEBaseIncludePath);$(XSECommonIncludePath);C:\Libraries;C:\src\SME-Sundries-master;C:\src\SME-Sundries-master\SME Sundries;C:\src\CrashRpt-main\include;$(DirectXIncludePath);$(SMESundriesIncludePath);$(BoostIncludePath);$(CrashRptIncludePath);$(NETFXKitsDir)\include\um;$(IncludePath)</IncludePath>
+    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Release - Skip Dev Channel|Win32'">$(ProjectDir);$(BGSEEBaseIncludePath);$(XSECommonIncludePath);C:\Libraries;C:\src\SME-Sundries-master;C:\src\SME-Sundries-master\SME Sundries;C:\src\CrashRpt-main\include;$(DirectXIncludePath);$(SMESundriesIncludePath);$(BoostIncludePath);$(CrashRptIncludePath);$(NETFXKitsDir)\include\um;$(IncludePath)</IncludePath>
+    <IncludePath Condition="'$(Configuration)|$(Platform)'=='Release - No CrashRpt, Attach Debugger|Win32'">$(ProjectDir);$(BGSEEBaseIncludePath);$(XSECommonIncludePath);C:\Libraries;C:\src\SME-Sundries-master;C:\src\SME-Sundries-master\SME Sundries;C:\src\CrashRpt-main\include;$(DirectXIncludePath);$(SMESundriesIncludePath);$(BoostIncludePath);$(CrashRptIncludePath);$(NETFXKitsDir)\include\um;$(IncludePath)</IncludePath>
     <SourcePath Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SourcePath)</SourcePath>
     <SourcePath Condition="'$(Configuration)|$(Platform)'=='Release - Skip Dev Channel|Win32'">$(SourcePath)</SourcePath>
     <SourcePath Condition="'$(Configuration)|$(Platform)'=='Release - No CrashRpt, Attach Debugger|Win32'">$(SourcePath)</SourcePath>
@@ -187,6 +187,9 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
+    <ResourceCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
     <Link>
       <AdditionalDependencies>ComCtl32.lib;shell32.lib;common_vc14.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
@@ -243,6 +246,9 @@ if not "$(DropboxPath)"=="" if exist "$(DropboxPath)\CSE Once-In-Awhile'lies\Dat
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
+    <ResourceCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
     <Link>
       <AdditionalDependencies>ComCtl32.lib;shell32.lib;common_vc14.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
@@ -299,6 +305,9 @@ if not "$(DropboxPath)"=="" if exist "$(DropboxPath)\CSE Once-In-Awhile'lies\Dat
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
+    <ResourceCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
     <Link>
       <AdditionalDependencies>ComCtl32.lib;shell32.lib;common_vc14.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
@@ -356,8 +365,11 @@ if not "$(DropboxPath)"=="" if exist "$(DropboxPath)\CSE Once-In-Awhile'lies\Dat
       <AdditionalOptions>-Zm200 /Zc:char8_t- /Zc:strictStrings-</AdditionalOptions>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
+    <ResourceCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
     <Link>
-      <AdditionalDependencies>ComCtl32.lib;shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ComCtl32.lib;shell32.lib;common_vc14.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <ModuleDefinitionFile>
@@ -418,8 +430,11 @@ if not "$(DropboxPath)"=="" if exist "$(DropboxPath)\CSE Once-In-Awhile'lies\Dat
       <AdditionalOptions>-Zm200 /Zc:char8_t- /Zc:strictStrings-</AdditionalOptions>
       <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
+    <ResourceCompile>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(IncludePath);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+    </ResourceCompile>
     <Link>
-      <AdditionalDependencies>ComCtl32.lib;shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>ComCtl32.lib;shell32.lib;common_vc14.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
       <IgnoreSpecificDefaultLibraries>%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>
       <ModuleDefinitionFile>
@@ -572,6 +587,7 @@ if not "$(DropboxPath)"=="" if exist "$(DropboxPath)\CSE Once-In-Awhile'lies\Dat
     <ClCompile Include="Exports.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="$(SMESundriesIncludePath)\INIEditGUI_Res.h" />
     <ClInclude Include="..\OBSE\obse\HavokBase.h" />
     <ClInclude Include="..\OBSE\obse\HavokCharacters.h" />
     <ClInclude Include="..\OBSE\obse\HavokCollision.h" />
@@ -786,6 +802,7 @@ if not "$(DropboxPath)"=="" if exist "$(DropboxPath)\CSE Once-In-Awhile'lies\Dat
     <None Include="Images\wtf.bmp" />
   </ItemGroup>
   <ItemGroup>
+    <ResourceCompile Include="$(SMESundriesIncludePath)\INIEditGUI_Res.rc" />
     <ResourceCompile Include="Construction Set Extender.rc" />
     <ResourceCompile Include="VersionInfo.rc">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">

@@ -90,14 +90,18 @@ void TESObjectREFR::SetPosition( float X, float Y, float Z )
 	TESObjectCELL* ExteriorAtCoordsEpilog = nullptr;
 
 	if (parentCell && parentCell->IsInterior() == false)
-		ExteriorAtCoordsProlog = _DATAHANDLER->GetExteriorCell(position.x, position.y, position.z, nullptr, parentCell->GetParentWorldSpace());
+	{
+		bool PathGridLinked = false;
+		ExteriorAtCoordsProlog = _DATAHANDLER->GetExteriorCell(position.x, position.y, position.z, &PathGridLinked, parentCell->GetParentWorldSpace());
+	}
 
 	thisCall<void>(0x00544250, this, X, Y, Z);									// TESObjectREFR::SetPosition
 	thisCall<void>(0x0053FD10, this, position.x, position.y, position.z);		// TESObjectREFR::SetExtraEditorMoveDataPosition
 
 	if (parentCell && parentCell->IsInterior() == false)
 	{
-		ExteriorAtCoordsEpilog = _DATAHANDLER->GetExteriorCell(position.x, position.y, position.z, nullptr, parentCell->GetParentWorldSpace());
+		bool PathGridLinked = false;
+		ExteriorAtCoordsEpilog = _DATAHANDLER->GetExteriorCell(position.x, position.y, position.z, &PathGridLinked, parentCell->GetParentWorldSpace());
 		if (ExteriorAtCoordsProlog != ExteriorAtCoordsEpilog)
 			_DATAHANDLER->MoveReference(ExteriorAtCoordsEpilog, this);
 	}

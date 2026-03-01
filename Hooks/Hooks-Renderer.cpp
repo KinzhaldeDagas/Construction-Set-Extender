@@ -200,7 +200,7 @@ namespace cse
 					if (Geom->m_pcName && strstr(Geom->m_pcName, "Block") == Geom->m_pcName)
 					return false;
 
-				auto Parent = NI_CAST(Geom->m_parent, NiAVObject);
+				NiAVObject* Parent = NI_CAST(Geom->m_parent, NiAVObject);
 				while (Parent)
 				{
 					auto Node = NI_CAST(Parent, NiNode);
@@ -227,9 +227,9 @@ namespace cse
 				auto CurrentRenderPass = *TESRender::CurrentRenderPassData;
 				if (CurrentRenderPass)
 				{
+					NiAVObject* PassGeometry = reinterpret_cast<NiAVObject**>(CurrentRenderPass)[0];
 					NiColor MaskColor;
-					auto Geom = *reinterpret_cast<NiAVObject**>(reinterpret_cast<UInt32>(CurrentRenderPass) + 0x24);
-					if (IsGeometryMasked(Geom, &MaskColor))
+					if (PassGeometry && IsGeometryMasked(PassGeometry, &MaskColor))
 					{
 						cdeclCall<void>(0x0079AC60,
 										ConstantIndex,
