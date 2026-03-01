@@ -344,6 +344,49 @@ namespace cse
 			return false;
 		}
 
+		static RevoiceParentMasterExportMode PromptParentMasterMode(HWND hWnd)
+		{
+			const int ParentMasterChoice = BGSEEUI->MsgBoxI(hWnd,
+				MB_YESNOCANCEL,
+				"Export with Parent Master Dialogue?\n\n"
+				"Yes = Export Active Plugin + Parent Masters (Oblivion.esm is always ignored)\n"
+				"No = Export Active Plugin only\n"
+				"Cancel = Export other Parent Masters (Oblivion.esm is always ignored)");
+
+			switch (ParentMasterChoice)
+			{
+			case IDYES:
+				return RevoiceParentMasterExportMode::IncludeAll;
+			case IDCANCEL:
+				return RevoiceParentMasterExportMode::IgnoreOblivion;
+			case IDNO:
+			default:
+				return RevoiceParentMasterExportMode::ActivePluginOnly;
+			}
+		}
+
+		static void BuildAllowedParentMasterList(TESFile* Plugin, RevoiceParentMasterExportMode ExportMode, std::vector<TESFile*>& Out)
+		{
+			Out.clear();
+			if (Plugin == nullptr)
+				return;
+
+			for (UInt32 i = 0; i < Plugin->masterCount; i++)
+			{
+				TESFile* MasterFile = Plugin->masterFiles[i];
+				if (MasterFile == nullptr)
+					continue;
+
+				if (_stricmp(MasterFile->fileName, "Oblivion.esm") == 0)
+				{
+					// Oblivion.esm is never allowed in parent-master processing for JSON/reVoice parity.
+					continue;
+				}
+
+				Out.push_back(MasterFile);
+			}
+		}
+
 		static std::string GetBasePluginName(const char* FileName)
 		{
 			std::string Name = FileName ? FileName : "Plugin";
@@ -638,18 +681,70 @@ namespace cse
 
 		static void ExportPluginToJSON(HWND hWnd)
 		{
-			TESFile* Plugin = nullptr;
-			if (ChooseLoadedPluginFromDialog(hWnd, &Plugin) == false)
+			TESFile* Plugin = _DATAHANDLER->activeFile;
+			if (Plugin == nullptr)
+			{
+				BGSEEUI->MsgBoxE("An active plugin must be set before using this tool.");
+				return;
+			}
+
+			char SelectPath[MAX_PATH] = { 0 };
+			std::string DefaultFileName = GetBasePluginName(Plugin->fileName) + "_forms.jsonl";
+			strncpy_s(SelectPath, DefaultFileName.c_str(), _TRUNCATE);
+			if (TESDialog::ShowFileSelect(hWnd,
+				"Data",
+				"JSONL Files\0*.jsonl\0JSON Files\0*.json\0\0",
+				"Export ESM/ESP to JSON (Active Plugin)",
+				"jsonl",
+				nullptr,
+				false,
+				true,
+				SelectPath,
+				MAX_PATH) == false)
+			{
+				return;
+			}
+
+			std::string FormsPath(SelectPath);
+			if (FormsPath.empty())
 				return;
 
-			std::string BaseName = GetBasePluginName(Plugin->fileName);
-			std::string OutDir = "Data";
+			for (auto& Ch : FormsPath)
+			{
+				if (Ch == '/')
+					Ch = '\\';
+			}
+
+			if (IsAbsoluteRevoicePath(FormsPath) == false && _strnicmp(FormsPath.c_str(), "Data\\", 5) != 0)
+				FormsPath = std::string("Data\\") + FormsPath;
+
+			if (FormsPath.size() < 6 || _stricmp(FormsPath.c_str() + FormsPath.size() - 6, ".jsonl"))
+				FormsPath += ".jsonl";
+
+			RevoiceParentMasterExportMode ExportMode = PromptParentMasterMode(hWnd);
+			std::vector<TESFile*> AllowedParentMasters;
+			BuildAllowedParentMasterList(Plugin, ExportMode, AllowedParentMasters);
+
+			std::string ManifestPath = FormsPath;
+			size_t LastDot = ManifestPath.find_last_of('.');
+			if (LastDot != std::string::npos)
+				ManifestPath.erase(LastDot);
+			ManifestPath += "_manifest.json";
 
 			std::vector<TESForm*> Forms;
 			CollectFormsOwnedByPlugin(Plugin, Forms);
+			if (ExportMode != RevoiceParentMasterExportMode::ActivePluginOnly)
+			{
+				for (auto* MasterFile : AllowedParentMasters)
+				{
+					std::vector<TESForm*> MasterForms;
+					CollectFormsOwnedByPlugin(MasterFile, MasterForms);
+					Forms.insert(Forms.end(), MasterForms.begin(), MasterForms.end());
+				}
+			}
+
 			TESCSMain::WriteToStatusBar(0, "JSON export in progress...");
 
-			std::string ManifestPath = OutDir + "\\" + BaseName + "_manifest.json";
 			std::ofstream ManifestOut(ManifestPath, std::ios::trunc);
 			if (ManifestOut.good() == false)
 			{
@@ -657,8 +752,8 @@ namespace cse
 				return;
 			}
 
-			std::string FormsFileName = BaseName + "_forms.jsonl";
-			std::string FormsPath = OutDir + "\\" + FormsFileName;
+			size_t LastSlash = FormsPath.find_last_of("\\/");
+			std::string FormsFileName = LastSlash != std::string::npos ? FormsPath.substr(LastSlash + 1) : FormsPath;
 			std::ofstream Out(FormsPath, std::ios::trunc);
 			if (Out.good() == false)
 			{
@@ -703,6 +798,7 @@ namespace cse
 			ManifestOut << "{\n"
 				<< "  \"schema\": \"cse-plugin-json-v2\",\n"
 				<< "  \"plugin\": \"" << EscapeJSONString(Plugin->fileName) << "\",\n"
+				<< "  \"mode\": \"" << (ExportMode == RevoiceParentMasterExportMode::IncludeAll ? "include-all" : (ExportMode == RevoiceParentMasterExportMode::IgnoreOblivion ? "ignore-oblivion" : "active-only")) << "\",\n"
 				<< "  \"formCount\": " << Exported << ",\n"
 				<< "  \"formsFile\": \"" << EscapeJSONString(FormsFileName) << "\"\n"
 				<< "}\n";
@@ -710,19 +806,57 @@ namespace cse
 			Out.flush();
 			ManifestOut.flush();
 			TESCSMain::WriteToStatusBar(0, "JSON export complete.");
-			BGSEEUI->MsgBoxI("Plugin export complete.\nPlugin: %s\nExported forms: %u\nFolder: %s", Plugin->fileName, Exported, OutDir.c_str());
+			BGSEEUI->MsgBoxI("Plugin export complete.\nPlugin: %s\nExported forms: %u\nFile: %s", Plugin->fileName, Exported, FormsPath.c_str());
 		}
 
 		static void ImportJSONToPlugin(HWND hWnd)
 		{
-			TESFile* Plugin = nullptr;
-			if (ChooseLoadedPluginFromDialog(hWnd, &Plugin) == false)
+			TESFile* Plugin = _DATAHANDLER->activeFile;
+			if (Plugin == nullptr)
+			{
+				BGSEEUI->MsgBoxE("An active plugin must be set before using this tool.");
+				return;
+			}
+
+			char SelectPath[MAX_PATH] = { 0 };
+			std::string DefaultFileName = GetBasePluginName(Plugin->fileName) + "_forms.jsonl";
+			strncpy_s(SelectPath, DefaultFileName.c_str(), _TRUNCATE);
+			if (TESDialog::ShowFileSelect(hWnd,
+				"Data",
+				"JSONL Files\0*.jsonl\0JSON Files\0*.json\0\0",
+				"Import JSON to ESM/ESP (Active Plugin)",
+				"jsonl",
+				nullptr,
+				false,
+				false,
+				SelectPath,
+				MAX_PATH) == false)
+			{
+				return;
+			}
+
+			std::string FormsPath(SelectPath);
+			if (FormsPath.empty())
 				return;
 
-			std::string BaseName = GetBasePluginName(Plugin->fileName);
-			std::string OutDir = "Data";
-			std::string ManifestPath = OutDir + "\\" + BaseName + "_manifest.json";
-			std::string FormsPath = OutDir + "\\" + BaseName + "_forms.jsonl";
+			for (auto& Ch : FormsPath)
+			{
+				if (Ch == '/')
+					Ch = '\\';
+			}
+
+			if (IsAbsoluteRevoicePath(FormsPath) == false && _strnicmp(FormsPath.c_str(), "Data\\", 5) != 0)
+				FormsPath = std::string("Data\\") + FormsPath;
+
+			RevoiceParentMasterExportMode ImportMode = PromptParentMasterMode(hWnd);
+			std::vector<TESFile*> AllowedParentMasters;
+			BuildAllowedParentMasterList(Plugin, ImportMode, AllowedParentMasters);
+
+			std::string ManifestPath = FormsPath;
+			size_t LastDot = ManifestPath.find_last_of('.');
+			if (LastDot != std::string::npos)
+				ManifestPath.erase(LastDot);
+			ManifestPath += "_manifest.json";
 
 			std::ifstream ManifestIn(ManifestPath);
 			if (ManifestIn.good())
@@ -737,7 +871,11 @@ namespace cse
 				}
 
 				if (ExtractJSONStringField(Manifest, "formsFile", ManifestFormsFile) && ManifestFormsFile.empty() == false)
-					FormsPath = OutDir + "\\" + ManifestFormsFile;
+				{
+					size_t LastSlash = FormsPath.find_last_of("\\/");
+					std::string BaseDir = LastSlash != std::string::npos ? FormsPath.substr(0, LastSlash) : std::string("Data");
+					FormsPath = BaseDir + "\\" + ManifestFormsFile;
+				}
 			}
 
 			std::ifstream In(FormsPath);
@@ -768,7 +906,20 @@ namespace cse
 					SkippedMalformed++;
 					continue;
 				}
-				if (_stricmp(PluginName.c_str(), Plugin->fileName) != 0)
+				bool PluginAllowed = (_stricmp(PluginName.c_str(), Plugin->fileName) == 0);
+				if (PluginAllowed == false && ImportMode != RevoiceParentMasterExportMode::ActivePluginOnly)
+				{
+					for (auto* MasterFile : AllowedParentMasters)
+					{
+						if (MasterFile && _stricmp(PluginName.c_str(), MasterFile->fileName) == 0)
+						{
+							PluginAllowed = true;
+							break;
+						}
+					}
+				}
+
+				if (PluginAllowed == false)
 				{
 					SkippedPluginMismatch++;
 					continue;
@@ -799,7 +950,7 @@ namespace cse
 				}
 
 				TESFile* Parent = Form->GetOverrideFile(-1);
-				if (Parent != Plugin)
+				if (ShouldExportDialogueFromFile(Parent, ImportMode, AllowedParentMasters) == false)
 				{
 					SkippedPluginMismatch++;
 					continue;
