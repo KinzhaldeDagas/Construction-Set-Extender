@@ -245,6 +245,7 @@ namespace cse
 			ReferenceColorMaskManager*					ColorMaskManager;
 			GlobalEventSink*							EventSink;
 			TESObjectREFRArrayT							ActiveRefCache;		// include temporary refs
+			UInt32									LastActiveRefCacheTick;
 			bool										RenderingScene;
 			bool										Initialized;
 			bool										MouseInClientArea;
