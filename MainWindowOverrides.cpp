@@ -18,6 +18,7 @@
 #include <fstream>
 #include <iterator>
 #include <set>
+#include <sstream>
 #include <vector>
 
 #include "[BGSEEBase]\ToolBox.h"
@@ -448,18 +449,39 @@ namespace cse
 			return Out;
 		}
 
+		static size_t SkipJSONWhitespace(const std::string& Json, size_t Index)
+		{
+			while (Index < Json.size())
+			{
+				char Ch = Json[Index];
+				if (Ch != ' ' && Ch != '\t' && Ch != '\r' && Ch != '\n')
+					break;
+				Index++;
+			}
+			return Index;
+		}
+
 		static bool ExtractJSONStringField(const std::string& Json, const char* Key, std::string& OutValue)
 		{
-			std::string Prefix = std::string("\"") + Key + "\":\"";
-			size_t Start = Json.find(Prefix);
-			if (Start == std::string::npos)
+			std::string Prefix = std::string("\"") + Key + "\"";
+			size_t KeyPos = Json.find(Prefix);
+			if (KeyPos == std::string::npos)
 				return false;
-			Start += Prefix.size();
+
+			size_t ValuePos = SkipJSONWhitespace(Json, KeyPos + Prefix.size());
+			if (ValuePos >= Json.size() || Json[ValuePos] != ':')
+				return false;
+
+			ValuePos = SkipJSONWhitespace(Json, ValuePos + 1);
+			if (ValuePos >= Json.size() || Json[ValuePos] != '"')
+				return false;
+
+			ValuePos++;
 			std::string Raw;
-			for (size_t i = Start; i < Json.size(); i++)
+			for (size_t i = ValuePos; i < Json.size(); i++)
 			{
 				char Ch = Json[i];
-				if (Ch == '"' && (i == Start || Json[i - 1] != '\\'))
+				if (Ch == '"' && (i == ValuePos || Json[i - 1] != '\\'))
 				{
 					OutValue = UnescapeJSONString(Raw);
 					return true;
@@ -467,6 +489,69 @@ namespace cse
 				Raw.push_back(Ch);
 			}
 			return false;
+		}
+
+		static void ExtractJSONObjectsFromBuffer(const std::string& Buffer, std::vector<std::string>& OutObjects)
+		{
+			OutObjects.clear();
+
+			std::stringstream LineStream(Buffer);
+			std::string Line;
+			while (std::getline(LineStream, Line))
+			{
+				size_t First = SkipJSONWhitespace(Line, 0);
+				if (First >= Line.size())
+					continue;
+				if (Line[First] == '{')
+					OutObjects.push_back(Line.substr(First));
+			}
+
+			if (OutObjects.empty() == false)
+				return;
+
+			int Depth = 0;
+			bool InString = false;
+			bool Escaped = false;
+			size_t ObjectStart = std::string::npos;
+			for (size_t i = 0; i < Buffer.size(); i++)
+			{
+				char Ch = Buffer[i];
+				if (InString)
+				{
+					if (Escaped)
+						Escaped = false;
+					else if (Ch == '\\')
+						Escaped = true;
+					else if (Ch == '"')
+						InString = false;
+					continue;
+				}
+
+				if (Ch == '"')
+				{
+					InString = true;
+					continue;
+				}
+
+				if (Ch == '{')
+				{
+					if (Depth == 0)
+						ObjectStart = i;
+					Depth++;
+				}
+				else if (Ch == '}')
+				{
+					if (Depth > 0)
+					{
+						Depth--;
+						if (Depth == 0 && ObjectStart != std::string::npos)
+						{
+							OutObjects.push_back(Buffer.substr(ObjectStart, i - ObjectStart + 1));
+							ObjectStart = std::string::npos;
+						}
+					}
+				}
+			}
 		}
 
 		static UInt32 ComputeFNV1a(const std::string& Value)
@@ -681,12 +766,9 @@ namespace cse
 
 		static void ExportPluginToJSON(HWND hWnd)
 		{
-			TESFile* Plugin = _DATAHANDLER->activeFile;
-			if (Plugin == nullptr)
-			{
-				BGSEEUI->MsgBoxE("An active plugin must be set before using this tool.");
+			TESFile* Plugin = nullptr;
+			if (ChooseLoadedPluginFromDialog(hWnd, &Plugin) == false || Plugin == nullptr)
 				return;
-			}
 
 			char SelectPath[MAX_PATH] = { 0 };
 			std::string DefaultFileName = GetBasePluginName(Plugin->fileName) + "_forms.jsonl";
@@ -694,7 +776,7 @@ namespace cse
 			if (TESDialog::ShowFileSelect(hWnd,
 				"Data",
 				"JSONL Files\0*.jsonl\0JSON Files\0*.json\0\0",
-				"Export ESM/ESP to JSON (Active Plugin)",
+				"Export ESM/ESP to JSON (Loaded Plugin)",
 				"jsonl",
 				nullptr,
 				false,
@@ -773,13 +855,15 @@ namespace cse
 					continue;
 
 				componentDLLInterface::FormData Data(Form);
+				TESFile* SourcePlugin = Form->GetOverrideFile(-1);
+				const char* SourcePluginName = (SourcePlugin && SourcePlugin->fileName) ? SourcePlugin->fileName : Plugin->fileName;
 				char FormIDHex[16] = { 0 };
 				FORMAT_STR(FormIDHex, "%08X", Form->formID);
 
 				const UInt32 TokenHash = ComputeFNV1a(FormToken);
 
 				Out << "{\"schema\":\"cse-plugin-json-row-v2\","
-					<< "\"plugin\":\"" << EscapeJSONString(Plugin->fileName) << "\","
+					<< "\"plugin\":\"" << EscapeJSONString(SourcePluginName) << "\","
 					<< "\"formToken\":\"" << EscapeJSONString(FormToken) << "\","
 					<< "\"formTokenHash\":\"" << FormatHex32(TokenHash) << "\","
 					<< "\"editorID\":\"" << EscapeJSONString(Data.EditorID ? Data.EditorID : "") << "\","
@@ -811,12 +895,9 @@ namespace cse
 
 		static void ImportJSONToPlugin(HWND hWnd)
 		{
-			TESFile* Plugin = _DATAHANDLER->activeFile;
-			if (Plugin == nullptr)
-			{
-				BGSEEUI->MsgBoxE("An active plugin must be set before using this tool.");
+			TESFile* Plugin = nullptr;
+			if (ChooseLoadedPluginFromDialog(hWnd, &Plugin) == false || Plugin == nullptr)
 				return;
-			}
 
 			char SelectPath[MAX_PATH] = { 0 };
 			std::string DefaultFileName = GetBasePluginName(Plugin->fileName) + "_forms.jsonl";
@@ -824,7 +905,7 @@ namespace cse
 			if (TESDialog::ShowFileSelect(hWnd,
 				"Data",
 				"JSONL Files\0*.jsonl\0JSON Files\0*.json\0\0",
-				"Import JSON to ESM/ESP (Active Plugin)",
+				"Import JSON to ESM/ESP (Loaded Plugin)",
 				"jsonl",
 				nullptr,
 				false,
@@ -892,16 +973,19 @@ namespace cse
 			Plugin->SetActive(true);
 
 			UInt32 Imported = 0, Failed = 0, SkippedPluginMismatch = 0, SkippedMalformed = 0, SkippedHashMismatch = 0;
-			std::string Line;
 			serialization::TESForm2Text Serializer;
 			TESCSMain::WriteToStatusBar(0, "JSON import in progress...");
-			while (std::getline(In, Line))
+
+			std::string RawInput((std::istreambuf_iterator<char>(In)), std::istreambuf_iterator<char>());
+			std::vector<std::string> InputRows;
+			ExtractJSONObjectsFromBuffer(RawInput, InputRows);
+			for (const auto& Row : InputRows)
 			{
-				if (Line.empty())
+				if (Row.empty())
 					continue;
 
 				std::string PluginName;
-				if (ExtractJSONStringField(Line, "plugin", PluginName) == false)
+				if (ExtractJSONStringField(Row, "plugin", PluginName) == false)
 				{
 					SkippedMalformed++;
 					continue;
@@ -926,14 +1010,14 @@ namespace cse
 				}
 
 				std::string FormToken;
-				if (ExtractJSONStringField(Line, "formToken", FormToken) == false)
+				if (ExtractJSONStringField(Row, "formToken", FormToken) == false)
 				{
 					SkippedMalformed++;
 					continue;
 				}
 
 				std::string TokenHash;
-				if (ExtractJSONStringField(Line, "formTokenHash", TokenHash) && TokenHash.empty() == false)
+				if (ExtractJSONStringField(Row, "formTokenHash", TokenHash) && TokenHash.empty() == false)
 				{
 					if (_stricmp(TokenHash.c_str(), FormatHex32(ComputeFNV1a(FormToken)).c_str()) != 0)
 					{
