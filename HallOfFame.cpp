@@ -242,9 +242,6 @@ namespace cse
 				// was flitting through the official forums and the Nexus on a wave of nostalgia when the thought hit me
 				// thanks for all the memories and fish(sticks)!
 				kESMembers.push_back("The Elder Scrolls Modding Community");
-				kESMembers.push_back("DaggerfallTeam");
-				kESMembers.push_back("Ilde");
-				kESMembers.push_back("ponyrider0");
 				kESMembers.push_back("saebel");
 				kESMembers.push_back("Arkngt X");
 				kESMembers.push_back("gruftikus");

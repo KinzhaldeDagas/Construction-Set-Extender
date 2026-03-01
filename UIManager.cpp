@@ -208,10 +208,11 @@ namespace cse
 			if (FilterString.empty())
 				return true;
 
-			auto MatchesFilter = [&](const std::string& InString) -> bool {
+			auto MatchesFilter = [&](const std::string& StringValue) -> bool {
+					std::string String = StringValue;
 				if (FilterString.empty())
 					return true;
-				else if (InString.empty())
+				else if (String.empty())
 					return false;
 
 				if (HasRegEx())
@@ -219,7 +220,7 @@ namespace cse
 					try
 					{
 						std::smatch Results;
-						if (std::regex_search(InString, Results, FilterRegEx))
+						if (std::regex_search(String, Results, FilterRegEx))
 							return true;
 					} catch (...) {
 						// Fail fast if bad regex.
@@ -231,7 +232,6 @@ namespace cse
 				}
 				else
 				{
-					std::string String = InString;
 					SME::StringHelpers::MakeLower(String);
 					if (String.find(FilterString) != std::string::npos)
 						return true;

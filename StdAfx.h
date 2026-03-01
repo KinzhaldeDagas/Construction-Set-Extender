@@ -108,10 +108,7 @@ using namespace SME::INI;
 using namespace SME::Functors;
 using namespace SME::MemoryHandler;
 
-// xOBSE / editor-safe declarations and interfaces
-#include "obse_common\obse_version.h"
-
-// Pull authoritative OBSE interfaces/types from xOBSE headers.
+// xOBSE
 #include <PluginAPI.h>
 
 // xOBSE templates may reference FormHeap allocators via declarations.

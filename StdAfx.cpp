@@ -12,7 +12,7 @@
 #pragma comment(lib, "UxTheme.lib")
 #pragma comment(lib, "mscoree.lib")
 #pragma comment(lib, "Psapi.lib")
-#if defined(CSE_ENABLE_CRASHRPT)
+#ifndef CSE_NO_CRASHRPT
 #pragma comment(lib, "CrashRpt1403.lib")
 #endif
 

@@ -291,70 +291,6 @@ namespace cse
 			}
 		}
 
-		LRESULT CALLBACK RegionEditorGeneralDlgSubClassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
-			bgsee::WindowSubclassProcCollection::SubclassProcExtraParams* SubclassParams)
-		{
-			LRESULT DlgProcResult = FALSE;
-			SubclassParams->Out.MarkMessageAsHandled = false;
-
-			auto GetEnableDataTypeCheckBox = [hWnd]() -> HWND
-			{
-				HWND Child = nullptr;
-				char ClassName[0x40] = { 0 };
-				char ControlText[0x200] = { 0 };
-
-				while ((Child = FindWindowEx(hWnd, Child, nullptr, nullptr)) != nullptr)
-				{
-					GetClassName(Child, ClassName, sizeof(ClassName));
-					if (_stricmp(ClassName, "Button"))
-						continue;
-
-					GetWindowText(Child, ControlText, sizeof(ControlText));
-					if (!_stricmp(ControlText, "Enable this type of data"))
-						return Child;
-				}
-
-				return nullptr;
-			};
-
-			static bool PreventAutoEnableAfterTabSwitch = false;
-
-			switch (uMsg)
-			{
-			case WM_NOTIFY:
-				{
-					NMHDR* NotifyData = reinterpret_cast<NMHDR*>(lParam);
-					if (NotifyData && NotifyData->code == TCN_SELCHANGING)
-					{
-						HWND EnableCheckBox = GetEnableDataTypeCheckBox();
-						PreventAutoEnableAfterTabSwitch = EnableCheckBox && SendMessage(EnableCheckBox, BM_GETCHECK, 0, 0) != BST_CHECKED;
-					}
-					else if (NotifyData && NotifyData->code == TCN_SELCHANGE && PreventAutoEnableAfterTabSwitch)
-					{
-						HWND EnableCheckBox = GetEnableDataTypeCheckBox();
-						if (EnableCheckBox && SendMessage(EnableCheckBox, BM_GETCHECK, 0, 0) == BST_CHECKED)
-						{
-							SendMessage(EnableCheckBox, BM_SETCHECK, BST_UNCHECKED, 0);
-							PostMessage(hWnd,
-								WM_COMMAND,
-								MAKEWPARAM(GetDlgCtrlID(EnableCheckBox), BN_CLICKED),
-								reinterpret_cast<LPARAM>(EnableCheckBox));
-						}
-
-						PreventAutoEnableAfterTabSwitch = false;
-					}
-				}
-
-				break;
-			case WM_DESTROY:
-				PreventAutoEnableAfterTabSwitch = false;
-				break;
-			}
-
-			return DlgProcResult;
-		}
-
-
 		LRESULT CALLBACK DataDlgSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
 											 bgsee::WindowSubclassProcCollection::SubclassProcExtraParams* SubclassParams)
 		{
@@ -3346,7 +3282,6 @@ namespace cse
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_LandscapeEdit, LandscapeEditDlgSubClassProc);
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_AIPackages, AIPackagesDlgSubClassProc);
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_AIForm, AIFormDlgSubClassProc);
-			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorGeneral, RegionEditorGeneralDlgSubClassProc);
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_NPC, FaceGenDlgSubClassProc);
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_Race, FaceGenDlgSubClassProc);
 

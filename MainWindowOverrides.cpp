@@ -14,8 +14,11 @@
 #include "Render Window\RenderWindowManager.h"
 #include "CustomDialogProcs.h"
 
+#include <algorithm>
 #include <fstream>
-#include <iomanip>
+#include <iterator>
+#include <set>
+#include <vector>
 
 #include "[BGSEEBase]\ToolBox.h"
 #include "[BGSEEBase]\Script\CodaVM.h"
@@ -341,49 +344,6 @@ namespace cse
 			return false;
 		}
 
-		static RevoiceParentMasterExportMode PromptParentMasterMode(HWND hWnd)
-		{
-			const int ParentMasterChoice = BGSEEUI->MsgBoxI(hWnd,
-				MB_YESNOCANCEL,
-				"Export with Parent Master Dialogue?\n\n"
-				"Yes = Export Active Plugin + Parent Masters (Oblivion.esm is always ignored)\n"
-				"No = Export Active Plugin only\n"
-				"Cancel = Export other Parent Masters (Oblivion.esm is always ignored)");
-
-			switch (ParentMasterChoice)
-			{
-			case IDYES:
-				return RevoiceParentMasterExportMode::IncludeAll;
-			case IDCANCEL:
-				return RevoiceParentMasterExportMode::IgnoreOblivion;
-			case IDNO:
-			default:
-				return RevoiceParentMasterExportMode::ActivePluginOnly;
-			}
-		}
-
-		static void BuildAllowedParentMasterList(TESFile* Plugin, RevoiceParentMasterExportMode ExportMode, std::vector<TESFile*>& Out)
-		{
-			Out.clear();
-			if (Plugin == nullptr)
-				return;
-
-			for (UInt32 i = 0; i < Plugin->masterCount; i++)
-			{
-				TESFile* MasterFile = Plugin->masterFiles[i];
-				if (MasterFile == nullptr)
-					continue;
-
-				if (_stricmp(MasterFile->fileName, "Oblivion.esm") == 0)
-				{
-					// Oblivion.esm is never allowed in parent-master processing for JSON/reVoice parity.
-					continue;
-				}
-
-				Out.push_back(MasterFile);
-			}
-		}
-
 		static std::string GetBasePluginName(const char* FileName)
 		{
 			std::string Name = FileName ? FileName : "Plugin";
@@ -678,70 +638,18 @@ namespace cse
 
 		static void ExportPluginToJSON(HWND hWnd)
 		{
-			TESFile* Plugin = _DATAHANDLER->activeFile;
-			if (Plugin == nullptr)
-			{
-				BGSEEUI->MsgBoxE("An active plugin must be set before using this tool.");
-				return;
-			}
-
-			char SelectPath[MAX_PATH] = { 0 };
-			std::string DefaultFileName = GetBasePluginName(Plugin->fileName) + "_forms.jsonl";
-			strncpy_s(SelectPath, DefaultFileName.c_str(), _TRUNCATE);
-			if (TESDialog::ShowFileSelect(hWnd,
-				"Data",
-				"JSONL Files\0*.jsonl\0JSON Files\0*.json\0\0",
-				"Export ESM/ESP to JSON (Active Plugin)",
-				"jsonl",
-				nullptr,
-				false,
-				true,
-				SelectPath,
-				MAX_PATH) == false)
-			{
-				return;
-			}
-
-			std::string FormsPath(SelectPath);
-			if (FormsPath.empty())
+			TESFile* Plugin = nullptr;
+			if (ChooseLoadedPluginFromDialog(hWnd, &Plugin) == false)
 				return;
 
-			for (auto& Ch : FormsPath)
-			{
-				if (Ch == '/')
-					Ch = '\\';
-			}
-
-			if (IsAbsoluteRevoicePath(FormsPath) == false && _strnicmp(FormsPath.c_str(), "Data\\", 5) != 0)
-				FormsPath = std::string("Data\\") + FormsPath;
-
-			if (FormsPath.size() < 6 || _stricmp(FormsPath.c_str() + FormsPath.size() - 6, ".jsonl"))
-				FormsPath += ".jsonl";
-
-			RevoiceParentMasterExportMode ExportMode = PromptParentMasterMode(hWnd);
-			std::vector<TESFile*> AllowedParentMasters;
-			BuildAllowedParentMasterList(Plugin, ExportMode, AllowedParentMasters);
-
-			std::string ManifestPath = FormsPath;
-			size_t LastDot = ManifestPath.find_last_of('.');
-			if (LastDot != std::string::npos)
-				ManifestPath.erase(LastDot);
-			ManifestPath += "_manifest.json";
+			std::string BaseName = GetBasePluginName(Plugin->fileName);
+			std::string OutDir = "Data";
 
 			std::vector<TESForm*> Forms;
 			CollectFormsOwnedByPlugin(Plugin, Forms);
-			if (ExportMode != RevoiceParentMasterExportMode::ActivePluginOnly)
-			{
-				for (auto* MasterFile : AllowedParentMasters)
-				{
-					std::vector<TESForm*> MasterForms;
-					CollectFormsOwnedByPlugin(MasterFile, MasterForms);
-					Forms.insert(Forms.end(), MasterForms.begin(), MasterForms.end());
-				}
-			}
-
 			TESCSMain::WriteToStatusBar(0, "JSON export in progress...");
 
+			std::string ManifestPath = OutDir + "\\" + BaseName + "_manifest.json";
 			std::ofstream ManifestOut(ManifestPath, std::ios::trunc);
 			if (ManifestOut.good() == false)
 			{
@@ -749,8 +657,8 @@ namespace cse
 				return;
 			}
 
-			size_t LastSlash = FormsPath.find_last_of("\\/");
-			std::string FormsFileName = LastSlash != std::string::npos ? FormsPath.substr(LastSlash + 1) : FormsPath;
+			std::string FormsFileName = BaseName + "_forms.jsonl";
+			std::string FormsPath = OutDir + "\\" + FormsFileName;
 			std::ofstream Out(FormsPath, std::ios::trunc);
 			if (Out.good() == false)
 			{
@@ -795,7 +703,6 @@ namespace cse
 			ManifestOut << "{\n"
 				<< "  \"schema\": \"cse-plugin-json-v2\",\n"
 				<< "  \"plugin\": \"" << EscapeJSONString(Plugin->fileName) << "\",\n"
-				<< "  \"mode\": \"" << (ExportMode == RevoiceParentMasterExportMode::IncludeAll ? "include-all" : (ExportMode == RevoiceParentMasterExportMode::IgnoreOblivion ? "ignore-oblivion" : "active-only")) << "\",\n"
 				<< "  \"formCount\": " << Exported << ",\n"
 				<< "  \"formsFile\": \"" << EscapeJSONString(FormsFileName) << "\"\n"
 				<< "}\n";
@@ -803,57 +710,19 @@ namespace cse
 			Out.flush();
 			ManifestOut.flush();
 			TESCSMain::WriteToStatusBar(0, "JSON export complete.");
-			BGSEEUI->MsgBoxI("Plugin export complete.\nPlugin: %s\nExported forms: %u\nFile: %s", Plugin->fileName, Exported, FormsPath.c_str());
+			BGSEEUI->MsgBoxI("Plugin export complete.\nPlugin: %s\nExported forms: %u\nFolder: %s", Plugin->fileName, Exported, OutDir.c_str());
 		}
 
 		static void ImportJSONToPlugin(HWND hWnd)
 		{
-			TESFile* Plugin = _DATAHANDLER->activeFile;
-			if (Plugin == nullptr)
-			{
-				BGSEEUI->MsgBoxE("An active plugin must be set before using this tool.");
-				return;
-			}
-
-			char SelectPath[MAX_PATH] = { 0 };
-			std::string DefaultFileName = GetBasePluginName(Plugin->fileName) + "_forms.jsonl";
-			strncpy_s(SelectPath, DefaultFileName.c_str(), _TRUNCATE);
-			if (TESDialog::ShowFileSelect(hWnd,
-				"Data",
-				"JSONL Files\0*.jsonl\0JSON Files\0*.json\0\0",
-				"Import JSON to ESM/ESP (Active Plugin)",
-				"jsonl",
-				nullptr,
-				false,
-				false,
-				SelectPath,
-				MAX_PATH) == false)
-			{
-				return;
-			}
-
-			std::string FormsPath(SelectPath);
-			if (FormsPath.empty())
+			TESFile* Plugin = nullptr;
+			if (ChooseLoadedPluginFromDialog(hWnd, &Plugin) == false)
 				return;
 
-			for (auto& Ch : FormsPath)
-			{
-				if (Ch == '/')
-					Ch = '\\';
-			}
-
-			if (IsAbsoluteRevoicePath(FormsPath) == false && _strnicmp(FormsPath.c_str(), "Data\\", 5) != 0)
-				FormsPath = std::string("Data\\") + FormsPath;
-
-			RevoiceParentMasterExportMode ImportMode = PromptParentMasterMode(hWnd);
-			std::vector<TESFile*> AllowedParentMasters;
-			BuildAllowedParentMasterList(Plugin, ImportMode, AllowedParentMasters);
-
-			std::string ManifestPath = FormsPath;
-			size_t LastDot = ManifestPath.find_last_of('.');
-			if (LastDot != std::string::npos)
-				ManifestPath.erase(LastDot);
-			ManifestPath += "_manifest.json";
+			std::string BaseName = GetBasePluginName(Plugin->fileName);
+			std::string OutDir = "Data";
+			std::string ManifestPath = OutDir + "\\" + BaseName + "_manifest.json";
+			std::string FormsPath = OutDir + "\\" + BaseName + "_forms.jsonl";
 
 			std::ifstream ManifestIn(ManifestPath);
 			if (ManifestIn.good())
@@ -868,11 +737,7 @@ namespace cse
 				}
 
 				if (ExtractJSONStringField(Manifest, "formsFile", ManifestFormsFile) && ManifestFormsFile.empty() == false)
-				{
-					size_t LastSlash = FormsPath.find_last_of("\\/");
-					std::string BaseDir = LastSlash != std::string::npos ? FormsPath.substr(0, LastSlash) : std::string("Data");
-					FormsPath = BaseDir + "\\" + ManifestFormsFile;
-				}
+					FormsPath = OutDir + "\\" + ManifestFormsFile;
 			}
 
 			std::ifstream In(FormsPath);
@@ -903,20 +768,7 @@ namespace cse
 					SkippedMalformed++;
 					continue;
 				}
-				bool PluginAllowed = (_stricmp(PluginName.c_str(), Plugin->fileName) == 0);
-				if (PluginAllowed == false && ImportMode != RevoiceParentMasterExportMode::ActivePluginOnly)
-				{
-					for (auto* MasterFile : AllowedParentMasters)
-					{
-						if (MasterFile && _stricmp(PluginName.c_str(), MasterFile->fileName) == 0)
-						{
-							PluginAllowed = true;
-							break;
-						}
-					}
-				}
-
-				if (PluginAllowed == false)
+				if (_stricmp(PluginName.c_str(), Plugin->fileName) != 0)
 				{
 					SkippedPluginMismatch++;
 					continue;
@@ -947,7 +799,7 @@ namespace cse
 				}
 
 				TESFile* Parent = Form->GetOverrideFile(-1);
-				if (ShouldExportDialogueFromFile(Parent, ImportMode, AllowedParentMasters) == false)
+				if (Parent != Plugin)
 				{
 					SkippedPluginMismatch++;
 					continue;
@@ -1186,176 +1038,6 @@ namespace cse
 
 				BGSEEUI->MsgBoxI("reVoice CSV export complete. Wrote %u dialogue rows to:\n%s", Rows, FilePath.c_str());
 			}
-		}
-
-
-		static TESNPC* GetSpeakerFromTopicInfo(TESTopicInfo* Info)
-		{
-			if (Info == nullptr)
-				return nullptr;
-
-			for (ConditionListT::Iterator Itr = Info->conditions.Begin(); Itr.End() == false && Itr.Get(); ++Itr)
-			{
-				TESConditionItem* Condition = Itr.Get();
-				SME_ASSERT(Condition);
-
-				const UInt16 FunctionIndex = Condition->functionIndex & 0x0FFF;
-				if (FunctionIndex == 72 || FunctionIndex == 224)
-				{
-					TESNPC* Speaker = CS_CAST(Condition->param1.form, TESForm, TESNPC);
-					if (Speaker)
-						return Speaker;
-				}
-			}
-
-			return nullptr;
-		}
-
-		static std::string SanitizeTabDelimitedField(const char* Input)
-		{
-			std::string Result = Input ? Input : "";
-			for (auto& Ch : Result)
-			{
-				if (Ch == '\t' || Ch == '\r' || Ch == '\n')
-					Ch = ' ';
-			}
-
-			return Result;
-		}
-
-		void ExportRevoiceCSVForActivePlugin(HWND hWnd)
-		{
-			if (_DATAHANDLER->activeFile == nullptr)
-			{
-				BGSEEUI->MsgBoxE("An active plugin must be set before using this tool.");
-				return;
-			}
-
-			char SelectPath[MAX_PATH] = { 0 };
-			if (TESDialog::ShowFileSelect(hWnd,
-				"Data",
-				"CSV Files\0*.csv\0\0",
-				"Export reVoice CSV (Active Plugin)",
-				"csv",
-				nullptr,
-				false,
-				true,
-				SelectPath,
-				MAX_PATH) == false)
-			{
-				return;
-			}
-
-			std::string FilePath(SelectPath);
-			if (FilePath.empty())
-				return;
-			if (FilePath.size() < 4 || _stricmp(FilePath.c_str() + FilePath.size() - 4, ".csv"))
-				FilePath += ".csv";
-
-			std::ofstream Output(FilePath, std::ios::trunc);
-			if (Output.good() == false)
-			{
-				BGSEEUI->MsgBoxE("Couldn't open output file for writing:\n%s", FilePath.c_str());
-				return;
-			}
-
-			Output << "FormID\tVoiceID\tSpeakerInfo\tOutputPath\tDialogue\n";
-
-			UInt32 Rows = 0;
-			for (tList<TESTopic>::Iterator ItrTopic = _DATAHANDLER->topics.Begin(); ItrTopic.End() == false && ItrTopic.Get(); ++ItrTopic)
-			{
-				TESTopic* Topic = ItrTopic.Get();
-				SME_ASSERT(Topic);
-
-				for (TESTopic::TopicDataListT::Iterator ItrTopicData = Topic->topicData.Begin();
-					ItrTopicData.End() == false && ItrTopicData.Get();
-					++ItrTopicData)
-				{
-					TESQuest* Quest = ItrTopicData->parentQuest;
-					if (Quest == nullptr)
-						continue;
-
-					for (int i = 0; i < ItrTopicData->questInfos.numObjs; i++)
-					{
-						TESTopicInfo* Info = ItrTopicData->questInfos.data[i];
-						if (Info == nullptr)
-							continue;
-
-						if ((Info->formFlags & TESForm::kFormFlags_FromActiveFile) == false)
-							continue;
-
-						TESNPC* Speaker = GetSpeakerFromTopicInfo(Info);
-						if (Speaker == nullptr || Speaker->race == nullptr)
-							continue;
-
-						const bool IsFemale = (Speaker->actorFlags & TESActorBaseData::kNPCFlag_Female) != 0;
-						const char* SexToken = IsFemale ? "F" : "M";
-						TESRace* SpeakerRace = Speaker->race;
-						TESRace* VoiceRace = IsFemale ? SpeakerRace->femaleVoiceRace : SpeakerRace->maleVoiceRace;
-						if (VoiceRace == nullptr)
-							VoiceRace = SpeakerRace;
-
-						const char* VoiceID = VoiceRace->GetEditorID() ? VoiceRace->GetEditorID() : "";
-						const char* RaceName = SpeakerRace->name.c_str();
-						if (RaceName == nullptr || strlen(RaceName) == 0)
-							RaceName = "Unknown";
-
-						std::string SpeakerInfo = std::string(RaceName) + "\\" + SexToken;
-
-						for (TESTopicInfo::ResponseListT::Iterator ItrResponse = Info->responseList.Begin();
-							ItrResponse.End() == false && ItrResponse.Get();
-							++ItrResponse)
-						{
-							TESTopicInfo::ResponseData* Response = ItrResponse.Get();
-							if (Response == nullptr)
-								continue;
-
-							const char* ResponseText = Response->responseText.c_str();
-							if (ResponseText == nullptr || strlen(ResponseText) == 0)
-								continue;
-
-							char OutPath[MAX_PATH] = { 0 };
-							FORMAT_STR(OutPath, "Sound\\Voice\\%s\\%s\\%s\\%s_%s_%08X_%u.mp3",
-								_DATAHANDLER->activeFile->fileName,
-								RaceName,
-								SexToken,
-								Quest->editorID.c_str(),
-								Topic->editorID.c_str(),
-								Info->formID,
-								Response->responseNumber);
-
-							if (!(Output
-								<< std::uppercase << std::hex << std::setfill('0') << std::setw(8) << Info->formID << std::dec
-								<< "\t" << SanitizeTabDelimitedField(VoiceID)
-								<< "\t" << SanitizeTabDelimitedField(SpeakerInfo.c_str())
-								<< "\t" << SanitizeTabDelimitedField(OutPath)
-								<< "\t" << SanitizeTabDelimitedField(ResponseText)
-								<< "\n"))
-							{
-								BGSEEUI->MsgBoxE("reVoice CSV export failed while writing output file:\n%s", FilePath.c_str());
-								return;
-							}
-							Rows++;
-						}
-					}
-				}
-			}
-
-			Output.flush();
-			if (Output.fail())
-			{
-				BGSEEUI->MsgBoxE("reVoice CSV export failed while finalizing output file:\n%s", FilePath.c_str());
-				return;
-			}
-
-			Output.close();
-			if (Output.fail())
-			{
-				BGSEEUI->MsgBoxE("reVoice CSV export failed while closing output file:\n%s", FilePath.c_str());
-				return;
-			}
-
-			BGSEEUI->MsgBoxI("reVoice CSV export complete. Wrote %u dialogue rows to:\n%s", Rows, FilePath.c_str());
 		}
 
 
@@ -1737,10 +1419,6 @@ namespace cse
 					break;
 				case IDC_MAINMENU_IMPORT_JSONTOPLUGIN:
 					ImportJSONToPlugin(hWnd);
-
-					break;
-				case IDC_MAINMENU_EXPORT_REVOICECSV_ACTIVEPLUGIN:
-					ExportRevoiceCSVForActivePlugin(hWnd);
 
 					break;
 				case IDC_MAINMENU_SAVEOPTIONS_CREATEBACKUPBEFORESAVING:

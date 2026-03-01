@@ -150,7 +150,6 @@ namespace cse
 					OutRotation.Scale(REFR_DEG2RAD);
 
 					Vector3 OutPosition(Position.x, Position.y, Position.z);
-
 					TESObjectREFR* NewRef = _DATAHANDLER->PlaceObjectRef(Base,
 																		&OutPosition,
 																		&OutRotation,
@@ -788,8 +787,8 @@ namespace cse
 						TESObjectLAND* Land = Cell->GetLand();
 						if (Land)
 						{
-							Vector3 Coordinates(XCoord, YCoord, 0.f);
-							TESLandTexture* Texture = Land->GetLandTextureAt(&Coordinates);
+							Vector3 TextureCoords(XCoord, YCoord, 0.f);
+									TESLandTexture* Texture = Land->GetLandTextureAt(&TextureCoords);
 							if (Texture)
 								Result->SetFormID(Texture->formID);
 						}
