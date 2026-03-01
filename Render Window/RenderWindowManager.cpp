@@ -20,7 +20,6 @@ namespace cse
 		{
 			constexpr size_t kActiveRefCacheBaseReserve = 500;
 			constexpr size_t kActiveRefCacheTrimThreshold = 15000;
-			constexpr UInt32 kActiveRefCacheRefreshIntervalMs = 50;
 			constexpr SIZE_T kProcessWorkingSetSoftLimitMB = 1300;
 
 			SIZE_T GetProcessWorkingSetMB()
@@ -1197,7 +1196,6 @@ namespace cse
 			DeferredExecutor = new RenderWindowDeferredExecutor();
 			ColorMaskManager = new ReferenceColorMaskManager();
 			ActiveRefCache.reserve(kActiveRefCacheBaseReserve);
-			LastActiveRefCacheTick = 0;
 			RenderingScene = false;
 			MouseInClientArea = false;
 			LastActiveCell = nullptr;
@@ -1401,12 +1399,6 @@ namespace cse
 
 		void RenderWindowManager::CacheActiveRefs()
 		{
-			const UInt32 CurrentTick = GetTickCount();
-			const bool CachedRefsAvailable = ActiveRefCache.empty() == false;
-			if (CachedRefsAvailable && CurrentTick - LastActiveRefCacheTick < kActiveRefCacheRefreshIntervalMs)
-				return;
-
-			LastActiveRefCacheTick = CurrentTick;
 			ActiveRefCache.clear();
 
 			TESRenderWindow::GetActiveCellObjects(ActiveRefCache, [](TESObjectREFR* Ref)->bool {
@@ -1944,7 +1936,6 @@ namespace cse
 		void RenderWindowManager::HandleClearData()
 		{
 			ActiveRefCache.clear();
-			LastActiveRefCacheTick = 0;
 
 			ExtendedState->MeasureBaseRuler = nullptr;
 			ExtendedState->MeasureBaseCircle = nullptr;
