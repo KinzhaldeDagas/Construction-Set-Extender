@@ -9,20 +9,6 @@ namespace cse
 	ObjectWindowImposterManager					ObjectWindowImposterManager::Instance;
 
 #define ID_OBJECTWIDOWIMPOSTER_COLUMNRESIZETIMERID			0x656
-#define ID_OBJECTWINDOWIMPOSTER_TITLE_REFRESH_TIMERID		0x657
-
-	static void UpdateObjectWindowImposterTitle(HWND hWnd)
-	{
-		std::string WndTitle = "Object Window";
-
-		if (settings::general::kShowHallOfFameMembersInTitleBar().i != hallOfFame::kDisplayESMember_None)
-		{
-			hallOfFame::GetRandomESMember(WndTitle);
-			WndTitle += " Object Window";
-		}
-
-		SetWindowText(hWnd, WndTitle.c_str());
-	}
 
 	INT_PTR ObjectWindowImposterManager::ImposterDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	{
@@ -68,9 +54,6 @@ namespace cse
 
 				KillTimer(hWnd, ID_OBJECTWIDOWIMPOSTER_COLUMNRESIZETIMERID);
 				break;
-			case ID_OBJECTWINDOWIMPOSTER_TITLE_REFRESH_TIMERID:
-				UpdateObjectWindowImposterTitle(hWnd);
-				break;
 			}
 
 			break;
@@ -112,7 +95,6 @@ namespace cse
 		case WM_DESTROY:
 			{
 				uiManager::FilterableFormListManager::Instance.Unregister(FilterEditBox);
-				KillTimer(hWnd, ID_OBJECTWINDOWIMPOSTER_TITLE_REFRESH_TIMERID);
 
 				CacheOperator CacheBackup(hWnd);
 				TESObjectWindow::PerformLimitedDeinit(hWnd);
@@ -148,10 +130,17 @@ namespace cse
 
 				// reproduce the relevant bits of the org wnd proc's code
 				CacheOperator CacheBackup(hWnd);
+				std::string WndTitle = "Object Window";
+
 				TESObjectWindow::PerformLimitedInit(hWnd);
 				SendMessage(hWnd, WM_OBJECTWINDOWIMPOSTER_REFRESHTREEVIEW, NULL, NULL);
-				UpdateObjectWindowImposterTitle(hWnd);
-				SetTimer(hWnd, ID_OBJECTWINDOWIMPOSTER_TITLE_REFRESH_TIMERID, 5 * 60 * 1000, nullptr);
+
+				if (settings::general::kShowHallOfFameMembersInTitleBar().i != hallOfFame::kDisplayESMember_None)
+				{
+					hallOfFame::GetRandomESMember(WndTitle);
+					WndTitle += " Object Window";
+				}
+				SetWindowText(hWnd, WndTitle.c_str());
 
 				BGSEEUI->GetSubclasser()->RegisterSubclassForWindow(hWnd, uiManager::CommonDialogExtraFittingsSubClassProc);
 				SendMessage(hWnd, WM_OBJECTWINDOWIMPOSTER_INITIALIZEXTRA, NULL, NULL);

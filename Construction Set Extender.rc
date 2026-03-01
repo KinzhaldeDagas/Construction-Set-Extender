@@ -7,7 +7,7 @@
 //
 // Generated from the TEXTINCLUDE 2 resource.
 //
-#include "winres.h"
+#include "afxres.h"
 #include "VersionInfo.h"
 
 /////////////////////////////////////////////////////////////////////////////
@@ -332,7 +332,7 @@ END
 
 2 TEXTINCLUDE 
 BEGIN
-    "#include ""winres.h""\r\n"
+    "#include ""afxres.h""\r\n"
     "#include ""VersionInfo.h""\r\n"
     "\0"
 END
@@ -392,9 +392,13 @@ BEGIN
             MENUITEM "Books",                       40491
             MENUITEM "Descriptions",                40494
             MENUITEM "Faction Rank Names",          40537
-            POPUP "reVoice CSV"
+            POPUP "reVoice CSVs"
             BEGIN
                 MENUITEM "Active Plugin",               IDC_MAINMENU_EXPORT_REVOICECSV_ACTIVEPLUGIN
+            END
+            POPUP "ESM/ESP to JSON"
+            BEGIN
+                MENUITEM "Loaded list of plugins",      IDC_MAINMENU_EXPORT_PLUGINTOJSON
             END
         END
         POPUP "Import"

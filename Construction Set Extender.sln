@@ -31,8 +31,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "[2. External Dependencies]"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "[1. Playground]", "[1. Playground]", "{4399FDB7-9112-4CDF-A4C5-0FA1BBAC464D}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "common_vc14", "..\..\Libraries\common\common_vc14.vcxproj", "{472E19AB-DEF0-42DF-819B-18722E8DC822}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug - Attach Debugger|Win32 = Debug - Attach Debugger|Win32
@@ -117,16 +115,16 @@ Global
 		{414EDF4A-5930-416A-B382-216B445539DB}.Release - Skip Dev Channel|Win32.Build.0 = Release|Win32
 		{414EDF4A-5930-416A-B382-216B445539DB}.Release|Win32.ActiveCfg = Release|Win32
 		{414EDF4A-5930-416A-B382-216B445539DB}.Release|Win32.Build.0 = Release|Win32
-		{472E19AB-DEF0-42DF-819B-18722E8DC822}.Debug - Attach Debugger|Win32.ActiveCfg = Debug|Win32
-		{472E19AB-DEF0-42DF-819B-18722E8DC822}.Debug - Attach Debugger|Win32.Build.0 = Debug|Win32
-		{472E19AB-DEF0-42DF-819B-18722E8DC822}.Debug|Win32.ActiveCfg = Debug|Win32
-		{472E19AB-DEF0-42DF-819B-18722E8DC822}.Debug|Win32.Build.0 = Debug|Win32
-		{472E19AB-DEF0-42DF-819B-18722E8DC822}.Release - No CrashRpt, Attach Debugger|Win32.ActiveCfg = Release|Win32
-		{472E19AB-DEF0-42DF-819B-18722E8DC822}.Release - No CrashRpt, Attach Debugger|Win32.Build.0 = Release|Win32
-		{472E19AB-DEF0-42DF-819B-18722E8DC822}.Release - Skip Dev Channel|Win32.ActiveCfg = Release|Win32
-		{472E19AB-DEF0-42DF-819B-18722E8DC822}.Release - Skip Dev Channel|Win32.Build.0 = Release|Win32
-		{472E19AB-DEF0-42DF-819B-18722E8DC822}.Release|Win32.ActiveCfg = Release|Win32
-		{472E19AB-DEF0-42DF-819B-18722E8DC822}.Release|Win32.Build.0 = Release|Win32
+		{20C6411C-596F-4B85-BE4E-8BC91F59D8A6}.Debug - Attach Debugger|Win32.ActiveCfg = Debug|Win32
+		{20C6411C-596F-4B85-BE4E-8BC91F59D8A6}.Debug - Attach Debugger|Win32.Build.0 = Debug|Win32
+		{20C6411C-596F-4B85-BE4E-8BC91F59D8A6}.Debug|Win32.ActiveCfg = Debug|Win32
+		{20C6411C-596F-4B85-BE4E-8BC91F59D8A6}.Debug|Win32.Build.0 = Debug|Win32
+		{20C6411C-596F-4B85-BE4E-8BC91F59D8A6}.Release - No CrashRpt, Attach Debugger|Win32.ActiveCfg = Release|Win32
+		{20C6411C-596F-4B85-BE4E-8BC91F59D8A6}.Release - No CrashRpt, Attach Debugger|Win32.Build.0 = Release|Win32
+		{20C6411C-596F-4B85-BE4E-8BC91F59D8A6}.Release - Skip Dev Channel|Win32.ActiveCfg = Release|Win32
+		{20C6411C-596F-4B85-BE4E-8BC91F59D8A6}.Release - Skip Dev Channel|Win32.Build.0 = Release|Win32
+		{20C6411C-596F-4B85-BE4E-8BC91F59D8A6}.Release|Win32.ActiveCfg = Release|Win32
+		{20C6411C-596F-4B85-BE4E-8BC91F59D8A6}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -139,7 +137,7 @@ Global
 		{AA53012B-2307-47FE-B637-4A828BA77A24} = {C82E8D51-4BB3-430F-BF67-8921BEAC4375}
 		{EDF21D74-5099-442E-B5AC-982A41CA10F6} = {4399FDB7-9112-4CDF-A4C5-0FA1BBAC464D}
 		{414EDF4A-5930-416A-B382-216B445539DB} = {C82E8D51-4BB3-430F-BF67-8921BEAC4375}
-		{472E19AB-DEF0-42DF-819B-18722E8DC822} = {DC7C1C22-8DAF-4450-A8FA-3862A9118186}
+		{20C6411C-596F-4B85-BE4E-8BC91F59D8A6} = {DC7C1C22-8DAF-4450-A8FA-3862A9118186}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {9FBDE326-A58C-4AC2-9959-4741FF8A22E0}

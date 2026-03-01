@@ -4,7 +4,6 @@
 #include "DetectSIMD.h"
 #include "Script\CodaVM.h"
 #include <Tools\VersionInfo.h>
-#include <VersionHelpers.h>
 
 namespace bgsee
 {
@@ -216,7 +215,7 @@ namespace bgsee
 		}
 
 
-	#if defined(CSE_ENABLE_CRASHRPT)
+#ifndef CSE_NO_CRASHRPT
 		CR_EXCEPTION_INFO ExceptionInfo;
 		memset(&ExceptionInfo, 0, sizeof(CR_EXCEPTION_INFO));
 		ExceptionInfo.cb = sizeof(CR_EXCEPTION_INFO);
@@ -239,9 +238,9 @@ namespace bgsee
 		}
 
 		BGSEECONSOLE_MESSAGE("Generated crash report for external crash and terminated process for crash type %d", Type);
-	#else
-		BGSEECONSOLE_MESSAGE("CrashRpt disabled; terminating process for crash type %d", Type);
-	#endif
+#else
+		BGSEECONSOLE_MESSAGE("CrashRpt support is disabled; terminating process for crash type %d", Type);
+#endif
 
 		// Manually terminate program
 		ExitProcess(0);
@@ -468,17 +467,21 @@ namespace bgsee
 			return false;
 		}
 
+		OSVERSIONINFOEX OSInfo = {0};
 		SYSTEM_INFO SysInfo = {0};
+
+		OSInfo.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEX);
+		GetVersionEx((LPOSVERSIONINFO)&OSInfo);
 		GetSystemInfo(&SysInfo);
 
-		if (!IsWindows7OrGreater())
+		if (OSInfo.dwMajorVersion < 6 && OSInfo.dwMinorVersion < 1)
 		{
 			BGSEECONSOLE_MESSAGE("OS version too old - Windows 7 or greater required");
 			return false;
 		}
-		else if (IsWindows10OrGreater())
+		else if (OSInfo.dwMajorVersion >= 6 && OSInfo.dwMinorVersion > 3)
 		{
-			BGSEECONSOLE_MESSAGE("Your current version of Windows is not officially supported - Expect general weirdness such as collapsing time vortexes and code cannibalism");
+			BGSEECONSOLE_MESSAGE("Your current version of Windows (%d.%d.%d) is not officially supported - Expect general weirdness such as collapsing time vortexes and code cannibalism", OSInfo.dwMajorVersion, OSInfo.dwMinorVersion, OSInfo.dwBuildNumber);
 			BGSEECONSOLE_MESSAGE("You may attempt to run the editor in Windows' Compatibility Mode. This can be done by opening the 'File Properties' dialog for the xSE loader and editor executables and enabling the 'Run this program in compatibility mode for:' option from the 'Compatibility' tab, and setting the option to 'Windows 7 Service Pack 1' ");
 		}
 
@@ -494,7 +497,7 @@ namespace bgsee
 
 		if (DirectoyCheckOverride == false &&
 			ProgFilesSubstring != nullptr && ProgFilesSubstring == APPPath &&
-			IsWindowsVistaOrGreater())
+			OSInfo.dwMajorVersion > 5)
 		{
 			BGSEECONSOLE_MESSAGE("Editor/game is installed to the Program Files directory - An unprotected directory like 'C:\\Games\\' is required");
 			return false;
@@ -688,11 +691,12 @@ namespace bgsee
 
 		Singleton = nullptr;
 
-	#if defined(CSE_ENABLE_CRASHRPT)
+#ifndef CSE_NO_CRASHRPT
 		if (CrashRptSupport)
 			crUninstall();
-	#endif
+#endif
 
+		ExitProcess(0);
 	}
 
 	Main::Main(InitializationParams& Params)
@@ -763,12 +767,10 @@ namespace bgsee
 		CrashRptSupport = false;
 #else
 		CrashRptSupport = Params.CrashRptSupport;
-	#if !defined(CSE_ENABLE_CRASHRPT)
-		CrashRptSupport = false;
-	#endif
+#endif
 		Initialized = true;
 
-	#if defined(CSE_ENABLE_CRASHRPT)
+#ifndef CSE_NO_CRASHRPT
 		if (CrashRptSupport)
 		{
 			CR_INSTALL_INFO CrashRptData = { 0 };
@@ -826,7 +828,7 @@ namespace bgsee
 				crAddScreenshot2(CR_AS_PROCESS_WINDOWS, 0);
 			}
 		}
-	#endif
+#endif
 	}
 
 
@@ -937,7 +939,6 @@ namespace bgsee
 		return ParentEditorSupportedVersion;
 	}
 
-#if defined(CSE_ENABLE_CRASHRPT)
 	int CALLBACK Main::CrashRptCrashCallback(CR_CRASH_CALLBACK_INFO* pInfo)
 	{
 		// panic and toss grenades around
@@ -955,7 +956,6 @@ namespace bgsee
 
 		return CR_CB_DODEFAULT;
 	}
-#endif
 
 	void Main::ShowPreferencesGUI( void )
 	{
