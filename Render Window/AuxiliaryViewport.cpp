@@ -299,8 +299,11 @@ namespace cse
 		Create(NULL, true, true);
 		INILoadUIState(&kINI_Top, &kINI_Left, &kINI_Right, &kINI_Bottom, &kINI_Visible);
 
-		ClearScreen();
-		SyncWithPrimaryCamera();
+		if (IsVisible())
+		{
+			ClearScreen();
+			SyncWithPrimaryCamera();
+		}
 	}
 
 	void AuxiliaryViewport::ClearScreen()
@@ -337,7 +340,7 @@ namespace cse
 
 	void AuxiliaryViewport::DrawBackBuffer(void)
 	{
-		if (IsVisible() == false)
+		if (IsVisible() == false || IsIconic(DialogHandle))
 			return;
 
 		_NIRENDERER->device->Present(nullptr, nullptr, DialogHandle, nullptr);
