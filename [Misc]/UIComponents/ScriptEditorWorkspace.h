@@ -720,7 +720,8 @@ private: DevComponents::DotNetBar::ItemContainer^ MenuSuppressedWarningsListView
 				this->ToolbarSaveScriptAndActivePlugin,
 					this->ToolbarSaveScriptNoCompile
 			});
-			this->ToolbarSaveScriptDropdown->Symbol = L"58836";
+			// Material icon U+E5D4 (same glyph as previous numeric symbol id 58836).
+			this->ToolbarSaveScriptDropdown->Symbol = L"\uE5D4";
 			this->ToolbarSaveScriptDropdown->SymbolSet = DevComponents::DotNetBar::eSymbolSet::Material;
 			this->ToolbarSaveScriptDropdown->SymbolSize = 12;
 			this->ToolbarSaveScriptDropdown->Text = L"<expand/>";
