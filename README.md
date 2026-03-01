@@ -6,6 +6,8 @@ New Features [TESTED]
 
 -reVoice support... This exports the required CSV files for revoice voice generation.. Implemented here to prevent "export voices for all races" instead of individial spoken dialogue heard ingame.
 
+-Organized the [View] drop down menu into catorgries "i forgot what they were as of writing so expect that later" each catorgory is opens another dropdown menu and they're named after their use case.
+
 [UNTESTED STUFF] will change...
 
 -JSON to Plugin but will probably not finish this, but it would make merges easier and github intergration...
