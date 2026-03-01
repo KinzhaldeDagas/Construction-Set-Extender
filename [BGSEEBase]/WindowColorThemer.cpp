@@ -401,10 +401,6 @@ namespace bgsee
 			return Colors[kColor_ButtonColorFace];
 		case COLOR_BTNTEXT:
 			return Colors[kColor_ButtonColorText];
-		case COLOR_WINDOW:
-			return Colors[kColor_TextBoxColorFill];
-		case COLOR_WINDOWTEXT:
-			return Colors[kColor_DefaultColorText];
 		}
 
 		return GetSysColor(nIndex);
@@ -421,10 +417,6 @@ namespace bgsee
 			return Brushes[kColor_ButtonColorFace];
 		case COLOR_BTNTEXT:
 			return Brushes[kColor_ButtonColorText];
-		case COLOR_WINDOW:
-			return Brushes[kColor_TextBoxColorFill];
-		case COLOR_WINDOWTEXT:
-			return Brushes[kColor_DefaultColorText];
 		}
 
 		return GetSysColorBrush(nIndex);
@@ -1103,3 +1095,4 @@ namespace bgsee
 	}
 
 }
+

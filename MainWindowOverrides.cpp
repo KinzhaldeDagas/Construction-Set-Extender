@@ -1358,6 +1358,7 @@ namespace cse
 					FormEnumerationManager::Instance.ToggleVisibilityUnmodifiedForms();
 
 					break;
+				case 40136: // "CS Preferences..." in the File menu; route to CSE options dialog
 				case IDC_MAINMENU_CSEPREFERENCES:
 					BGSEEMAIN->ShowPreferencesGUI();
 
