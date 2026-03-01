@@ -301,7 +301,7 @@ namespace cse
 			if (Output.good() == false)
 				return false;
 
-			Output << "FormID,VoiceID,Race,SpeakerInfo,Emotion,OutputPath,Dialogue\n";
+			Output << "FormID,VoiceID,Race,Gender,SpeakerInfo,Emotion,OutputPath,Dialogue\n";
 			for (size_t i = StartIndex; i < EndIndexExclusive; i++)
 				Output << Rows[i] << "\n";
 
@@ -1082,19 +1082,22 @@ namespace cse
 							std::string EscapedFormID = EscapeCSVField(FormID);
 							std::string EscapedVoiceID = EscapeCSVField(VoiceID);
 							std::string EscapedRace = EscapeCSVField(RaceName);
+							std::string EscapedGender = EscapeCSVField(SexToken);
 							std::string EscapedSpeakerInfo = EscapeCSVField(SpeakerInfo.c_str());
 							std::string EscapedEmotion = EscapeCSVField(Emotion);
 							std::string EscapedOutPath = EscapeCSVField(OutPath);
 							std::string EscapedResponseText = EscapeCSVField(ResponseText);
 
 							std::string Row;
-							Row.reserve(EscapedFormID.size() + EscapedVoiceID.size() + EscapedRace.size() + EscapedSpeakerInfo.size() +
-								EscapedEmotion.size() + EscapedOutPath.size() + EscapedResponseText.size() + 6);
+							Row.reserve(EscapedFormID.size() + EscapedVoiceID.size() + EscapedRace.size() + EscapedGender.size() + EscapedSpeakerInfo.size() +
+								EscapedEmotion.size() + EscapedOutPath.size() + EscapedResponseText.size() + 7);
 							Row += EscapedFormID;
 							Row += ",";
 							Row += EscapedVoiceID;
 							Row += ",";
 							Row += EscapedRace;
+							Row += ",";
+							Row += EscapedGender;
 							Row += ",";
 							Row += EscapedSpeakerInfo;
 							Row += ",";
