@@ -12,6 +12,9 @@ namespace cse
 													ImGui::PushStyleColor(ImGuiCol_ButtonActive, (ImVec4)ImColor::HSV(0, 0, 0, 0))
 #define POP_TRANSPARENT_BUTTON_COLORS				ImGui::PopStyleColor(3);
 #define TOOLBAR_BUTTON_SIZE							ImVec2(30, 0)
+		constexpr int				kToolbarButtonWidth = 30;
+		constexpr int				kToolbarButtonSpacing = 10;
+		constexpr int				kTopToolbarWindowPaddingX = 7;
 
 		ToolbarOSDLayer				ToolbarOSDLayer::Instance;
 		constexpr int				kFilterRefsReset = -9;
@@ -179,16 +182,19 @@ namespace cse
 		void ToolbarOSDLayer::RenderTopToolbar(ImGuiDX9* GUI)
 		{
 			int XSize = *TESRenderWindow::ScreenWidth;
-			int Width = 5 + TopToolbarPopupIDs.size() * 40;
+			const auto ToolbarButtonCount = static_cast<int>(TopToolbarPopupIDs.size());
+			int InterButtonSpacing = ToolbarButtonCount > 1 ? (ToolbarButtonCount - 1) * kToolbarButtonSpacing : 0;
+			int Width = (kTopToolbarWindowPaddingX * 2) + (ToolbarButtonCount * kToolbarButtonWidth) + InterButtonSpacing;
 
 			if (BeginToolbarWindow("Top Dock", XSize - Width, 10, -1, -1, ImVec2(7, 7), ImVec2(5, 5), ImVec2(7, 7)) == false)
 				return;
 			else
 			{
-				for (auto Itr : TopToolbarPopupIDs)
+				for (int i = 0; i < ToolbarButtonCount; i++)
 				{
-					TopToolbarPopupProvider.Draw(Itr, GUI, GUI->GetCurrentWindow());
-					ImGui::SameLine(0, 10);
+					TopToolbarPopupProvider.Draw(TopToolbarPopupIDs[i], GUI, GUI->GetCurrentWindow());
+					if (i < ToolbarButtonCount - 1)
+						ImGui::SameLine(0, kToolbarButtonSpacing);
 				}
 
 				EndToolbarWindow();
