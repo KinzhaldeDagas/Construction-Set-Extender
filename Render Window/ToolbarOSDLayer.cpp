@@ -15,6 +15,7 @@ namespace cse
 		constexpr int				kToolbarButtonWidth = 30;
 		constexpr int				kToolbarButtonSpacing = 10;
 		constexpr int				kTopToolbarWindowPaddingX = 7;
+		constexpr int				kTopToolbarWidthAdjustment = 1;
 
 		ToolbarOSDLayer				ToolbarOSDLayer::Instance;
 		constexpr int				kFilterRefsReset = -9;
@@ -184,7 +185,7 @@ namespace cse
 			int XSize = *TESRenderWindow::ScreenWidth;
 			const auto ToolbarButtonCount = static_cast<int>(TopToolbarPopupIDs.size());
 			int InterButtonSpacing = ToolbarButtonCount > 1 ? (ToolbarButtonCount - 1) * kToolbarButtonSpacing : 0;
-			int Width = (kTopToolbarWindowPaddingX * 2) + (ToolbarButtonCount * kToolbarButtonWidth) + InterButtonSpacing;
+			int Width = (kTopToolbarWindowPaddingX * 2) + (ToolbarButtonCount * kToolbarButtonWidth) + InterButtonSpacing + kTopToolbarWidthAdjustment;
 
 			if (BeginToolbarWindow("Top Dock", XSize - Width, 10, -1, -1, ImVec2(7, 7), ImVec2(5, 5), ImVec2(7, 7)) == false)
 				return;
