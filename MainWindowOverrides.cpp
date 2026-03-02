@@ -400,6 +400,72 @@ namespace cse
 			return std::string("Data\\region_assets_") + BaseName + ".csv";
 		}
 
+		struct RegionAssetExportRow
+		{
+			std::string FormType;
+			std::string FormIDHex;
+			std::string EditorID;
+			std::string Plugin;
+			UInt32 FormIDValue = 0;
+		};
+
+		static bool IsExportableRegionAssetFormType(UInt8 FormType)
+		{
+			return FormType == TESForm::kFormType_Tree ||
+				FormType == TESForm::kFormType_Flora ||
+				FormType == TESForm::kFormType_Grass ||
+				FormType == TESForm::kFormType_LandTexture ||
+				FormType == TESForm::kFormType_Static;
+		}
+
+		static bool TryBuildRegionAssetExportRow(TESForm* Form,
+			const std::vector<TESFile*>& AllowedFiles,
+			std::set<UInt32>& SeenFormIDs,
+			RegionAssetExportRow& OutRow,
+			UInt32& SkippedDuplicate,
+			UInt32& SkippedUnsupported,
+			UInt32& SkippedScope,
+			UInt32& SkippedNoSource)
+		{
+			if (Form == nullptr)
+				return false;
+
+			if (IsExportableRegionAssetFormType(Form->formType) == false)
+			{
+				SkippedUnsupported++;
+				return false;
+			}
+
+			if (IsFormFromActivePluginOrMaster(Form, AllowedFiles) == false)
+			{
+				SkippedScope++;
+				return false;
+			}
+
+			TESFile* Source = Form->GetOverrideFile(-1);
+			if (Source == nullptr)
+			{
+				SkippedNoSource++;
+				return false;
+			}
+
+			if (SeenFormIDs.insert(Form->formID).second == false)
+			{
+				SkippedDuplicate++;
+				return false;
+			}
+
+			char FormID[16] = { 0 };
+			FORMAT_STR(FormID, "%08X", Form->formID);
+
+			OutRow.FormType = TESForm::GetFormTypeIDLongName(Form->formType);
+			OutRow.FormIDHex = FormID;
+			OutRow.EditorID = Form->GetEditorID() ? Form->GetEditorID() : "";
+			OutRow.Plugin = Source->fileName;
+			OutRow.FormIDValue = Form->formID;
+			return true;
+		}
+
 		static void ExportRegionAssetFormsCSV(HWND hWnd)
 		{
 			if (_DATAHANDLER == nullptr || _DATAHANDLER->activeFile == nullptr)
@@ -439,6 +505,58 @@ namespace cse
 			std::vector<TESFile*> AllowedFiles;
 			CollectActivePluginAndMasters(AllowedFiles);
 
+			std::vector<RegionAssetExportRow> Rows;
+			Rows.reserve(1024);
+			std::set<UInt32> SeenFormIDs;
+
+			UInt32 SkippedDuplicate = 0;
+			UInt32 SkippedUnsupported = 0;
+			UInt32 SkippedScope = 0;
+			UInt32 SkippedNoSource = 0;
+
+			for (TESObject* Itr = _DATAHANDLER->objects->first; Itr; Itr = Itr->next)
+			{
+				RegionAssetExportRow Row;
+				if (TryBuildRegionAssetExportRow(Itr,
+					AllowedFiles,
+					SeenFormIDs,
+					Row,
+					SkippedDuplicate,
+					SkippedUnsupported,
+					SkippedScope,
+					SkippedNoSource))
+				{
+					Rows.push_back(Row);
+				}
+			}
+
+			for (tList<TESLandTexture>::Iterator Itr = _DATAHANDLER->landTextures.Begin(); !Itr.End() && Itr.Get(); ++Itr)
+			{
+				RegionAssetExportRow Row;
+				if (TryBuildRegionAssetExportRow(Itr.Get(),
+					AllowedFiles,
+					SeenFormIDs,
+					Row,
+					SkippedDuplicate,
+					SkippedUnsupported,
+					SkippedScope,
+					SkippedNoSource))
+				{
+					Rows.push_back(Row);
+				}
+			}
+
+			std::sort(Rows.begin(), Rows.end(), [](const RegionAssetExportRow& Left, const RegionAssetExportRow& Right)
+			{
+				if (_stricmp(Left.FormType.c_str(), Right.FormType.c_str()) != 0)
+					return _stricmp(Left.FormType.c_str(), Right.FormType.c_str()) < 0;
+
+				if (_stricmp(Left.EditorID.c_str(), Right.EditorID.c_str()) != 0)
+					return _stricmp(Left.EditorID.c_str(), Right.EditorID.c_str()) < 0;
+
+				return Left.FormIDValue < Right.FormIDValue;
+			});
+
 			std::ofstream Out(FilePath, std::ios::trunc);
 			if (!Out.good())
 			{
@@ -447,45 +565,36 @@ namespace cse
 			}
 
 			Out << "Schema,FormType,FormID,EditorID,Plugin\n";
-			UInt32 Exported = 0;
-
-			for (TESObject* Itr = _DATAHANDLER->objects->first; Itr; Itr = Itr->next)
+			for (const auto& Row : Rows)
 			{
-				TESForm* Form = Itr;
-				if (Form == nullptr)
-					continue;
-				if (IsFormFromActivePluginOrMaster(Form, AllowedFiles) == false)
-					continue;
-				if (Form->formType != TESForm::kFormType_Tree && Form->formType != TESForm::kFormType_Flora && Form->formType != TESForm::kFormType_Grass && Form->formType != TESForm::kFormType_Static)
-					continue;
-				TESFile* Source = Form->GetOverrideFile(-1);
-				char FormID[16] = { 0 };
-				FORMAT_STR(FormID, "%08X", Form->formID);
-				Out << "region-assets-v1," << EscapeCSVField(TESForm::GetFormTypeIDLongName(Form->formType)) << ","
-					<< EscapeCSVField(FormID) << "," << EscapeCSVField(Form->GetEditorID() ? Form->GetEditorID() : "") << ","
-					<< EscapeCSVField(Source ? Source->fileName : "") << "\n";
-				Exported++;
-			}
-
-			for (tList<TESLandTexture>::Iterator Itr = _DATAHANDLER->landTextures.Begin(); !Itr.End() && Itr.Get(); ++Itr)
-			{
-				TESForm* Form = Itr.Get();
-				if (Form == nullptr)
-					continue;
-				if (IsFormFromActivePluginOrMaster(Form, AllowedFiles) == false)
-					continue;
-				TESFile* Source = Form->GetOverrideFile(-1);
-				char FormID[16] = { 0 };
-				FORMAT_STR(FormID, "%08X", Form->formID);
-				Out << "region-assets-v1," << EscapeCSVField(TESForm::GetFormTypeIDLongName(Form->formType)) << ","
-					<< EscapeCSVField(FormID) << "," << EscapeCSVField(Form->GetEditorID() ? Form->GetEditorID() : "") << ","
-					<< EscapeCSVField(Source ? Source->fileName : "") << "\n";
-				Exported++;
+				Out << "region-assets-v1," << EscapeCSVField(Row.FormType.c_str()) << ","
+					<< EscapeCSVField(Row.FormIDHex.c_str()) << ","
+					<< EscapeCSVField(Row.EditorID.c_str()) << ","
+					<< EscapeCSVField(Row.Plugin.c_str()) << "\n";
 			}
 
 			Out.flush();
-			BGSEEUI->MsgBoxI("Region asset export complete.\nRows: %u\nPath: %s", Exported, FilePath.c_str());
+			if (!Out.good())
+			{
+				BGSEEUI->MsgBoxE("Error while writing region asset CSV:\n%s", FilePath.c_str());
+				return;
+			}
+
+			BGSEEUI->MsgBoxI("Region asset export complete.\n"
+				"Rows exported: %u\n"
+				"Skipped duplicates: %u\n"
+				"Skipped unsupported types: %u\n"
+				"Skipped out-of-scope: %u\n"
+				"Skipped unresolved source plugin: %u\n"
+				"Path: %s",
+				static_cast<UInt32>(Rows.size()),
+				SkippedDuplicate,
+				SkippedUnsupported,
+				SkippedScope,
+				SkippedNoSource,
+				FilePath.c_str());
 		}
+
 
 		static void TrimCSVField(std::string& Value)
 		{
