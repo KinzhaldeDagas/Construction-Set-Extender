@@ -3161,7 +3161,7 @@ namespace cse
 				HeaderItem.mask = HDI_TEXT;
 				HeaderItem.pszText = HeaderText;
 				HeaderItem.cchTextMax = sizeof(HeaderText);
-				Header_GetItemA(ListView_GetHeader(ListView), c, &HeaderItem);
+				Header_GetItem(ListView_GetHeader(ListView), c, &HeaderItem);
 				Out << EscapeRegionCSVCell(HeaderText);
 				if (c + 1 < ColCount)
 					Out << ',';
@@ -3216,7 +3216,7 @@ namespace cse
 				Item.iItem = ListView_GetItemCount(ListView);
 				Item.iSubItem = 0;
 				Item.pszText = const_cast<char*>(Fields[0].c_str());
-				int RowIndex = ListView_InsertItemA(ListView, &Item);
+				int RowIndex = ListView_InsertItem(ListView, &Item);
 				if (RowIndex < 0)
 					continue;
 
