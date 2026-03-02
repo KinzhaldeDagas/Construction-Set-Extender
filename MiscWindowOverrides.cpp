@@ -3236,6 +3236,12 @@ namespace cse
 			return std::string("Data\\CSVExports\\Regions\\") + FileName;
 		}
 
+		static bool IsRegionObjectsSchemaTemplate(int TemplateID)
+		{
+			return TemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsData ||
+				TemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsExtraData;
+		}
+
 		static std::string GetRegionObjectsSchemaHeader(int TemplateID, int ColumnIndex)
 		{
 			static const char* kObjectsHeaders[] =
@@ -3299,6 +3305,8 @@ namespace cse
 			if (!Out.good())
 				return false;
 
+			const int TemplateID = GetDlgCtrlID(hWnd);
+			const bool UseStrictSchemaHeaders = IsRegionObjectsSchemaTemplate(TemplateID);
 			for (int c = 0; c < ColCount; c++)
 			{
 				char HeaderText[256] = { 0 };
@@ -3308,8 +3316,8 @@ namespace cse
 				HeaderItem.cchTextMax = sizeof(HeaderText);
 				Header_GetItem(ListView_GetHeader(ListView), c, &HeaderItem);
 
-				std::string SchemaHeader = GetRegionObjectsSchemaHeader(GetDlgCtrlID(hWnd), c);
-				if (SchemaHeader.rfind("Column", 0) == 0)
+				std::string SchemaHeader = GetRegionObjectsSchemaHeader(TemplateID, c);
+				if (UseStrictSchemaHeaders == false || SchemaHeader.rfind("Column", 0) == 0)
 				{
 					std::string NativeHeader = HeaderText;
 					if (NativeHeader.empty() == false)
