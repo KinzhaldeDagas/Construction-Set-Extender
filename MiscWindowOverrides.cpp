@@ -14,7 +14,6 @@
 #include "[Common]\CLIWrapper.h"
 #include <fstream>
 #include <algorithm>
-#include <set>
 #include <vector>
 #include <string>
 
@@ -3237,29 +3236,59 @@ namespace cse
 			return std::string("Data\\CSVExports\\Regions\\") + FileName;
 		}
 
-		static std::string NormalizeRegionCSVHeader(const char* HeaderText, int ColumnIndex)
+		static std::string GetRegionObjectsSchemaHeader(int TemplateID, int ColumnIndex)
 		{
-			std::string Result;
-			if (HeaderText)
+			static const char* kObjectsHeaders[] =
 			{
-				for (const unsigned char* It = reinterpret_cast<const unsigned char*>(HeaderText); *It; ++It)
-				{
-					if (isalnum(*It))
-						Result.push_back(static_cast<char>(*It));
-				}
+				"Object",
+				"Density",
+				"MinSlope",
+				"MaxSlope",
+				"MinHeight",
+				"MaxHeight",
+				"RadiusWrtParent",
+				"Clustering"
+			};
+			static const char* kObjectsMoreHeaders[] =
+			{
+				"Object",
+				"AngleVarianceXPlus",
+				"AngleVarianceXMinus",
+				"AngleVarianceYPlus",
+				"AngleVarianceYMinus",
+				"AngleVarianceZPlus",
+				"AngleVarianceZMinus",
+				"Sink",
+				"SinkVariance",
+				"SizeVariance",
+				"ConformToSlope",
+				"PaintVertices",
+				"PaintVerticesColor",
+				"PercentOfRadius"
+			};
+
+			const char** Schema = nullptr;
+			size_t SchemaSize = 0;
+			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsData)
+			{
+				Schema = kObjectsHeaders;
+				SchemaSize = sizeof(kObjectsHeaders) / sizeof(kObjectsHeaders[0]);
+			}
+			else if (TemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsExtraData)
+			{
+				Schema = kObjectsMoreHeaders;
+				SchemaSize = sizeof(kObjectsMoreHeaders) / sizeof(kObjectsMoreHeaders[0]);
 			}
 
-			if (Result.empty())
-			{
-				char Fallback[32] = { 0 };
-				FORMAT_STR(Fallback, "Column%d", ColumnIndex + 1);
-				Result = Fallback;
-			}
+			if (Schema && ColumnIndex >= 0 && static_cast<size_t>(ColumnIndex) < SchemaSize)
+				return Schema[ColumnIndex];
 
-			return Result;
+			char Fallback[32] = { 0 };
+			FORMAT_STR(Fallback, "Column%d", ColumnIndex + 1);
+			return Fallback;
 		}
 
-		static bool ExportRegionObjectsListViewCSV(HWND ListView, const std::string& Path)
+		static bool ExportRegionObjectsListViewCSV(HWND hWnd, HWND ListView, const std::string& Path)
 		{
 			int ColCount = Header_GetItemCount(ListView_GetHeader(ListView));
 			int RowCount = ListView_GetItemCount(ListView);
@@ -3270,7 +3299,6 @@ namespace cse
 			if (!Out.good())
 				return false;
 
-			std::set<std::string> SeenHeaders;
 			for (int c = 0; c < ColCount; c++)
 			{
 				char HeaderText[256] = { 0 };
@@ -3280,16 +3308,15 @@ namespace cse
 				HeaderItem.cchTextMax = sizeof(HeaderText);
 				Header_GetItem(ListView_GetHeader(ListView), c, &HeaderItem);
 
-				std::string NormalizedHeader = NormalizeRegionCSVHeader(HeaderText, c);
-				if (SeenHeaders.find(NormalizedHeader) != SeenHeaders.end())
+				std::string SchemaHeader = GetRegionObjectsSchemaHeader(GetDlgCtrlID(hWnd), c);
+				if (SchemaHeader.rfind("Column", 0) == 0)
 				{
-					char UniqueHeader[300] = { 0 };
-					FORMAT_STR(UniqueHeader, "%s%d", NormalizedHeader.c_str(), c + 1);
-					NormalizedHeader = UniqueHeader;
+					std::string NativeHeader = HeaderText;
+					if (NativeHeader.empty() == false)
+						SchemaHeader = NativeHeader;
 				}
-				SeenHeaders.insert(NormalizedHeader);
 
-				Out << EscapeRegionCSVCell(NormalizedHeader.c_str());
+				Out << EscapeRegionCSVCell(SchemaHeader.c_str());
 				if (c + 1 < ColCount)
 					Out << ',';
 			}
@@ -3482,7 +3509,7 @@ namespace cse
 					std::string Path = BuildRegionObjectsCSVPath(hWnd);
 					if (LOWORD(wParam) == IDC_REGIONOBJ_EXPORTBTN)
 					{
-						if (ExportRegionObjectsListViewCSV(ListView, Path))
+						if (ExportRegionObjectsListViewCSV(hWnd, ListView, Path))
 							BGSEEUI->MsgBoxI("Generated objects exported to:\n%s", Path.c_str());
 						else
 							BGSEEUI->MsgBoxE("Failed to export generated objects CSV.");
