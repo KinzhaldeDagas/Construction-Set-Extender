@@ -3107,10 +3107,10 @@ namespace cse
 			return true;
 		}
 
-		static HWND FindFirstListViewChild(HWND Parent)
+		static void CollectListViewChildren(HWND Parent, std::vector<HWND>& Out)
 		{
 			if (Parent == nullptr)
-				return nullptr;
+				return;
 
 			HWND Child = GetWindow(Parent, GW_CHILD);
 			char ClassName[64] = { 0 };
@@ -3118,16 +3118,67 @@ namespace cse
 			{
 				GetClassNameA(Child, ClassName, sizeof(ClassName));
 				if (_stricmp(ClassName, "SysListView32") == 0)
-					return Child;
+					Out.push_back(Child);
 
-				HWND Nested = FindFirstListViewChild(Child);
-				if (Nested)
-					return Nested;
+				CollectListViewChildren(Child, Out);
 
 				Child = GetWindow(Child, GW_HWNDNEXT);
 			}
+		}
 
-			return nullptr;
+		static HWND FindBestRegionObjectsListView(HWND hWnd)
+		{
+			if (hWnd == nullptr)
+				return nullptr;
+
+			std::vector<HWND> Candidates;
+			CollectListViewChildren(hWnd, Candidates);
+
+			if (Candidates.empty())
+			{
+				// Some tabs host the generated-objects list outside the template root window.
+				HWND Parent = GetParent(hWnd);
+				if (Parent)
+					CollectListViewChildren(Parent, Candidates);
+			}
+
+			if (Candidates.empty())
+				return nullptr;
+
+			HWND Best = nullptr;
+			int BestScore = INT_MIN;
+			for (HWND Candidate : Candidates)
+			{
+				if (Candidate == nullptr)
+					continue;
+
+				LONG_PTR Style = GetWindowLongPtrA(Candidate, GWL_STYLE);
+				if ((Style & LVS_TYPEMASK) != LVS_REPORT)
+					continue;
+
+				RECT Bounds = { 0 };
+				GetWindowRect(Candidate, &Bounds);
+				int Width = std::max<LONG>(0, Bounds.right - Bounds.left);
+				int Height = std::max<LONG>(0, Bounds.bottom - Bounds.top);
+				int AreaScore = (Width * Height) / 100;
+
+				int ColCount = Header_GetItemCount(ListView_GetHeader(Candidate));
+				int Score = AreaScore;
+				if (IsWindowVisible(Candidate))
+					Score += 1000;
+				if (ColCount >= 2)
+					Score += 250;
+				if (ColCount >= 3)
+					Score += 250;
+
+				if (Score > BestScore)
+				{
+					BestScore = Score;
+					Best = Candidate;
+				}
+			}
+
+			return Best;
 		}
 
 		static std::string BuildRegionObjectsCSVPath(HWND hWnd)
@@ -3354,7 +3405,7 @@ namespace cse
 			case WM_COMMAND:
 				if (LOWORD(wParam) == IDC_REGIONOBJ_EXPORTBTN || LOWORD(wParam) == IDC_REGIONOBJ_IMPORTBTN)
 				{
-					HWND ListView = FindFirstListViewChild(hWnd);
+					HWND ListView = FindBestRegionObjectsListView(hWnd);
 					if (!ListView)
 					{
 						BGSEEUI->MsgBoxE("Couldn't find generated objects list in this tab.");
