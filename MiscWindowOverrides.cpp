@@ -3131,10 +3131,16 @@ namespace cse
 				if (Ch == ' ' || Ch == '\\' || Ch == '/' || Ch == ':' || Ch == '*' || Ch == '?' || Ch == '"' || Ch == '<' || Ch == '>' || Ch == '|')
 					Ch = '_';
 			}
+
+			std::string Suffix = "GENERATED_OBJECTS";
+			const int TemplateID = GetDlgCtrlID(hWnd);
+			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorSoundData)
+				Suffix = "SOUNDS";
+
 			CreateDirectoryA("Data", nullptr);
 			CreateDirectoryA("Data\\CSVExports", nullptr);
 			CreateDirectoryA("Data\\CSVExports\\Regions", nullptr);
-			return std::string("Data\\CSVExports\\Regions\\") + Base + "_GENERATED_OBJECTS.csv";
+			return std::string("Data\\CSVExports\\Regions\\") + Base + "_" + Suffix + ".csv";
 		}
 
 		static bool ExportRegionObjectsListViewCSV(HWND ListView, const std::string& Path)
@@ -3521,6 +3527,7 @@ namespace cse
 
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorObjectsData, RegionObjectsGeneratedCSVSubClassProc);
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorObjectsExtraData, RegionObjectsGeneratedCSVSubClassProc);
+			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorSoundData, RegionObjectsGeneratedCSVSubClassProc);
 
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_CellEdit, TESObjectCELLDlgSubClassProc);
 		}
