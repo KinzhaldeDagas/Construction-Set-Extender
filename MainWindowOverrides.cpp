@@ -301,7 +301,7 @@ namespace cse
 			if (Output.good() == false)
 				return false;
 
-			Output << "FormID,VoiceID,SpeakerInfo,OutputPath,Dialogue\n";
+			Output << "FormID,VoiceID,Race,Gender,SpeakerInfo,Emotion,OutputPath,Dialogue\n";
 			for (size_t i = StartIndex; i < EndIndexExclusive; i++)
 				Output << Rows[i] << "\n";
 
@@ -364,6 +364,82 @@ namespace cse
 			if (LastDot != std::string::npos)
 				Name.erase(LastDot);
 			return Name;
+		}
+
+		static bool StringContainsTokenCaseInsensitive(const std::string& Value, const char* Token)
+		{
+			if (Token == nullptr || Token[0] == 0)
+				return false;
+
+			char UpperValue[256] = { 0 };
+			char UpperToken[64] = { 0 };
+			FORMAT_STR(UpperValue, "%s", Value.c_str());
+			FORMAT_STR(UpperToken, "%s", Token);
+			_strupr_s(UpperValue, sizeof(UpperValue));
+			_strupr_s(UpperToken, sizeof(UpperToken));
+
+			return strstr(UpperValue, UpperToken) != nullptr;
+		}
+
+		static const char* ResolveRevoiceVoiceID(TESRace* VoiceRace, bool IsFemale)
+		{
+			if (VoiceRace == nullptr)
+				return IsFemale ? "F-Imperial-Breton" : "M-Imperials";
+
+			const char* EditorID = VoiceRace->GetEditorID() ? VoiceRace->GetEditorID() : "";
+			const char* RaceName = VoiceRace->name.c_str();
+			std::string ProbeText = std::string(EditorID) + " " + (RaceName ? RaceName : "");
+
+			if (StringContainsTokenCaseInsensitive(ProbeText, "DREMORA"))
+				return IsFemale ? "F-Dremora" : "M-Dremora";
+			if (StringContainsTokenCaseInsensitive(ProbeText, "KHAJIIT") ||
+				StringContainsTokenCaseInsensitive(ProbeText, "ARGONIAN"))
+			{
+				return IsFemale ? "F-Khajiit-Argonian" : "M-Khajiit-Argonian";
+			}
+			if (StringContainsTokenCaseInsensitive(ProbeText, "REDGUARD"))
+				return IsFemale ? "F-Redguard" : "M-Redguard";
+			if (StringContainsTokenCaseInsensitive(ProbeText, "NORD") ||
+				StringContainsTokenCaseInsensitive(ProbeText, "ORC"))
+			{
+				return IsFemale ? "F-Orc-Nord" : "M-Orc-Nord";
+			}
+			if (StringContainsTokenCaseInsensitive(ProbeText, "IMPERIAL") ||
+				StringContainsTokenCaseInsensitive(ProbeText, "BRETON"))
+			{
+				return IsFemale ? "F-Imperial-Breton" : (StringContainsTokenCaseInsensitive(ProbeText, "BRETON") ? "M-Bretons" : "M-Imperials");
+			}
+			if (StringContainsTokenCaseInsensitive(ProbeText, "DARK") ||
+				StringContainsTokenCaseInsensitive(ProbeText, "WOOD") ||
+				StringContainsTokenCaseInsensitive(ProbeText, "HIGH") ||
+				StringContainsTokenCaseInsensitive(ProbeText, "ELF"))
+			{
+				return IsFemale ? "F-High-Dark-Wood Elves" : "M-Dark-High-Wood Elves";
+			}
+
+			return IsFemale ? "F-Imperial-Breton" : "M-Imperials";
+		}
+
+		static const char* GetDialogueEmotionTypeLabel(UInt32 EmotionType)
+		{
+			switch (EmotionType)
+			{
+			case TESTopicInfo::ResponseData::kEmotionType_Anger:
+				return "Anger";
+			case TESTopicInfo::ResponseData::kEmotionType_Disgust:
+				return "Disgust";
+			case TESTopicInfo::ResponseData::kEmotionType_Fear:
+				return "Fear";
+			case TESTopicInfo::ResponseData::kEmotionType_Sad:
+				return "Sad";
+			case TESTopicInfo::ResponseData::kEmotionType_Happy:
+				return "Happy";
+			case TESTopicInfo::ResponseData::kEmotionType_Surprise:
+				return "Surprise";
+			case TESTopicInfo::ResponseData::kEmotionType_Neutral:
+			default:
+				return "Neutral";
+			}
 		}
 
 		static std::string EscapeJSONString(const std::string& In)
@@ -959,11 +1035,7 @@ namespace cse
 						if (VoiceRace == nullptr)
 							VoiceRace = SpeakerRace;
 
-						const char* VoiceID = VoiceRace->GetEditorID() ? VoiceRace->GetEditorID() : "";
-						if (VoiceID == nullptr || strlen(VoiceID) == 0)
-						{
-							VoiceID = SpeakerRace->GetEditorID() ? SpeakerRace->GetEditorID() : "";
-						}
+						const char* VoiceID = ResolveRevoiceVoiceID(VoiceRace, IsFemale);
 						const char* RaceName = SpeakerRace->name.c_str();
 						if (RaceName == nullptr || strlen(RaceName) == 0)
 							RaceName = "Unknown";
@@ -981,6 +1053,11 @@ namespace cse
 							const char* ResponseText = Response->responseText.c_str();
 							if (ResponseText == nullptr || strlen(ResponseText) == 0)
 								continue;
+
+							char Emotion[64] = { 0 };
+							FORMAT_STR(Emotion, "%s:%u",
+								GetDialogueEmotionTypeLabel(Response->emotionType),
+								Response->emotionValue);
 
 							char OutPath[MAX_PATH] = { 0 };
 							const char* VoiceFolder = VoiceID;
@@ -1004,18 +1081,27 @@ namespace cse
 
 							std::string EscapedFormID = EscapeCSVField(FormID);
 							std::string EscapedVoiceID = EscapeCSVField(VoiceID);
+							std::string EscapedRace = EscapeCSVField(RaceName);
+							std::string EscapedGender = EscapeCSVField(SexToken);
 							std::string EscapedSpeakerInfo = EscapeCSVField(SpeakerInfo.c_str());
+							std::string EscapedEmotion = EscapeCSVField(Emotion);
 							std::string EscapedOutPath = EscapeCSVField(OutPath);
 							std::string EscapedResponseText = EscapeCSVField(ResponseText);
 
 							std::string Row;
-							Row.reserve(EscapedFormID.size() + EscapedVoiceID.size() + EscapedSpeakerInfo.size() +
-								EscapedOutPath.size() + EscapedResponseText.size() + 4);
+							Row.reserve(EscapedFormID.size() + EscapedVoiceID.size() + EscapedRace.size() + EscapedGender.size() + EscapedSpeakerInfo.size() +
+								EscapedEmotion.size() + EscapedOutPath.size() + EscapedResponseText.size() + 7);
 							Row += EscapedFormID;
 							Row += ",";
 							Row += EscapedVoiceID;
 							Row += ",";
+							Row += EscapedRace;
+							Row += ",";
+							Row += EscapedGender;
+							Row += ",";
 							Row += EscapedSpeakerInfo;
+							Row += ",";
+							Row += EscapedEmotion;
 							Row += ",";
 							Row += EscapedOutPath;
 							Row += ",";
