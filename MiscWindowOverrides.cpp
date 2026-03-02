@@ -3221,9 +3221,11 @@ namespace cse
 			return Best;
 		}
 
+		static int ResolveRegionCSVTemplateID(HWND hWnd);
+
 		static std::string BuildRegionObjectsCSVPath(HWND hWnd)
 		{
-			const int TemplateID = GetDlgCtrlID(hWnd);
+			const int TemplateID = ResolveRegionCSVTemplateID(hWnd);
 			std::string FileName = "RegionEditor_Objects.csv";
 			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsExtraData)
 				FileName = "RegionEditor_Objectsmore.csv";
@@ -3242,12 +3244,29 @@ namespace cse
 				TemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsExtraData;
 		}
 
-		static bool IsRegionObjectsKnownTemplate(int TemplateID)
+		static int ResolveRegionCSVTemplateID(HWND hWnd)
 		{
-			return TemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsData ||
-				TemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsExtraData ||
-				TemplateID == TESDialog::kDialogTemplate_RegionEditorSoundData;
+			const int RawTemplateID = GetDlgCtrlID(hWnd);
+			if (RawTemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsData ||
+				RawTemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsExtraData ||
+				RawTemplateID == TESDialog::kDialogTemplate_RegionEditorSoundData)
+			{
+				return RawTemplateID;
+			}
+
+			char Title[256] = { 0 };
+			GetWindowTextA(hWnd, Title, sizeof(Title));
+			std::string TabTitle = Title;
+			if (_stricmp(TabTitle.c_str(), "Objects (more)") == 0)
+				return TESDialog::kDialogTemplate_RegionEditorObjectsExtraData;
+			if (_stricmp(TabTitle.c_str(), "Objects") == 0)
+				return TESDialog::kDialogTemplate_RegionEditorObjectsData;
+			if (_stricmp(TabTitle.c_str(), "Sound") == 0)
+				return TESDialog::kDialogTemplate_RegionEditorSoundData;
+
+			return TESDialog::kDialogTemplate_RegionEditorObjectsData;
 		}
+
 
 		static bool EqualsInsensitive(const std::string& L, const std::string& R)
 		{
@@ -3317,7 +3336,7 @@ namespace cse
 			if (!Out.good())
 				return false;
 
-			const int TemplateID = GetDlgCtrlID(hWnd);
+			const int TemplateID = ResolveRegionCSVTemplateID(hWnd);
 			const bool UseStrictSchemaHeaders = IsRegionObjectsSchemaTemplate(TemplateID);
 			for (int c = 0; c < ColCount; c++)
 			{
@@ -3379,9 +3398,6 @@ namespace cse
 
 		static bool ExportRegionTabListViewCSV(HWND hWnd, HWND ListView, const std::string& Path)
 		{
-			const int TemplateID = GetDlgCtrlID(hWnd);
-			if (!IsRegionObjectsKnownTemplate(TemplateID))
-				return false;
 			return ExportRegionObjectsListViewCSV(hWnd, ListView, Path);
 		}
 
@@ -3389,9 +3405,7 @@ namespace cse
 
 		static bool ImportRegionTabListViewCSV(HWND hWnd, HWND ListView, const std::string& Path)
 		{
-			const int TemplateID = GetDlgCtrlID(hWnd);
-			if (!IsRegionObjectsKnownTemplate(TemplateID))
-				return false;
+			const int TemplateID = ResolveRegionCSVTemplateID(hWnd);
 			return ImportRegionObjectsListViewCSV(ListView, Path, TemplateID);
 		}
 
