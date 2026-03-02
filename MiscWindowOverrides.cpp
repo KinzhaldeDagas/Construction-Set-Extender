@@ -3109,6 +3109,9 @@ namespace cse
 
 		static HWND FindFirstListViewChild(HWND Parent)
 		{
+			if (Parent == nullptr)
+				return nullptr;
+
 			HWND Child = GetWindow(Parent, GW_CHILD);
 			char ClassName[64] = { 0 };
 			while (Child)
@@ -3116,8 +3119,14 @@ namespace cse
 				GetClassNameA(Child, ClassName, sizeof(ClassName));
 				if (_stricmp(ClassName, "SysListView32") == 0)
 					return Child;
+
+				HWND Nested = FindFirstListViewChild(Child);
+				if (Nested)
+					return Nested;
+
 				Child = GetWindow(Child, GW_HWNDNEXT);
 			}
+
 			return nullptr;
 		}
 
