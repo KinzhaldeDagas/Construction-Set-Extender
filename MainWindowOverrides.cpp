@@ -737,7 +737,7 @@ namespace cse
 			std::set<UInt32> SeenFormIDs;
 			std::vector<std::string> Fields;
 			std::string HeaderLine;
-			if (std::getline(In, HeaderLine) == false)
+			if (!std::getline(In, HeaderLine))
 			{
 				BGSEEUI->MsgBoxE("CSV is empty:\n%s", SelectPath);
 				return;
