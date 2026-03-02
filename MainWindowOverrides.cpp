@@ -416,7 +416,8 @@ namespace cse
 				FormType == TESForm::kFormType_Flora ||
 				FormType == TESForm::kFormType_Grass ||
 				FormType == TESForm::kFormType_LandTexture ||
-				FormType == TESForm::kFormType_Static;
+				FormType == TESForm::kFormType_Static ||
+				FormType == TESForm::kFormType_Sound;
 		}
 
 		static bool StringContainsCaseInsensitive(const char* Haystack, const char* Needle)
@@ -495,7 +496,8 @@ namespace cse
 			char FormID[16] = { 0 };
 			FORMAT_STR(FormID, "%08X", Form->formID);
 
-			OutRow.FormType = (Form->formType == TESForm::kFormType_Static) ? "Rock" : TESForm::GetFormTypeIDLongName(Form->formType);
+			OutRow.FormType = (Form->formType == TESForm::kFormType_Static) ? "Rock" :
+				(Form->formType == TESForm::kFormType_Sound ? "MiscSound" : TESForm::GetFormTypeIDLongName(Form->formType));
 			OutRow.FormIDHex = FormID;
 			OutRow.EditorID = Form->GetEditorID() ? Form->GetEditorID() : "";
 			OutRow.Plugin = Source->fileName;
@@ -602,6 +604,22 @@ namespace cse
 				}
 			}
 
+			for (tList<TESSound>::Iterator Itr = _DATAHANDLER->sounds.Begin(); !Itr.End() && Itr.Get(); ++Itr)
+			{
+				RegionAssetExportRow Row;
+				if (TryBuildRegionAssetExportRow(Itr.Get(),
+					AllowedFiles,
+					SeenFormIDs,
+					Row,
+					SkippedDuplicate,
+					SkippedUnsupported,
+					SkippedScope,
+					SkippedNoSource))
+				{
+					Rows.push_back(Row);
+				}
+			}
+
 			std::sort(Rows.begin(), Rows.end(), [](const RegionAssetExportRow& Left, const RegionAssetExportRow& Right)
 			{
 				if (_stricmp(Left.FormType.c_str(), Right.FormType.c_str()) != 0)
@@ -661,6 +679,7 @@ namespace cse
 					else if (_stricmp(Row.FormType.c_str(), "Grass") == 0) TypeToken = "GRASS";
 					else if (_stricmp(Row.FormType.c_str(), "LandTexture") == 0) TypeToken = "LANDTEXTURE";
 					else if (_stricmp(Row.FormType.c_str(), "Rock") == 0) TypeToken = "ROCK";
+					else if (_stricmp(Row.FormType.c_str(), "MiscSound") == 0) TypeToken = "MISCSOUND";
 					Buckets[TypeToken].push_back(Row);
 				}
 
@@ -783,7 +802,9 @@ namespace cse
 				_stricmp(FormType.c_str(), "Grass") == 0 ||
 				_stricmp(FormType.c_str(), "LandTexture") == 0 ||
 				_stricmp(FormType.c_str(), "Static") == 0 ||
-				_stricmp(FormType.c_str(), "Rock") == 0;
+				_stricmp(FormType.c_str(), "Rock") == 0 ||
+				_stricmp(FormType.c_str(), "MiscSound") == 0 ||
+				_stricmp(FormType.c_str(), "Sound") == 0;
 		}
 
 		static bool IsSupportedRegionAssetFormType(UInt8 FormType)
@@ -792,7 +813,8 @@ namespace cse
 				FormType == TESForm::kFormType_Flora ||
 				FormType == TESForm::kFormType_Grass ||
 				FormType == TESForm::kFormType_LandTexture ||
-				FormType == TESForm::kFormType_Static;
+				FormType == TESForm::kFormType_Static ||
+				FormType == TESForm::kFormType_Sound;
 		}
 
 		static void ImportRegionAssetFormsCSV(HWND hWnd)
@@ -950,9 +972,18 @@ namespace cse
 				}
 
 				const bool TokenIsRock = _stricmp(TypeToken.c_str(), "Rock") == 0;
+				const bool TokenIsMiscSound = _stricmp(TypeToken.c_str(), "MiscSound") == 0 || _stricmp(TypeToken.c_str(), "Sound") == 0;
 				if (TokenIsRock)
 				{
 					if (Form->formType != TESForm::kFormType_Static || IsRockStaticForm(Form) == false)
+					{
+						RejectedTypeMismatch++;
+						continue;
+					}
+				}
+				else if (TokenIsMiscSound)
+				{
+					if (Form->formType != TESForm::kFormType_Sound)
 					{
 						RejectedTypeMismatch++;
 						continue;
