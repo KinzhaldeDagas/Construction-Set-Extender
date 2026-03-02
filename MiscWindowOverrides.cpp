@@ -3221,29 +3221,143 @@ namespace cse
 			return Best;
 		}
 
+		static int ResolveRegionCSVTemplateID(HWND hWnd);
+
 		static std::string BuildRegionObjectsCSVPath(HWND hWnd)
 		{
-			char Title[260] = { 0 };
-			GetWindowTextA(hWnd, Title, sizeof(Title));
-			std::string Base = Title[0] ? Title : "RegionGeneratedObjects";
-			for (char& Ch : Base)
-			{
-				if (Ch == ' ' || Ch == '\\' || Ch == '/' || Ch == ':' || Ch == '*' || Ch == '?' || Ch == '"' || Ch == '<' || Ch == '>' || Ch == '|')
-					Ch = '_';
-			}
-
-			std::string Suffix = "GENERATED_OBJECTS";
-			const int TemplateID = GetDlgCtrlID(hWnd);
-			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorSoundData)
-				Suffix = "SOUNDS";
+			const int TemplateID = ResolveRegionCSVTemplateID(hWnd);
+			std::string FileName = "RegionEditor_Objects.csv";
+			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsExtraData)
+				FileName = "RegionEditor_Objectsmore.csv";
+			else if (TemplateID == TESDialog::kDialogTemplate_RegionEditorSoundData)
+				FileName = "RegionEditor_Sound.csv";
 
 			CreateDirectoryA("Data", nullptr);
 			CreateDirectoryA("Data\\CSVExports", nullptr);
 			CreateDirectoryA("Data\\CSVExports\\Regions", nullptr);
-			return std::string("Data\\CSVExports\\Regions\\") + Base + "_" + Suffix + ".csv";
+			return std::string("Data\\CSVExports\\Regions\\") + FileName;
 		}
 
-		static bool ExportRegionObjectsListViewCSV(HWND ListView, const std::string& Path)
+		static bool IsRegionObjectsSchemaTemplate(int TemplateID)
+		{
+			return TemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsData ||
+				TemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsExtraData;
+		}
+
+		static int ResolveRegionCSVTemplateID(HWND hWnd)
+		{
+			const int RawTemplateID = GetDlgCtrlID(hWnd);
+			if (RawTemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsData ||
+				RawTemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsExtraData ||
+				RawTemplateID == TESDialog::kDialogTemplate_RegionEditorSoundData)
+			{
+				return RawTemplateID;
+			}
+
+			char Title[256] = { 0 };
+			GetWindowTextA(hWnd, Title, sizeof(Title));
+			std::string TabTitle = Title;
+			if (_stricmp(TabTitle.c_str(), "Objects (more)") == 0)
+				return TESDialog::kDialogTemplate_RegionEditorObjectsExtraData;
+			if (_stricmp(TabTitle.c_str(), "Objects") == 0)
+				return TESDialog::kDialogTemplate_RegionEditorObjectsData;
+			if (_stricmp(TabTitle.c_str(), "Sound") == 0)
+				return TESDialog::kDialogTemplate_RegionEditorSoundData;
+
+			return TESDialog::kDialogTemplate_RegionEditorObjectsData;
+		}
+
+
+		static bool EqualsInsensitive(const std::string& L, const std::string& R)
+		{
+			return _stricmp(L.c_str(), R.c_str()) == 0;
+		}
+
+		static std::string ResolveRegionEditorName(HWND hWnd)
+		{
+			const char* kIgnoredTitles[] = { "Region Editor", "Objects", "Objects (more)", "Sound" };
+			HWND Current = hWnd;
+			for (int Depth = 0; Current && Depth < 10; Depth++)
+			{
+				char Title[512] = { 0 };
+				GetWindowTextA(Current, Title, sizeof(Title));
+				if (Title[0])
+				{
+					bool Ignore = false;
+					for (const char* Ignored : kIgnoredTitles)
+					{
+						if (_stricmp(Title, Ignored) == 0)
+						{
+							Ignore = true;
+							break;
+						}
+					}
+
+					if (!Ignore)
+						return Title;
+				}
+
+				Current = GetParent(Current);
+			}
+
+			return "";
+		}
+
+		static std::string GetRegionObjectsSchemaHeader(int TemplateID, int ColumnIndex)
+		{
+			static const char* kObjectsHeaders[] =
+			{
+				"Region",
+				"Object",
+				"Density",
+				"MinSlope",
+				"MaxSlope",
+				"MinHeight",
+				"MaxHeight",
+				"RadiusWrtParent",
+				"Clustering"
+			};
+			static const char* kObjectsMoreHeaders[] =
+			{
+				"Region",
+				"Object",
+				"AngleVarianceXPlus",
+				"AngleVarianceXMinus",
+				"AngleVarianceYPlus",
+				"AngleVarianceYMinus",
+				"AngleVarianceZPlus",
+				"AngleVarianceZMinus",
+				"Sink",
+				"SinkVariance",
+				"SizeVariance",
+				"ConformToSlope",
+				"PaintVertices",
+				"PaintVerticesColor",
+				"PercentOfRadius"
+			};
+
+			const char** Schema = nullptr;
+			size_t SchemaSize = 0;
+			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsData)
+			{
+				Schema = kObjectsHeaders;
+				SchemaSize = sizeof(kObjectsHeaders) / sizeof(kObjectsHeaders[0]);
+			}
+			else if (TemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsExtraData)
+			{
+				Schema = kObjectsMoreHeaders;
+				SchemaSize = sizeof(kObjectsMoreHeaders) / sizeof(kObjectsMoreHeaders[0]);
+			}
+
+			if (Schema && ColumnIndex >= 0 && static_cast<size_t>(ColumnIndex) < SchemaSize)
+				return Schema[ColumnIndex];
+
+			char Fallback[32] = { 0 };
+			FORMAT_STR(Fallback, "Column%d", ColumnIndex + 1);
+			return Fallback;
+		}
+
+		static bool ExportRegionObjectsListViewCSV(HWND hWnd, HWND ListView, const std::string& Path)
 		{
 			int ColCount = Header_GetItemCount(ListView_GetHeader(ListView));
 			int RowCount = ListView_GetItemCount(ListView);
@@ -3254,22 +3368,50 @@ namespace cse
 			if (!Out.good())
 				return false;
 
-			for (int c = 0; c < ColCount; c++)
+			const int TemplateID = ResolveRegionCSVTemplateID(hWnd);
+			const bool UseStrictSchemaHeaders = IsRegionObjectsSchemaTemplate(TemplateID);
+			const int HeaderCount = UseStrictSchemaHeaders ? ColCount + 1 : ColCount;
+			for (int c = 0; c < HeaderCount; c++)
 			{
+				if (UseStrictSchemaHeaders && c == 0)
+				{
+					Out << "Region";
+					if (c + 1 < HeaderCount)
+						Out << ',';
+					continue;
+				}
+
+				const int ListColumnIndex = UseStrictSchemaHeaders ? c - 1 : c;
 				char HeaderText[256] = { 0 };
 				HDITEMA HeaderItem = { 0 };
 				HeaderItem.mask = HDI_TEXT;
 				HeaderItem.pszText = HeaderText;
 				HeaderItem.cchTextMax = sizeof(HeaderText);
-				Header_GetItem(ListView_GetHeader(ListView), c, &HeaderItem);
-				Out << EscapeRegionCSVCell(HeaderText);
-				if (c + 1 < ColCount)
+				Header_GetItem(ListView_GetHeader(ListView), ListColumnIndex, &HeaderItem);
+
+				std::string SchemaHeader = GetRegionObjectsSchemaHeader(TemplateID, c);
+				if (UseStrictSchemaHeaders == false || SchemaHeader.rfind("Column", 0) == 0)
+				{
+					std::string NativeHeader = HeaderText;
+					if (NativeHeader.empty() == false)
+						SchemaHeader = NativeHeader;
+				}
+
+				Out << EscapeRegionCSVCell(SchemaHeader.c_str());
+				if (c + 1 < HeaderCount)
 					Out << ',';
 			}
 			Out << "\n";
 
+			const std::string RegionName = ResolveRegionEditorName(hWnd);
 			for (int r = 0; r < RowCount; r++)
 			{
+				if (UseStrictSchemaHeaders)
+				{
+					Out << EscapeRegionCSVCell(RegionName.c_str());
+					if (ColCount > 0)
+						Out << ',';
+				}
 				for (int c = 0; c < ColCount; c++)
 				{
 					char Cell[512] = { 0 };
@@ -3285,7 +3427,41 @@ namespace cse
 			return Out.good();
 		}
 
-		static bool ImportRegionObjectsListViewCSV(HWND ListView, const std::string& Path)
+		static bool ValidateRegionCSVHeaderForTemplate(int TemplateID, const std::vector<std::string>& HeaderFields)
+		{
+			if (!IsRegionObjectsSchemaTemplate(TemplateID))
+				return true;
+
+			for (int i = 0; ; i++)
+			{
+				std::string Expected = GetRegionObjectsSchemaHeader(TemplateID, i);
+				if (Expected.rfind("Column", 0) == 0)
+					break;
+				if (i >= static_cast<int>(HeaderFields.size()))
+					return false;
+				if (!EqualsInsensitive(HeaderFields[i], Expected))
+					return false;
+			}
+
+			if (HeaderFields.size() > 1 && HeaderFields[0].empty())
+				return false;
+			return true;
+		}
+
+		static bool ExportRegionTabListViewCSV(HWND hWnd, HWND ListView, const std::string& Path)
+		{
+			return ExportRegionObjectsListViewCSV(hWnd, ListView, Path);
+		}
+
+		static bool ImportRegionObjectsListViewCSV(HWND ListView, const std::string& Path, int TemplateID);
+
+		static bool ImportRegionTabListViewCSV(HWND hWnd, HWND ListView, const std::string& Path)
+		{
+			const int TemplateID = ResolveRegionCSVTemplateID(hWnd);
+			return ImportRegionObjectsListViewCSV(ListView, Path, TemplateID);
+		}
+
+		static bool ImportRegionObjectsListViewCSV(HWND ListView, const std::string& Path, int TemplateID)
 		{
 			std::ifstream In(Path);
 			if (!In.good())
@@ -3296,8 +3472,12 @@ namespace cse
 				return false;
 
 			int ColCount = Header_GetItemCount(ListView_GetHeader(ListView));
+			const bool UseStrictSchemaHeaders = IsRegionObjectsSchemaTemplate(TemplateID);
+			const int RequiredColumns = UseStrictSchemaHeaders ? ColCount + 1 : ColCount;
 			std::vector<std::string> Fields;
-			if (!ParseRegionCSVLine(HeaderLine, Fields) || static_cast<int>(Fields.size()) < ColCount)
+			if (!ParseRegionCSVLine(HeaderLine, Fields) || static_cast<int>(Fields.size()) < RequiredColumns)
+				return false;
+			if (!ValidateRegionCSVHeaderForTemplate(TemplateID, Fields))
 				return false;
 
 			ListView_DeleteAllItems(ListView);
@@ -3310,18 +3490,24 @@ namespace cse
 					continue;
 				if (Fields.empty())
 					continue;
+				if (static_cast<int>(Fields.size()) < RequiredColumns)
+					continue;
 
+				const int FirstListColumn = UseStrictSchemaHeaders ? 1 : 0;
 				LVITEMA Item = { 0 };
 				Item.mask = LVIF_TEXT;
 				Item.iItem = ListView_GetItemCount(ListView);
 				Item.iSubItem = 0;
-				Item.pszText = const_cast<char*>(Fields[0].c_str());
+				Item.pszText = const_cast<char*>(Fields[FirstListColumn].c_str());
 				int RowIndex = ListView_InsertItem(ListView, &Item);
 				if (RowIndex < 0)
 					continue;
 
-				for (int c = 1; c < ColCount && c < static_cast<int>(Fields.size()); c++)
-					ListView_SetItemText(ListView, RowIndex, c, const_cast<char*>(Fields[c].c_str()));
+				for (int c = 1; c < ColCount; c++)
+				{
+					const int SourceIndex = UseStrictSchemaHeaders ? c + 1 : c;
+					ListView_SetItemText(ListView, RowIndex, c, const_cast<char*>(Fields[SourceIndex].c_str()));
+				}
 			}
 
 			return true;
@@ -3387,7 +3573,6 @@ namespace cse
 			{
 			case WM_INITDIALOG:
 			{
-				const int TemplateID = GetDlgCtrlID(hWnd);
 				HWND EnableToggle = FindChildButtonByText(hWnd, "Enable this type of data");
 				HWND CopyObjectsButton = FindChildButtonByText(hWnd, "Copy Objects From Other Region");
 
@@ -3414,20 +3599,10 @@ namespace cse
 
 				if (EnableToggle)
 				{
-					if (TemplateID == TESDialog::kDialogTemplate_RegionEditorSoundData)
-					{
-						ExportX = EnableRect.left;
-						ExportY = EnableRect.bottom + 6;
-						ImportX = ExportX + ExportSize.cx + ButtonGap;
-						ImportY = ExportY;
-					}
-					else
-					{
-						ExportX = EnableRect.right + 8;
-						ExportY = EnableRect.top;
-						ImportX = ExportX + ExportSize.cx + ButtonGap;
-						ImportY = ExportY;
-					}
+					ExportX = EnableRect.right + 8;
+					ExportY = EnableRect.top;
+					ImportX = ExportX + ExportSize.cx + ButtonGap;
+					ImportY = ExportY;
 				}
 
 				HWND ExportButton = CreateWindowExA(0, "BUTTON", "Export CSV", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
@@ -3455,14 +3630,14 @@ namespace cse
 					std::string Path = BuildRegionObjectsCSVPath(hWnd);
 					if (LOWORD(wParam) == IDC_REGIONOBJ_EXPORTBTN)
 					{
-						if (ExportRegionObjectsListViewCSV(ListView, Path))
+						if (ExportRegionTabListViewCSV(hWnd, ListView, Path))
 							BGSEEUI->MsgBoxI("Generated objects exported to:\n%s", Path.c_str());
 						else
 							BGSEEUI->MsgBoxE("Failed to export generated objects CSV.");
 					}
 					else
 					{
-						if (ImportRegionObjectsListViewCSV(ListView, Path))
+						if (ImportRegionTabListViewCSV(hWnd, ListView, Path))
 							BGSEEUI->MsgBoxI("Generated objects imported from:\n%s\n\nThe list has been overwritten.", Path.c_str());
 						else
 							BGSEEUI->MsgBoxE("Failed to import generated objects CSV from:\n%s", Path.c_str());
