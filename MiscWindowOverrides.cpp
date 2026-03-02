@@ -3227,6 +3227,29 @@ namespace cse
 			return true;
 		}
 
+		static HWND FindChildButtonByText(HWND Parent, const char* Text)
+		{
+			if (Parent == nullptr || Text == nullptr)
+				return nullptr;
+
+			HWND Child = GetWindow(Parent, GW_CHILD);
+			char ClassName[64] = { 0 };
+			char WindowText[256] = { 0 };
+			while (Child)
+			{
+				GetClassNameA(Child, ClassName, sizeof(ClassName));
+				if (_stricmp(ClassName, "Button") == 0)
+				{
+					GetWindowTextA(Child, WindowText, sizeof(WindowText));
+					if (_stricmp(WindowText, Text) == 0)
+						return Child;
+				}
+				Child = GetWindow(Child, GW_HWNDNEXT);
+			}
+
+			return nullptr;
+		}
+
 		LRESULT CALLBACK RegionObjectsGeneratedCSVSubClassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
 			bgsee::WindowSubclassProcCollection::SubclassProcExtraParams* SubclassParams)
 		{
@@ -3235,11 +3258,64 @@ namespace cse
 			switch (uMsg)
 			{
 			case WM_INITDIALOG:
-				CreateWindowExA(0, "BUTTON", "Export CSV", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-					8, 8, 90, 22, hWnd, reinterpret_cast<HMENU>(IDC_REGIONOBJ_EXPORTBTN), *TESCSMain::Instance, nullptr);
-				CreateWindowExA(0, "BUTTON", "Import CSV", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-					104, 8, 90, 22, hWnd, reinterpret_cast<HMENU>(IDC_REGIONOBJ_IMPORTBTN), *TESCSMain::Instance, nullptr);
+			{
+				const int TemplateID = GetDlgCtrlID(hWnd);
+				HWND EnableToggle = FindChildButtonByText(hWnd, "Enable this type of data");
+				HWND OverrideToggle = FindChildButtonByText(hWnd, "Override");
+				HWND CopyObjectsButton = FindChildButtonByText(hWnd, "Copy Objects From Other Region");
+
+				RECT EnableRect = { 0 }, OverrideRect = { 0 }, CopyRect = { 0 };
+				if (EnableToggle)
+					GetWindowRect(EnableToggle, &EnableRect);
+				if (OverrideToggle)
+					GetWindowRect(OverrideToggle, &OverrideRect);
+				if (CopyObjectsButton)
+					GetWindowRect(CopyObjectsButton, &CopyRect);
+
+				MapWindowPoints(nullptr, hWnd, reinterpret_cast<LPPOINT>(&EnableRect), 2);
+				MapWindowPoints(nullptr, hWnd, reinterpret_cast<LPPOINT>(&OverrideRect), 2);
+				MapWindowPoints(nullptr, hWnd, reinterpret_cast<LPPOINT>(&CopyRect), 2);
+
+				if (TemplateID == TESDialog::kDialogTemplate_RegionEditorSoundData && EnableToggle && OverrideToggle)
+				{
+					SetWindowPos(EnableToggle, nullptr,
+						OverrideRect.right + 8,
+						EnableRect.top,
+						0,
+						0,
+						SWP_NOZORDER | SWP_NOSIZE);
+				}
+
+				int ButtonWidth = 90;
+				int ButtonHeight = 22;
+				HFONT ButtonFont = nullptr;
+				if (CopyObjectsButton)
+				{
+					ButtonWidth = CopyRect.right - CopyRect.left;
+					ButtonHeight = CopyRect.bottom - CopyRect.top;
+					ButtonFont = reinterpret_cast<HFONT>(SendMessage(CopyObjectsButton, WM_GETFONT, 0, 0));
+				}
+
+				int ExportX = 8;
+				int ExportY = 8;
+				if (EnableToggle)
+				{
+					ExportX = EnableRect.right + 8;
+					ExportY = EnableRect.top;
+				}
+
+				HWND ExportButton = CreateWindowExA(0, "BUTTON", "Export CSV", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
+					ExportX, ExportY, ButtonWidth, ButtonHeight, hWnd, reinterpret_cast<HMENU>(IDC_REGIONOBJ_EXPORTBTN), *TESCSMain::Instance, nullptr);
+				HWND ImportButton = CreateWindowExA(0, "BUTTON", "Import CSV", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
+					ExportX + ButtonWidth + 6, ExportY, ButtonWidth, ButtonHeight, hWnd, reinterpret_cast<HMENU>(IDC_REGIONOBJ_IMPORTBTN), *TESCSMain::Instance, nullptr);
+
+				if (ButtonFont)
+				{
+					SendMessage(ExportButton, WM_SETFONT, reinterpret_cast<WPARAM>(ButtonFont), TRUE);
+					SendMessage(ImportButton, WM_SETFONT, reinterpret_cast<WPARAM>(ButtonFont), TRUE);
+				}
 				break;
+			}
 			case WM_COMMAND:
 				if (LOWORD(wParam) == IDC_REGIONOBJ_EXPORTBTN || LOWORD(wParam) == IDC_REGIONOBJ_IMPORTBTN)
 				{
