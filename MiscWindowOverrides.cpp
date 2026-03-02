@@ -3273,10 +3273,41 @@ namespace cse
 			return _stricmp(L.c_str(), R.c_str()) == 0;
 		}
 
+		static std::string ResolveRegionEditorName(HWND hWnd)
+		{
+			const char* kIgnoredTitles[] = { "Region Editor", "Objects", "Objects (more)", "Sound" };
+			HWND Current = hWnd;
+			for (int Depth = 0; Current && Depth < 10; Depth++)
+			{
+				char Title[512] = { 0 };
+				GetWindowTextA(Current, Title, sizeof(Title));
+				if (Title[0])
+				{
+					bool Ignore = false;
+					for (const char* Ignored : kIgnoredTitles)
+					{
+						if (_stricmp(Title, Ignored) == 0)
+						{
+							Ignore = true;
+							break;
+						}
+					}
+
+					if (!Ignore)
+						return Title;
+				}
+
+				Current = GetParent(Current);
+			}
+
+			return "";
+		}
+
 		static std::string GetRegionObjectsSchemaHeader(int TemplateID, int ColumnIndex)
 		{
 			static const char* kObjectsHeaders[] =
 			{
+				"Region",
 				"Object",
 				"Density",
 				"MinSlope",
@@ -3288,6 +3319,7 @@ namespace cse
 			};
 			static const char* kObjectsMoreHeaders[] =
 			{
+				"Region",
 				"Object",
 				"AngleVarianceXPlus",
 				"AngleVarianceXMinus",
@@ -3338,14 +3370,24 @@ namespace cse
 
 			const int TemplateID = ResolveRegionCSVTemplateID(hWnd);
 			const bool UseStrictSchemaHeaders = IsRegionObjectsSchemaTemplate(TemplateID);
-			for (int c = 0; c < ColCount; c++)
+			const int HeaderCount = UseStrictSchemaHeaders ? ColCount + 1 : ColCount;
+			for (int c = 0; c < HeaderCount; c++)
 			{
+				if (UseStrictSchemaHeaders && c == 0)
+				{
+					Out << "Region";
+					if (c + 1 < HeaderCount)
+						Out << ',';
+					continue;
+				}
+
+				const int ListColumnIndex = UseStrictSchemaHeaders ? c - 1 : c;
 				char HeaderText[256] = { 0 };
 				HDITEMA HeaderItem = { 0 };
 				HeaderItem.mask = HDI_TEXT;
 				HeaderItem.pszText = HeaderText;
 				HeaderItem.cchTextMax = sizeof(HeaderText);
-				Header_GetItem(ListView_GetHeader(ListView), c, &HeaderItem);
+				Header_GetItem(ListView_GetHeader(ListView), ListColumnIndex, &HeaderItem);
 
 				std::string SchemaHeader = GetRegionObjectsSchemaHeader(TemplateID, c);
 				if (UseStrictSchemaHeaders == false || SchemaHeader.rfind("Column", 0) == 0)
@@ -3356,13 +3398,20 @@ namespace cse
 				}
 
 				Out << EscapeRegionCSVCell(SchemaHeader.c_str());
-				if (c + 1 < ColCount)
+				if (c + 1 < HeaderCount)
 					Out << ',';
 			}
 			Out << "\n";
 
+			const std::string RegionName = ResolveRegionEditorName(hWnd);
 			for (int r = 0; r < RowCount; r++)
 			{
+				if (UseStrictSchemaHeaders)
+				{
+					Out << EscapeRegionCSVCell(RegionName.c_str());
+					if (ColCount > 0)
+						Out << ',';
+				}
 				for (int c = 0; c < ColCount; c++)
 				{
 					char Cell[512] = { 0 };
@@ -3393,6 +3442,9 @@ namespace cse
 				if (!EqualsInsensitive(HeaderFields[i], Expected))
 					return false;
 			}
+
+			if (HeaderFields.size() > 1 && HeaderFields[0].empty())
+				return false;
 			return true;
 		}
 
@@ -3420,8 +3472,12 @@ namespace cse
 				return false;
 
 			int ColCount = Header_GetItemCount(ListView_GetHeader(ListView));
+			const bool UseStrictSchemaHeaders = IsRegionObjectsSchemaTemplate(TemplateID);
+			const int RequiredColumns = UseStrictSchemaHeaders ? ColCount + 1 : ColCount;
 			std::vector<std::string> Fields;
-			if (!ParseRegionCSVLine(HeaderLine, Fields) || static_cast<int>(Fields.size()) < ColCount)
+			if (!ParseRegionCSVLine(HeaderLine, Fields) || static_cast<int>(Fields.size()) < RequiredColumns)
+				return false;
+			if (!ValidateRegionCSVHeaderForTemplate(TemplateID, Fields))
 				return false;
 			if (!ValidateRegionCSVHeaderForTemplate(TemplateID, Fields))
 				return false;
@@ -3436,18 +3492,24 @@ namespace cse
 					continue;
 				if (Fields.empty())
 					continue;
+				if (static_cast<int>(Fields.size()) < RequiredColumns)
+					continue;
 
+				const int FirstListColumn = UseStrictSchemaHeaders ? 1 : 0;
 				LVITEMA Item = { 0 };
 				Item.mask = LVIF_TEXT;
 				Item.iItem = ListView_GetItemCount(ListView);
 				Item.iSubItem = 0;
-				Item.pszText = const_cast<char*>(Fields[0].c_str());
+				Item.pszText = const_cast<char*>(Fields[FirstListColumn].c_str());
 				int RowIndex = ListView_InsertItem(ListView, &Item);
 				if (RowIndex < 0)
 					continue;
 
-				for (int c = 1; c < ColCount && c < static_cast<int>(Fields.size()); c++)
-					ListView_SetItemText(ListView, RowIndex, c, const_cast<char*>(Fields[c].c_str()));
+				for (int c = 1; c < ColCount; c++)
+				{
+					const int SourceIndex = UseStrictSchemaHeaders ? c + 1 : c;
+					ListView_SetItemText(ListView, RowIndex, c, const_cast<char*>(Fields[SourceIndex].c_str()));
+				}
 			}
 
 			return true;
