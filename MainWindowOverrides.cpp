@@ -654,10 +654,10 @@ namespace cse
 				if (!Out.good())
 					return false;
 
-				Out << "Schema,FormType,FormID,EditorID,Plugin\n";
+				Out << "FormType,FormID,EditorID,Plugin\n";
 				for (const auto& Row : SourceRows)
 				{
-					Out << "region-assets-v1," << EscapeCSVField(Row.FormType.c_str()) << ","
+					Out << EscapeCSVField(Row.FormType.c_str()) << ","
 						<< EscapeCSVField(Row.FormIDHex.c_str()) << ","
 						<< EscapeCSVField(Row.EditorID.c_str()) << ","
 						<< EscapeCSVField(Row.Plugin.c_str()) << "\n";
@@ -897,9 +897,9 @@ namespace cse
 					EditorIDIdx = i;
 			}
 
-			if (SchemaIdx < 0 || TypeIdx < 0 || FormIDIdx < 0)
+			if (TypeIdx < 0 || FormIDIdx < 0)
 			{
-				BGSEEUI->MsgBoxE("CSV header missing required columns (Schema, FormType, FormID):\n%s", SelectPath);
+				BGSEEUI->MsgBoxE("CSV header missing required columns (FormType, FormID):\n%s", SelectPath);
 				return;
 			}
 
@@ -916,17 +916,23 @@ namespace cse
 					continue;
 				}
 
-				if (Fields.size() <= static_cast<UInt32>(std::max(std::max(SchemaIdx, TypeIdx), std::max(FormIDIdx, EditorIDIdx))))
+				const SInt32 RequiredMaxIdx = std::max(TypeIdx, FormIDIdx);
+				const SInt32 OptionalMaxIdx = std::max(SchemaIdx, EditorIDIdx);
+				const SInt32 MaxFieldIdx = std::max(RequiredMaxIdx, OptionalMaxIdx);
+				if (Fields.size() <= static_cast<UInt32>(MaxFieldIdx))
 				{
 					RejectedHeader++;
 					continue;
 				}
 
-				const std::string& Schema = Fields[SchemaIdx];
-				if (_stricmp(Schema.c_str(), "region-assets-v1") != 0)
+				if (SchemaIdx >= 0)
 				{
-					RejectedSchema++;
-					continue;
+					const std::string& Schema = Fields[SchemaIdx];
+					if (Schema.empty() == false && _stricmp(Schema.c_str(), "region-assets-v1") != 0)
+					{
+						RejectedSchema++;
+						continue;
+					}
 				}
 
 				const std::string& TypeToken = Fields[TypeIdx];
