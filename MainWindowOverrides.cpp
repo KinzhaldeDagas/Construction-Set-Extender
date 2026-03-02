@@ -15,6 +15,7 @@
 #include "CustomDialogProcs.h"
 
 #include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <iterator>
 #include <set>
@@ -455,7 +456,7 @@ namespace cse
 					continue;
 				if (IsFormFromActivePluginOrMaster(Form, AllowedFiles) == false)
 					continue;
-				if (Form->formType != TESForm::kFormType_Tree && Form->formType != TESForm::kFormType_Flora && Form->formType != TESForm::kFormType_Grass)
+				if (Form->formType != TESForm::kFormType_Tree && Form->formType != TESForm::kFormType_Flora && Form->formType != TESForm::kFormType_Grass && Form->formType != TESForm::kFormType_Static)
 					continue;
 				TESFile* Source = Form->GetOverrideFile(-1);
 				char FormID[16] = { 0 };
@@ -484,6 +485,101 @@ namespace cse
 
 			Out.flush();
 			BGSEEUI->MsgBoxI("Region asset export complete.\nRows: %u\nPath: %s", Exported, FilePath.c_str());
+		}
+
+		static void TrimCSVField(std::string& Value)
+		{
+			size_t Start = 0;
+			while (Start < Value.size() && isspace(static_cast<unsigned char>(Value[Start])))
+				Start++;
+
+			size_t End = Value.size();
+			while (End > Start && isspace(static_cast<unsigned char>(Value[End - 1])))
+				End--;
+
+			if (Start == 0 && End == Value.size())
+				return;
+			Value = Value.substr(Start, End - Start);
+		}
+
+		static bool ParseCSVLine(const std::string& Line, std::vector<std::string>& OutFields)
+		{
+			OutFields.clear();
+			std::string Current;
+			bool InQuotes = false;
+
+			for (size_t i = 0; i < Line.size(); i++)
+			{
+				char Ch = Line[i];
+				if (InQuotes)
+				{
+					if (Ch == '"')
+					{
+						if (i + 1 < Line.size() && Line[i + 1] == '"')
+						{
+							Current.push_back('"');
+							i++;
+						}
+						else
+						{
+							InQuotes = false;
+						}
+					}
+					else
+					{
+						Current.push_back(Ch);
+					}
+				}
+				else
+				{
+					if (Ch == ',')
+					{
+						TrimCSVField(Current);
+						OutFields.push_back(Current);
+						Current.clear();
+					}
+					else if (Ch == '"')
+					{
+						InQuotes = true;
+					}
+					else
+					{
+						Current.push_back(Ch);
+					}
+				}
+			}
+
+			if (InQuotes)
+				return false;
+
+			TrimCSVField(Current);
+			OutFields.push_back(Current);
+			return true;
+		}
+
+		static bool EqualsCI(const char* Left, const char* Right)
+		{
+			if (Left == nullptr || Right == nullptr)
+				return false;
+			return _stricmp(Left, Right) == 0;
+		}
+
+		static bool IsSupportedRegionAssetTypeToken(const std::string& FormType)
+		{
+			return _stricmp(FormType.c_str(), "Tree") == 0 ||
+				_stricmp(FormType.c_str(), "Flora") == 0 ||
+				_stricmp(FormType.c_str(), "Grass") == 0 ||
+				_stricmp(FormType.c_str(), "LandTexture") == 0 ||
+				_stricmp(FormType.c_str(), "Static") == 0;
+		}
+
+		static bool IsSupportedRegionAssetFormType(UInt8 FormType)
+		{
+			return FormType == TESForm::kFormType_Tree ||
+				FormType == TESForm::kFormType_Flora ||
+				FormType == TESForm::kFormType_Grass ||
+				FormType == TESForm::kFormType_LandTexture ||
+				FormType == TESForm::kFormType_Static;
 		}
 
 		static void ImportRegionAssetFormsCSV(HWND hWnd)
@@ -518,37 +614,161 @@ namespace cse
 			std::vector<TESFile*> AllowedFiles;
 			CollectActivePluginAndMasters(AllowedFiles);
 
-			UInt32 Processed = 0, Allowed = 0, Rejected = 0;
+			UInt32 TotalRows = 0;
+			UInt32 AcceptedRows = 0;
+			UInt32 RejectedMalformed = 0;
+			UInt32 RejectedHeader = 0;
+			UInt32 RejectedSchema = 0;
+			UInt32 RejectedTypeToken = 0;
+			UInt32 RejectedResolve = 0;
+			UInt32 RejectedScope = 0;
+			UInt32 RejectedTypeMismatch = 0;
+			UInt32 DuplicateRows = 0;
+
+			std::set<UInt32> SeenFormIDs;
+			std::vector<std::string> Fields;
+			std::string HeaderLine;
+			if (std::getline(In, HeaderLine) == false)
+			{
+				BGSEEUI->MsgBoxE("CSV is empty:\n%s", SelectPath);
+				return;
+			}
+
+			if (ParseCSVLine(HeaderLine, Fields) == false)
+			{
+				BGSEEUI->MsgBoxE("CSV header is malformed:\n%s", SelectPath);
+				return;
+			}
+
+			SInt32 SchemaIdx = -1, TypeIdx = -1, FormIDIdx = -1, EditorIDIdx = -1;
+			for (UInt32 i = 0; i < Fields.size(); i++)
+			{
+				if (_stricmp(Fields[i].c_str(), "Schema") == 0)
+					SchemaIdx = i;
+				else if (_stricmp(Fields[i].c_str(), "FormType") == 0)
+					TypeIdx = i;
+				else if (_stricmp(Fields[i].c_str(), "FormID") == 0)
+					FormIDIdx = i;
+				else if (_stricmp(Fields[i].c_str(), "EditorID") == 0)
+					EditorIDIdx = i;
+			}
+
+			if (SchemaIdx < 0 || TypeIdx < 0 || FormIDIdx < 0)
+			{
+				BGSEEUI->MsgBoxE("CSV header missing required columns (Schema, FormType, FormID):\n%s", SelectPath);
+				return;
+			}
+
 			std::string Line;
-			std::getline(In, Line);
 			while (std::getline(In, Line))
 			{
 				if (Line.empty())
 					continue;
-				Processed++;
+				TotalRows++;
 
-				size_t FirstComma = Line.find(',');
-				size_t SecondComma = FirstComma == std::string::npos ? std::string::npos : Line.find(',', FirstComma + 1);
-				size_t ThirdComma = SecondComma == std::string::npos ? std::string::npos : Line.find(',', SecondComma + 1);
-				if (SecondComma == std::string::npos || ThirdComma == std::string::npos)
+				if (ParseCSVLine(Line, Fields) == false)
 				{
-					Rejected++;
+					RejectedMalformed++;
 					continue;
 				}
 
-				std::string FormIDToken = Line.substr(SecondComma + 1, ThirdComma - SecondComma - 1);
-				FormIDToken.erase(std::remove(FormIDToken.begin(), FormIDToken.end(), '"'), FormIDToken.end());
+				if (Fields.size() <= static_cast<UInt32>(std::max(std::max(SchemaIdx, TypeIdx), std::max(FormIDIdx, EditorIDIdx))))
+				{
+					RejectedHeader++;
+					continue;
+				}
 
-				UInt32 FormID = strtoul(FormIDToken.c_str(), nullptr, 16);
+				const std::string& Schema = Fields[SchemaIdx];
+				if (_stricmp(Schema.c_str(), "region-assets-v1") != 0)
+				{
+					RejectedSchema++;
+					continue;
+				}
+
+				const std::string& TypeToken = Fields[TypeIdx];
+				if (IsSupportedRegionAssetTypeToken(TypeToken) == false)
+				{
+					RejectedTypeToken++;
+					continue;
+				}
+
+				const std::string& FormIDToken = Fields[FormIDIdx];
+				char* ParseEnd = nullptr;
+				UInt32 FormID = strtoul(FormIDToken.c_str(), &ParseEnd, 16);
+				if (ParseEnd == FormIDToken.c_str() || (ParseEnd && *ParseEnd != '\0'))
+				{
+					RejectedMalformed++;
+					continue;
+				}
+
 				TESForm* Form = TESForm::LookupByFormID(FormID);
-				if (IsFormFromActivePluginOrMaster(Form, AllowedFiles))
-					Allowed++;
-				else
-					Rejected++;
+				if (Form == nullptr && EditorIDIdx >= 0)
+				{
+					const std::string& EditorID = Fields[EditorIDIdx];
+					if (EditorID.empty() == false)
+						Form = TESForm::LookupByEditorID(EditorID.c_str());
+				}
+
+				if (Form == nullptr)
+				{
+					RejectedResolve++;
+					continue;
+				}
+
+				if (IsFormFromActivePluginOrMaster(Form, AllowedFiles) == false)
+				{
+					RejectedScope++;
+					continue;
+				}
+
+				if (IsSupportedRegionAssetFormType(Form->formType) == false)
+				{
+					RejectedTypeMismatch++;
+					continue;
+				}
+
+				const char* ActualTypeName = TESForm::GetFormTypeIDLongName(Form->formType);
+				if (EqualsCI(ActualTypeName, TypeToken.c_str()) == false)
+				{
+					RejectedTypeMismatch++;
+					continue;
+				}
+
+				if (SeenFormIDs.insert(Form->formID).second == false)
+				{
+					DuplicateRows++;
+					continue;
+				}
+
+				AcceptedRows++;
 			}
 
-			BGSEEUI->MsgBoxI("Region asset import validation complete.\nRows processed: %u\nAllowed in active plugin/master scope: %u\nRejected (out of scope/unresolved): %u", Processed, Allowed, Rejected);
+			BGSEEUI->MsgBoxI(
+				"Region asset import pipeline complete (validation stage).\n"
+				"CSV: %s\n\n"
+				"Rows read: %u\n"
+				"Accepted rows: %u\n"
+				"Duplicate rows: %u\n"
+				"Rejected malformed rows: %u\n"
+				"Rejected missing/short columns: %u\n"
+				"Rejected schema mismatch: %u\n"
+				"Rejected unsupported type token: %u\n"
+				"Rejected unresolved forms: %u\n"
+				"Rejected out-of-scope forms: %u\n"
+				"Rejected type mismatch rows: %u",
+				SelectPath,
+				TotalRows,
+				AcceptedRows,
+				DuplicateRows,
+				RejectedMalformed,
+				RejectedHeader,
+				RejectedSchema,
+				RejectedTypeToken,
+				RejectedResolve,
+				RejectedScope,
+				RejectedTypeMismatch);
 		}
+
 
 		static std::string GetBasePluginName(const char* FileName)
 		{
