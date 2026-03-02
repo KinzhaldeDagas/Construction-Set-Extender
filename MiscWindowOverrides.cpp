@@ -3242,6 +3242,18 @@ namespace cse
 				TemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsExtraData;
 		}
 
+		static bool IsRegionObjectsKnownTemplate(int TemplateID)
+		{
+			return TemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsData ||
+				TemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsExtraData ||
+				TemplateID == TESDialog::kDialogTemplate_RegionEditorSoundData;
+		}
+
+		static bool EqualsInsensitive(const std::string& L, const std::string& R)
+		{
+			return _stricmp(L.c_str(), R.c_str()) == 0;
+		}
+
 		static std::string GetRegionObjectsSchemaHeader(int TemplateID, int ColumnIndex)
 		{
 			static const char* kObjectsHeaders[] =
@@ -3347,7 +3359,43 @@ namespace cse
 			return Out.good();
 		}
 
-		static bool ImportRegionObjectsListViewCSV(HWND ListView, const std::string& Path)
+		static bool ValidateRegionCSVHeaderForTemplate(int TemplateID, const std::vector<std::string>& HeaderFields)
+		{
+			if (!IsRegionObjectsSchemaTemplate(TemplateID))
+				return true;
+
+			for (int i = 0; ; i++)
+			{
+				std::string Expected = GetRegionObjectsSchemaHeader(TemplateID, i);
+				if (Expected.rfind("Column", 0) == 0)
+					break;
+				if (i >= static_cast<int>(HeaderFields.size()))
+					return false;
+				if (!EqualsInsensitive(HeaderFields[i], Expected))
+					return false;
+			}
+			return true;
+		}
+
+		static bool ExportRegionTabListViewCSV(HWND hWnd, HWND ListView, const std::string& Path)
+		{
+			const int TemplateID = GetDlgCtrlID(hWnd);
+			if (!IsRegionObjectsKnownTemplate(TemplateID))
+				return false;
+			return ExportRegionObjectsListViewCSV(hWnd, ListView, Path);
+		}
+
+		static bool ImportRegionObjectsListViewCSV(HWND ListView, const std::string& Path, int TemplateID);
+
+		static bool ImportRegionTabListViewCSV(HWND hWnd, HWND ListView, const std::string& Path)
+		{
+			const int TemplateID = GetDlgCtrlID(hWnd);
+			if (!IsRegionObjectsKnownTemplate(TemplateID))
+				return false;
+			return ImportRegionObjectsListViewCSV(ListView, Path, TemplateID);
+		}
+
+		static bool ImportRegionObjectsListViewCSV(HWND ListView, const std::string& Path, int TemplateID)
 		{
 			std::ifstream In(Path);
 			if (!In.good())
@@ -3360,6 +3408,8 @@ namespace cse
 			int ColCount = Header_GetItemCount(ListView_GetHeader(ListView));
 			std::vector<std::string> Fields;
 			if (!ParseRegionCSVLine(HeaderLine, Fields) || static_cast<int>(Fields.size()) < ColCount)
+				return false;
+			if (!ValidateRegionCSVHeaderForTemplate(TemplateID, Fields))
 				return false;
 
 			ListView_DeleteAllItems(ListView);
@@ -3449,7 +3499,6 @@ namespace cse
 			{
 			case WM_INITDIALOG:
 			{
-				const int TemplateID = GetDlgCtrlID(hWnd);
 				HWND EnableToggle = FindChildButtonByText(hWnd, "Enable this type of data");
 				HWND CopyObjectsButton = FindChildButtonByText(hWnd, "Copy Objects From Other Region");
 
@@ -3476,20 +3525,10 @@ namespace cse
 
 				if (EnableToggle)
 				{
-					if (TemplateID == TESDialog::kDialogTemplate_RegionEditorSoundData)
-					{
-						ExportX = EnableRect.left;
-						ExportY = EnableRect.bottom + 6;
-						ImportX = ExportX + ExportSize.cx + ButtonGap;
-						ImportY = ExportY;
-					}
-					else
-					{
-						ExportX = EnableRect.right + 8;
-						ExportY = EnableRect.top;
-						ImportX = ExportX + ExportSize.cx + ButtonGap;
-						ImportY = ExportY;
-					}
+					ExportX = EnableRect.right + 8;
+					ExportY = EnableRect.top;
+					ImportX = ExportX + ExportSize.cx + ButtonGap;
+					ImportY = ExportY;
 				}
 
 				HWND ExportButton = CreateWindowExA(0, "BUTTON", "Export CSV", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
@@ -3517,14 +3556,14 @@ namespace cse
 					std::string Path = BuildRegionObjectsCSVPath(hWnd);
 					if (LOWORD(wParam) == IDC_REGIONOBJ_EXPORTBTN)
 					{
-						if (ExportRegionObjectsListViewCSV(hWnd, ListView, Path))
+						if (ExportRegionTabListViewCSV(hWnd, ListView, Path))
 							BGSEEUI->MsgBoxI("Generated objects exported to:\n%s", Path.c_str());
 						else
 							BGSEEUI->MsgBoxE("Failed to export generated objects CSV.");
 					}
 					else
 					{
-						if (ImportRegionObjectsListViewCSV(ListView, Path))
+						if (ImportRegionTabListViewCSV(hWnd, ListView, Path))
 							BGSEEUI->MsgBoxI("Generated objects imported from:\n%s\n\nThe list has been overwritten.", Path.c_str());
 						else
 							BGSEEUI->MsgBoxE("Failed to import generated objects CSV from:\n%s", Path.c_str());
