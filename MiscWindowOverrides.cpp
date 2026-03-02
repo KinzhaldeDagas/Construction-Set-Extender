@@ -13,6 +13,7 @@
 #include "FormUndoStack.h"
 #include "[Common]\CLIWrapper.h"
 #include <fstream>
+#include <algorithm>
 #include <vector>
 #include <string>
 
@@ -3107,10 +3108,12 @@ namespace cse
 			return true;
 		}
 
-		static HWND FindFirstListViewChild(HWND Parent)
+		static HWND FindChildButtonByText(HWND Parent, const char* Text);
+
+		static void CollectListViewChildren(HWND Parent, std::vector<HWND>& Out)
 		{
 			if (Parent == nullptr)
-				return nullptr;
+				return;
 
 			HWND Child = GetWindow(Parent, GW_CHILD);
 			char ClassName[64] = { 0 };
@@ -3118,16 +3121,104 @@ namespace cse
 			{
 				GetClassNameA(Child, ClassName, sizeof(ClassName));
 				if (_stricmp(ClassName, "SysListView32") == 0)
-					return Child;
+					Out.push_back(Child);
 
-				HWND Nested = FindFirstListViewChild(Child);
-				if (Nested)
-					return Nested;
-
+				CollectListViewChildren(Child, Out);
 				Child = GetWindow(Child, GW_HWNDNEXT);
 			}
+		}
 
-			return nullptr;
+		static void CollectUniqueListViewChildren(HWND Parent, std::vector<HWND>& Out)
+		{
+			std::vector<HWND> Found;
+			CollectListViewChildren(Parent, Found);
+			for (HWND Candidate : Found)
+			{
+				if (std::find(Out.begin(), Out.end(), Candidate) == Out.end())
+					Out.push_back(Candidate);
+			}
+		}
+
+		static HWND FindBestRegionObjectsListView(HWND hWnd)
+		{
+			if (hWnd == nullptr)
+				return nullptr;
+
+			HWND Parent = GetParent(hWnd);
+			HWND GrandParent = Parent ? GetParent(Parent) : nullptr;
+			HWND AnchorButton = FindChildButtonByText(hWnd, "Copy Objects From Other Region");
+			if (AnchorButton == nullptr && Parent)
+				AnchorButton = FindChildButtonByText(Parent, "Copy Objects From Other Region");
+
+			RECT AnchorRect = { 0 };
+			if (AnchorButton)
+				GetWindowRect(AnchorButton, &AnchorRect);
+
+			std::vector<HWND> Candidates;
+			CollectUniqueListViewChildren(hWnd, Candidates);
+			if (Parent)
+				CollectUniqueListViewChildren(Parent, Candidates);
+			if (GrandParent)
+				CollectUniqueListViewChildren(GrandParent, Candidates);
+
+			if (Candidates.empty())
+				return nullptr;
+
+			HWND Best = nullptr;
+			int BestScore = INT_MIN;
+			for (HWND Candidate : Candidates)
+			{
+				if (Candidate == nullptr || !IsWindow(Candidate))
+					continue;
+
+				LONG_PTR Style = GetWindowLongPtrA(Candidate, GWL_STYLE);
+				RECT Bounds = { 0 };
+				if (!GetWindowRect(Candidate, &Bounds))
+					continue;
+				const int Width = std::max<LONG>(0, Bounds.right - Bounds.left);
+				const int Height = std::max<LONG>(0, Bounds.bottom - Bounds.top);
+				if (Width < 50 || Height < 50)
+					continue;
+
+				const int ColCount = Header_GetItemCount(ListView_GetHeader(Candidate));
+				const int RowCount = ListView_GetItemCount(Candidate);
+
+				int Score = (Width * Height) / 100;
+				if ((Style & LVS_TYPEMASK) == LVS_REPORT)
+					Score += 1200;
+				else
+					Score -= 1000;
+				if (IsWindowVisible(Candidate))
+					Score += 1000;
+				if (IsWindowEnabled(Candidate))
+					Score += 100;
+				if (IsChild(hWnd, Candidate))
+					Score += 500;
+				if (Parent && IsChild(Parent, Candidate))
+					Score += 200;
+				if (ColCount >= 2)
+					Score += 400;
+				if (ColCount >= 3)
+					Score += 300;
+				if (RowCount > 0)
+					Score += 100;
+
+				if (AnchorButton)
+				{
+					if (GetParent(Candidate) == GetParent(AnchorButton))
+						Score += 800;
+					if (Bounds.top >= AnchorRect.top)
+						Score += 200;
+				}
+
+				if (Score > BestScore)
+				{
+					BestScore = Score;
+					Best = Candidate;
+				}
+			}
+
+			return Best;
 		}
 
 		static std::string BuildRegionObjectsCSVPath(HWND hWnd)
@@ -3354,7 +3445,7 @@ namespace cse
 			case WM_COMMAND:
 				if (LOWORD(wParam) == IDC_REGIONOBJ_EXPORTBTN || LOWORD(wParam) == IDC_REGIONOBJ_IMPORTBTN)
 				{
-					HWND ListView = FindFirstListViewChild(hWnd);
+					HWND ListView = FindBestRegionObjectsListView(hWnd);
 					if (!ListView)
 					{
 						BGSEEUI->MsgBoxE("Couldn't find generated objects list in this tab.");
