@@ -3223,27 +3223,78 @@ namespace cse
 
 		static std::string BuildRegionObjectsCSVPath(HWND hWnd)
 		{
-			char Title[260] = { 0 };
-			GetWindowTextA(hWnd, Title, sizeof(Title));
-			std::string Base = Title[0] ? Title : "RegionGeneratedObjects";
-			for (char& Ch : Base)
-			{
-				if (Ch == ' ' || Ch == '\\' || Ch == '/' || Ch == ':' || Ch == '*' || Ch == '?' || Ch == '"' || Ch == '<' || Ch == '>' || Ch == '|')
-					Ch = '_';
-			}
-
-			std::string Suffix = "GENERATED_OBJECTS";
 			const int TemplateID = GetDlgCtrlID(hWnd);
-			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorSoundData)
-				Suffix = "SOUNDS";
+			std::string FileName = "RegionEditor_Objects.csv";
+			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsExtraData)
+				FileName = "RegionEditor_Objectsmore.csv";
+			else if (TemplateID == TESDialog::kDialogTemplate_RegionEditorSoundData)
+				FileName = "RegionEditor_Sound.csv";
 
 			CreateDirectoryA("Data", nullptr);
 			CreateDirectoryA("Data\\CSVExports", nullptr);
 			CreateDirectoryA("Data\\CSVExports\\Regions", nullptr);
-			return std::string("Data\\CSVExports\\Regions\\") + Base + "_" + Suffix + ".csv";
+			return std::string("Data\\CSVExports\\Regions\\") + FileName;
 		}
 
-		static bool ExportRegionObjectsListViewCSV(HWND ListView, const std::string& Path)
+		static bool IsRegionObjectsSchemaTemplate(int TemplateID)
+		{
+			return TemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsData ||
+				TemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsExtraData;
+		}
+
+		static std::string GetRegionObjectsSchemaHeader(int TemplateID, int ColumnIndex)
+		{
+			static const char* kObjectsHeaders[] =
+			{
+				"Object",
+				"Density",
+				"MinSlope",
+				"MaxSlope",
+				"MinHeight",
+				"MaxHeight",
+				"RadiusWrtParent",
+				"Clustering"
+			};
+			static const char* kObjectsMoreHeaders[] =
+			{
+				"Object",
+				"AngleVarianceXPlus",
+				"AngleVarianceXMinus",
+				"AngleVarianceYPlus",
+				"AngleVarianceYMinus",
+				"AngleVarianceZPlus",
+				"AngleVarianceZMinus",
+				"Sink",
+				"SinkVariance",
+				"SizeVariance",
+				"ConformToSlope",
+				"PaintVertices",
+				"PaintVerticesColor",
+				"PercentOfRadius"
+			};
+
+			const char** Schema = nullptr;
+			size_t SchemaSize = 0;
+			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsData)
+			{
+				Schema = kObjectsHeaders;
+				SchemaSize = sizeof(kObjectsHeaders) / sizeof(kObjectsHeaders[0]);
+			}
+			else if (TemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsExtraData)
+			{
+				Schema = kObjectsMoreHeaders;
+				SchemaSize = sizeof(kObjectsMoreHeaders) / sizeof(kObjectsMoreHeaders[0]);
+			}
+
+			if (Schema && ColumnIndex >= 0 && static_cast<size_t>(ColumnIndex) < SchemaSize)
+				return Schema[ColumnIndex];
+
+			char Fallback[32] = { 0 };
+			FORMAT_STR(Fallback, "Column%d", ColumnIndex + 1);
+			return Fallback;
+		}
+
+		static bool ExportRegionObjectsListViewCSV(HWND hWnd, HWND ListView, const std::string& Path)
 		{
 			int ColCount = Header_GetItemCount(ListView_GetHeader(ListView));
 			int RowCount = ListView_GetItemCount(ListView);
@@ -3254,6 +3305,8 @@ namespace cse
 			if (!Out.good())
 				return false;
 
+			const int TemplateID = GetDlgCtrlID(hWnd);
+			const bool UseStrictSchemaHeaders = IsRegionObjectsSchemaTemplate(TemplateID);
 			for (int c = 0; c < ColCount; c++)
 			{
 				char HeaderText[256] = { 0 };
@@ -3262,7 +3315,16 @@ namespace cse
 				HeaderItem.pszText = HeaderText;
 				HeaderItem.cchTextMax = sizeof(HeaderText);
 				Header_GetItem(ListView_GetHeader(ListView), c, &HeaderItem);
-				Out << EscapeRegionCSVCell(HeaderText);
+
+				std::string SchemaHeader = GetRegionObjectsSchemaHeader(TemplateID, c);
+				if (UseStrictSchemaHeaders == false || SchemaHeader.rfind("Column", 0) == 0)
+				{
+					std::string NativeHeader = HeaderText;
+					if (NativeHeader.empty() == false)
+						SchemaHeader = NativeHeader;
+				}
+
+				Out << EscapeRegionCSVCell(SchemaHeader.c_str());
 				if (c + 1 < ColCount)
 					Out << ',';
 			}
@@ -3455,7 +3517,7 @@ namespace cse
 					std::string Path = BuildRegionObjectsCSVPath(hWnd);
 					if (LOWORD(wParam) == IDC_REGIONOBJ_EXPORTBTN)
 					{
-						if (ExportRegionObjectsListViewCSV(ListView, Path))
+						if (ExportRegionObjectsListViewCSV(hWnd, ListView, Path))
 							BGSEEUI->MsgBoxI("Generated objects exported to:\n%s", Path.c_str());
 						else
 							BGSEEUI->MsgBoxE("Failed to export generated objects CSV.");
