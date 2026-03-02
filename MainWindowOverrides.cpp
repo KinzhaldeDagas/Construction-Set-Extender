@@ -499,6 +499,9 @@ namespace cse
 				if (Ch == '/')
 					Ch = '\\';
 			}
+			if (IsAbsoluteRevoicePath(FilePath) == false && _strnicmp(FilePath.c_str(), "Data\\", 5) != 0)
+				FilePath = std::string("Data\\") + FilePath;
+
 			if (FilePath.size() < 4 || _stricmp(FilePath.c_str() + FilePath.size() - 4, ".csv"))
 				FilePath += ".csv";
 
@@ -713,10 +716,19 @@ namespace cse
 				MAX_PATH) == false)
 				return;
 
-			std::ifstream In(SelectPath);
+			std::string ImportPath(SelectPath);
+			for (auto& Ch : ImportPath)
+			{
+				if (Ch == '/')
+					Ch = '\\';
+			}
+			if (IsAbsoluteRevoicePath(ImportPath) == false && _strnicmp(ImportPath.c_str(), "Data\\", 5) != 0)
+				ImportPath = std::string("Data\\") + ImportPath;
+
+			std::ifstream In(ImportPath);
 			if (!In.good())
 			{
-				BGSEEUI->MsgBoxE("Couldn't open CSV for import:\n%s", SelectPath);
+				BGSEEUI->MsgBoxE("Couldn't open CSV for import:\n%s", ImportPath.c_str());
 				return;
 			}
 
@@ -865,7 +877,7 @@ namespace cse
 				"Rejected unresolved forms: %u\n"
 				"Rejected out-of-scope forms: %u\n"
 				"Rejected type mismatch rows: %u",
-				SelectPath,
+				ImportPath.c_str(),
 				TotalRows,
 				AcceptedRows,
 				DuplicateRows,
