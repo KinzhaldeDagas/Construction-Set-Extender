@@ -350,6 +350,206 @@ namespace cse
 			return false;
 		}
 
+		static void CollectActivePluginAndMasters(std::vector<TESFile*>& OutFiles)
+		{
+			OutFiles.clear();
+			if (_DATAHANDLER == nullptr || _DATAHANDLER->activeFile == nullptr)
+				return;
+
+			OutFiles.push_back(_DATAHANDLER->activeFile);
+			for (UInt32 i = 0; i < _DATAHANDLER->activeFile->masterCount; i++)
+			{
+				TESFile* MasterFile = _DATAHANDLER->activeFile->masterFiles[i];
+				if (MasterFile == nullptr)
+					continue;
+
+				if (std::find(OutFiles.begin(), OutFiles.end(), MasterFile) == OutFiles.end())
+					OutFiles.push_back(MasterFile);
+			}
+		}
+
+		static bool IsFormFromActivePluginOrMaster(TESForm* Form, const std::vector<TESFile*>& AllowedFiles)
+		{
+			if (Form == nullptr)
+				return false;
+
+			TESFile* Source = Form->GetOverrideFile(-1);
+			if (Source == nullptr)
+				return false;
+
+			for (auto* File : AllowedFiles)
+			{
+				if (File == Source)
+					return true;
+			}
+			return false;
+		}
+
+		static std::string BuildDefaultRegionAssetCSVPath()
+		{
+			std::string BaseName = _DATAHANDLER && _DATAHANDLER->activeFile ? _DATAHANDLER->activeFile->fileName : "ActivePlugin.esp";
+			size_t LastSlash = BaseName.find_last_of("\\/");
+			if (LastSlash != std::string::npos)
+				BaseName.erase(0, LastSlash + 1);
+			size_t LastDot = BaseName.find_last_of('.');
+			if (LastDot != std::string::npos)
+				BaseName.erase(LastDot);
+			if (BaseName.empty())
+				BaseName = "ActivePlugin";
+			return std::string("Data\\region_assets_") + BaseName + ".csv";
+		}
+
+		static void ExportRegionAssetFormsCSV(HWND hWnd)
+		{
+			if (_DATAHANDLER == nullptr || _DATAHANDLER->activeFile == nullptr)
+			{
+				BGSEEUI->MsgBoxE("An active plugin must be set before exporting region asset CSV.");
+				return;
+			}
+
+			char SelectPath[MAX_PATH] = { 0 };
+			std::string DefaultPath = BuildDefaultRegionAssetCSVPath();
+			strncpy_s(SelectPath, DefaultPath.c_str(), _TRUNCATE);
+			if (TESDialog::ShowFileSelect(hWnd,
+				"Data",
+				"CSV Files\0*.csv\0\0",
+				"Export Region Asset CSV",
+				"csv",
+				nullptr,
+				false,
+				true,
+				SelectPath,
+				MAX_PATH) == false)
+			{
+				return;
+			}
+
+			std::string FilePath(SelectPath);
+			if (FilePath.empty())
+				return;
+			for (auto& Ch : FilePath)
+			{
+				if (Ch == '/')
+					Ch = '\\';
+			}
+			if (FilePath.size() < 4 || _stricmp(FilePath.c_str() + FilePath.size() - 4, ".csv"))
+				FilePath += ".csv";
+
+			std::vector<TESFile*> AllowedFiles;
+			CollectActivePluginAndMasters(AllowedFiles);
+
+			std::ofstream Out(FilePath, std::ios::trunc);
+			if (!Out.good())
+			{
+				BGSEEUI->MsgBoxE("Couldn't open output CSV:\n%s", FilePath.c_str());
+				return;
+			}
+
+			Out << "Schema,FormType,FormID,EditorID,Plugin\n";
+			UInt32 Exported = 0;
+
+			for (TESObject* Itr = _DATAHANDLER->objects->first; Itr; Itr = Itr->next)
+			{
+				TESForm* Form = Itr;
+				if (Form == nullptr)
+					continue;
+				if (IsFormFromActivePluginOrMaster(Form, AllowedFiles) == false)
+					continue;
+				if (Form->formType != TESForm::kFormType_Tree && Form->formType != TESForm::kFormType_Flora && Form->formType != TESForm::kFormType_Grass)
+					continue;
+				TESFile* Source = Form->GetOverrideFile(-1);
+				char FormID[16] = { 0 };
+				FORMAT_STR(FormID, "%08X", Form->formID);
+				Out << "region-assets-v1," << EscapeCSVField(TESForm::GetFormTypeIDLongName(Form->formType)) << ","
+					<< EscapeCSVField(FormID) << "," << EscapeCSVField(Form->GetEditorID() ? Form->GetEditorID() : "") << ","
+					<< EscapeCSVField(Source ? Source->fileName : "") << "\n";
+				Exported++;
+			}
+
+			for (tList<TESLandTexture>::Iterator Itr = _DATAHANDLER->landTextures.Begin(); !Itr.End() && Itr.Get(); ++Itr)
+			{
+				TESForm* Form = Itr.Get();
+				if (Form == nullptr)
+					continue;
+				if (IsFormFromActivePluginOrMaster(Form, AllowedFiles) == false)
+					continue;
+				TESFile* Source = Form->GetOverrideFile(-1);
+				char FormID[16] = { 0 };
+				FORMAT_STR(FormID, "%08X", Form->formID);
+				Out << "region-assets-v1," << EscapeCSVField(TESForm::GetFormTypeIDLongName(Form->formType)) << ","
+					<< EscapeCSVField(FormID) << "," << EscapeCSVField(Form->GetEditorID() ? Form->GetEditorID() : "") << ","
+					<< EscapeCSVField(Source ? Source->fileName : "") << "\n";
+				Exported++;
+			}
+
+			Out.flush();
+			BGSEEUI->MsgBoxI("Region asset export complete.\nRows: %u\nPath: %s", Exported, FilePath.c_str());
+		}
+
+		static void ImportRegionAssetFormsCSV(HWND hWnd)
+		{
+			if (_DATAHANDLER == nullptr || _DATAHANDLER->activeFile == nullptr)
+			{
+				BGSEEUI->MsgBoxE("An active plugin must be set before importing region asset CSV.");
+				return;
+			}
+
+			char SelectPath[MAX_PATH] = { 0 };
+			strncpy_s(SelectPath, BuildDefaultRegionAssetCSVPath().c_str(), _TRUNCATE);
+			if (TESDialog::ShowFileSelect(hWnd,
+				"Data",
+				"CSV Files\0*.csv\0\0",
+				"Import Region Asset CSV",
+				"csv",
+				nullptr,
+				true,
+				false,
+				SelectPath,
+				MAX_PATH) == false)
+				return;
+
+			std::ifstream In(SelectPath);
+			if (!In.good())
+			{
+				BGSEEUI->MsgBoxE("Couldn't open CSV for import:\n%s", SelectPath);
+				return;
+			}
+
+			std::vector<TESFile*> AllowedFiles;
+			CollectActivePluginAndMasters(AllowedFiles);
+
+			UInt32 Processed = 0, Allowed = 0, Rejected = 0;
+			std::string Line;
+			std::getline(In, Line);
+			while (std::getline(In, Line))
+			{
+				if (Line.empty())
+					continue;
+				Processed++;
+
+				size_t FirstComma = Line.find(',');
+				size_t SecondComma = FirstComma == std::string::npos ? std::string::npos : Line.find(',', FirstComma + 1);
+				size_t ThirdComma = SecondComma == std::string::npos ? std::string::npos : Line.find(',', SecondComma + 1);
+				if (SecondComma == std::string::npos || ThirdComma == std::string::npos)
+				{
+					Rejected++;
+					continue;
+				}
+
+				std::string FormIDToken = Line.substr(SecondComma + 1, ThirdComma - SecondComma - 1);
+				FormIDToken.erase(std::remove(FormIDToken.begin(), FormIDToken.end(), '"'), FormIDToken.end());
+
+				UInt32 FormID = strtoul(FormIDToken.c_str(), nullptr, 16);
+				TESForm* Form = TESForm::LookupByFormID(FormID);
+				if (IsFormFromActivePluginOrMaster(Form, AllowedFiles))
+					Allowed++;
+				else
+					Rejected++;
+			}
+
+			BGSEEUI->MsgBoxI("Region asset import validation complete.\nRows processed: %u\nAllowed in active plugin/master scope: %u\nRejected (out of scope/unresolved): %u", Processed, Allowed, Rejected);
+		}
+
 		static std::string GetBasePluginName(const char* FileName)
 		{
 			std::string Name = FileName ? FileName : "Plugin";
@@ -1520,12 +1720,20 @@ namespace cse
 					ExportRevoiceCSVForActivePlugin(hWnd);
 
 					break;
+				case IDC_MAINMENU_EXPORT_REGIONASSETCSV_ACTIVEPLUGIN:
+					ExportRegionAssetFormsCSV(hWnd);
+
+					break;
 				case IDC_MAINMENU_EXPORT_PLUGINTOJSON:
 					ExportPluginToJSON(hWnd);
 
 					break;
 				case IDC_MAINMENU_IMPORT_JSONTOPLUGIN:
 					ImportJSONToPlugin(hWnd);
+
+					break;
+				case IDC_MAINMENU_IMPORT_REGIONASSETCSV_ACTIVEPLUGIN:
+					ImportRegionAssetFormsCSV(hWnd);
 
 					break;
 				case IDC_MAINMENU_SAVEOPTIONS_CREATEBACKUPBEFORESAVING:
