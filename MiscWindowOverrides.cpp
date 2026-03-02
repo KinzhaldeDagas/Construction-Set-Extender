@@ -12,6 +12,9 @@
 #include "HallOfFame.h"
 #include "FormUndoStack.h"
 #include "[Common]\CLIWrapper.h"
+#include <fstream>
+#include <vector>
+#include <string>
 
 namespace cse
 {
@@ -3041,6 +3044,227 @@ namespace cse
 			return "";
 		}
 
+
+		#define IDC_REGIONOBJ_EXPORTBTN 9401
+		#define IDC_REGIONOBJ_IMPORTBTN 9402
+
+		static std::string EscapeRegionCSVCell(const char* Value)
+		{
+			const char* Source = Value ? Value : "";
+			std::string Out = "\"";
+			for (const char* P = Source; *P; ++P)
+			{
+				if (*P == '"')
+					Out += "\"\"";
+				else if (*P == '\r' || *P == '\n')
+					Out.push_back(' ');
+				else
+					Out.push_back(*P);
+			}
+			Out += "\"";
+			return Out;
+		}
+
+		static bool ParseRegionCSVLine(const std::string& Line, std::vector<std::string>& Out)
+		{
+			Out.clear();
+			std::string Cur;
+			bool InQuotes = false;
+			for (size_t i = 0; i < Line.size(); i++)
+			{
+				char Ch = Line[i];
+				if (InQuotes)
+				{
+					if (Ch == '"')
+					{
+						if (i + 1 < Line.size() && Line[i + 1] == '"')
+						{
+							Cur.push_back('"');
+							i++;
+						}
+						else
+							InQuotes = false;
+					}
+					else
+						Cur.push_back(Ch);
+				}
+				else
+				{
+					if (Ch == ',')
+					{
+						Out.push_back(Cur);
+						Cur.clear();
+					}
+					else if (Ch == '"')
+						InQuotes = true;
+					else
+						Cur.push_back(Ch);
+				}
+			}
+			if (InQuotes)
+				return false;
+			Out.push_back(Cur);
+			return true;
+		}
+
+		static HWND FindFirstListViewChild(HWND Parent)
+		{
+			HWND Child = GetWindow(Parent, GW_CHILD);
+			char ClassName[64] = { 0 };
+			while (Child)
+			{
+				GetClassNameA(Child, ClassName, sizeof(ClassName));
+				if (_stricmp(ClassName, "SysListView32") == 0)
+					return Child;
+				Child = GetWindow(Child, GW_HWNDNEXT);
+			}
+			return nullptr;
+		}
+
+		static std::string BuildRegionObjectsCSVPath(HWND hWnd)
+		{
+			char Title[260] = { 0 };
+			GetWindowTextA(hWnd, Title, sizeof(Title));
+			std::string Base = Title[0] ? Title : "RegionGeneratedObjects";
+			for (char& Ch : Base)
+			{
+				if (Ch == ' ' || Ch == '\\' || Ch == '/' || Ch == ':' || Ch == '*' || Ch == '?' || Ch == '"' || Ch == '<' || Ch == '>' || Ch == '|')
+					Ch = '_';
+			}
+			CreateDirectoryA("Data", nullptr);
+			CreateDirectoryA("Data\\CSVExports", nullptr);
+			CreateDirectoryA("Data\\CSVExports\\Regions", nullptr);
+			return std::string("Data\\CSVExports\\Regions\\") + Base + "_GENERATED_OBJECTS.csv";
+		}
+
+		static bool ExportRegionObjectsListViewCSV(HWND ListView, const std::string& Path)
+		{
+			int ColCount = Header_GetItemCount(ListView_GetHeader(ListView));
+			int RowCount = ListView_GetItemCount(ListView);
+			if (ColCount <= 0)
+				return false;
+
+			std::ofstream Out(Path, std::ios::trunc);
+			if (!Out.good())
+				return false;
+
+			for (int c = 0; c < ColCount; c++)
+			{
+				char HeaderText[256] = { 0 };
+				HDITEMA HeaderItem = { 0 };
+				HeaderItem.mask = HDI_TEXT;
+				HeaderItem.pszText = HeaderText;
+				HeaderItem.cchTextMax = sizeof(HeaderText);
+				Header_GetItemA(ListView_GetHeader(ListView), c, &HeaderItem);
+				Out << EscapeRegionCSVCell(HeaderText);
+				if (c + 1 < ColCount)
+					Out << ',';
+			}
+			Out << "\n";
+
+			for (int r = 0; r < RowCount; r++)
+			{
+				for (int c = 0; c < ColCount; c++)
+				{
+					char Cell[512] = { 0 };
+					ListView_GetItemText(ListView, r, c, Cell, sizeof(Cell));
+					Out << EscapeRegionCSVCell(Cell);
+					if (c + 1 < ColCount)
+						Out << ',';
+				}
+				Out << "\n";
+			}
+
+			Out.flush();
+			return Out.good();
+		}
+
+		static bool ImportRegionObjectsListViewCSV(HWND ListView, const std::string& Path)
+		{
+			std::ifstream In(Path);
+			if (!In.good())
+				return false;
+
+			std::string HeaderLine;
+			if (!std::getline(In, HeaderLine))
+				return false;
+
+			int ColCount = Header_GetItemCount(ListView_GetHeader(ListView));
+			std::vector<std::string> Fields;
+			if (!ParseRegionCSVLine(HeaderLine, Fields) || static_cast<int>(Fields.size()) < ColCount)
+				return false;
+
+			ListView_DeleteAllItems(ListView);
+			std::string Line;
+			while (std::getline(In, Line))
+			{
+				if (Line.empty())
+					continue;
+				if (!ParseRegionCSVLine(Line, Fields))
+					continue;
+				if (Fields.empty())
+					continue;
+
+				LVITEMA Item = { 0 };
+				Item.mask = LVIF_TEXT;
+				Item.iItem = ListView_GetItemCount(ListView);
+				Item.iSubItem = 0;
+				Item.pszText = const_cast<char*>(Fields[0].c_str());
+				int RowIndex = ListView_InsertItemA(ListView, &Item);
+				if (RowIndex < 0)
+					continue;
+
+				for (int c = 1; c < ColCount && c < static_cast<int>(Fields.size()); c++)
+					ListView_SetItemText(ListView, RowIndex, c, const_cast<char*>(Fields[c].c_str()));
+			}
+
+			return true;
+		}
+
+		LRESULT CALLBACK RegionObjectsGeneratedCSVSubClassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
+			bgsee::WindowSubclassProcCollection::SubclassProcExtraParams* SubclassParams)
+		{
+			LRESULT DlgProcResult = FALSE;
+			SubclassParams->Out.MarkMessageAsHandled = false;
+			switch (uMsg)
+			{
+			case WM_INITDIALOG:
+				CreateWindowExA(0, "BUTTON", "Export CSV", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
+					8, 8, 90, 22, hWnd, reinterpret_cast<HMENU>(IDC_REGIONOBJ_EXPORTBTN), *TESCSMain::Instance, nullptr);
+				CreateWindowExA(0, "BUTTON", "Import CSV", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
+					104, 8, 90, 22, hWnd, reinterpret_cast<HMENU>(IDC_REGIONOBJ_IMPORTBTN), *TESCSMain::Instance, nullptr);
+				break;
+			case WM_COMMAND:
+				if (LOWORD(wParam) == IDC_REGIONOBJ_EXPORTBTN || LOWORD(wParam) == IDC_REGIONOBJ_IMPORTBTN)
+				{
+					HWND ListView = FindFirstListViewChild(hWnd);
+					if (!ListView)
+					{
+						BGSEEUI->MsgBoxE("Couldn't find generated objects list in this tab.");
+						break;
+					}
+
+					std::string Path = BuildRegionObjectsCSVPath(hWnd);
+					if (LOWORD(wParam) == IDC_REGIONOBJ_EXPORTBTN)
+					{
+						if (ExportRegionObjectsListViewCSV(ListView, Path))
+							BGSEEUI->MsgBoxI("Generated objects exported to:\n%s", Path.c_str());
+						else
+							BGSEEUI->MsgBoxE("Failed to export generated objects CSV.");
+					}
+					else
+					{
+						if (ImportRegionObjectsListViewCSV(ListView, Path))
+							BGSEEUI->MsgBoxI("Generated objects imported from:\n%s\n\nThe list has been overwritten.", Path.c_str());
+						else
+							BGSEEUI->MsgBoxE("Failed to import generated objects CSV from:\n%s", Path.c_str());
+					}
+				}
+				break;
+			}
+			return DlgProcResult;
+		}
+
 		LRESULT CALLBACK WindowPosDlgSubClassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
 												  bgsee::WindowSubclassProcCollection::SubclassProcExtraParams* SubclassParams)
 		{
@@ -3294,6 +3518,9 @@ namespace cse
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_LeveledItem, LeveledItemFormDlgSubClassProc);
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_LeveledCreature, LeveledItemFormDlgSubClassProc);
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_LeveledSpell, LeveledItemFormDlgSubClassProc);
+
+			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorObjectsData, RegionObjectsGeneratedCSVSubClassProc);
+			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorObjectsExtraData, RegionObjectsGeneratedCSVSubClassProc);
 
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_CellEdit, TESObjectCELLDlgSubClassProc);
 		}
