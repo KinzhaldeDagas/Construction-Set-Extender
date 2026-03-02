@@ -14,6 +14,7 @@
 #include "[Common]\CLIWrapper.h"
 #include <fstream>
 #include <algorithm>
+#include <set>
 #include <vector>
 #include <string>
 
@@ -3223,24 +3224,39 @@ namespace cse
 
 		static std::string BuildRegionObjectsCSVPath(HWND hWnd)
 		{
-			char Title[260] = { 0 };
-			GetWindowTextA(hWnd, Title, sizeof(Title));
-			std::string Base = Title[0] ? Title : "RegionGeneratedObjects";
-			for (char& Ch : Base)
-			{
-				if (Ch == ' ' || Ch == '\\' || Ch == '/' || Ch == ':' || Ch == '*' || Ch == '?' || Ch == '"' || Ch == '<' || Ch == '>' || Ch == '|')
-					Ch = '_';
-			}
-
-			std::string Suffix = "GENERATED_OBJECTS";
 			const int TemplateID = GetDlgCtrlID(hWnd);
-			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorSoundData)
-				Suffix = "SOUNDS";
+			std::string FileName = "RegionEditor_Objects.csv";
+			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsExtraData)
+				FileName = "RegionEditor_Objectsmore.csv";
+			else if (TemplateID == TESDialog::kDialogTemplate_RegionEditorSoundData)
+				FileName = "RegionEditor_Sound.csv";
 
 			CreateDirectoryA("Data", nullptr);
 			CreateDirectoryA("Data\\CSVExports", nullptr);
 			CreateDirectoryA("Data\\CSVExports\\Regions", nullptr);
-			return std::string("Data\\CSVExports\\Regions\\") + Base + "_" + Suffix + ".csv";
+			return std::string("Data\\CSVExports\\Regions\\") + FileName;
+		}
+
+		static std::string NormalizeRegionCSVHeader(const char* HeaderText, int ColumnIndex)
+		{
+			std::string Result;
+			if (HeaderText)
+			{
+				for (const unsigned char* It = reinterpret_cast<const unsigned char*>(HeaderText); *It; ++It)
+				{
+					if (isalnum(*It))
+						Result.push_back(static_cast<char>(*It));
+				}
+			}
+
+			if (Result.empty())
+			{
+				char Fallback[32] = { 0 };
+				FORMAT_STR(Fallback, "Column%d", ColumnIndex + 1);
+				Result = Fallback;
+			}
+
+			return Result;
 		}
 
 		static bool ExportRegionObjectsListViewCSV(HWND ListView, const std::string& Path)
@@ -3254,6 +3270,7 @@ namespace cse
 			if (!Out.good())
 				return false;
 
+			std::set<std::string> SeenHeaders;
 			for (int c = 0; c < ColCount; c++)
 			{
 				char HeaderText[256] = { 0 };
@@ -3262,7 +3279,17 @@ namespace cse
 				HeaderItem.pszText = HeaderText;
 				HeaderItem.cchTextMax = sizeof(HeaderText);
 				Header_GetItem(ListView_GetHeader(ListView), c, &HeaderItem);
-				Out << EscapeRegionCSVCell(HeaderText);
+
+				std::string NormalizedHeader = NormalizeRegionCSVHeader(HeaderText, c);
+				if (SeenHeaders.find(NormalizedHeader) != SeenHeaders.end())
+				{
+					char UniqueHeader[300] = { 0 };
+					FORMAT_STR(UniqueHeader, "%s%d", NormalizedHeader.c_str(), c + 1);
+					NormalizedHeader = UniqueHeader;
+				}
+				SeenHeaders.insert(NormalizedHeader);
+
+				Out << EscapeRegionCSVCell(NormalizedHeader.c_str());
 				if (c + 1 < ColCount)
 					Out << ',';
 			}
