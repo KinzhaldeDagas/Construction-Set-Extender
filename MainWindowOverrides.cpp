@@ -545,6 +545,22 @@ namespace cse
 			std::vector<TESFile*> AllowedFiles;
 			CollectActivePluginAndMasters(AllowedFiles);
 
+			const bool IncludeOblivionMaster = BGSEEUI->MsgBoxI(hWnd,
+				MB_YESNO,
+				"Do you want to include Oblivion.esm?\n\n"
+				"Yes = include Oblivion.esm rows\n"
+				"No = exclude Oblivion.esm rows") == IDYES;
+
+			if (IncludeOblivionMaster == false)
+			{
+				AllowedFiles.erase(
+					std::remove_if(AllowedFiles.begin(), AllowedFiles.end(), [](TESFile* File)
+					{
+						return File && _stricmp(File->fileName, "Oblivion.esm") == 0;
+					}),
+					AllowedFiles.end());
+			}
+
 			std::vector<RegionAssetExportRow> Rows;
 			Rows.reserve(1024);
 			std::set<UInt32> SeenFormIDs;
