@@ -3109,6 +3109,9 @@ namespace cse
 
 		static HWND FindFirstListViewChild(HWND Parent)
 		{
+			if (Parent == nullptr)
+				return nullptr;
+
 			HWND Child = GetWindow(Parent, GW_CHILD);
 			char ClassName[64] = { 0 };
 			while (Child)
@@ -3116,8 +3119,14 @@ namespace cse
 				GetClassNameA(Child, ClassName, sizeof(ClassName));
 				if (_stricmp(ClassName, "SysListView32") == 0)
 					return Child;
+
+				HWND Nested = FindFirstListViewChild(Child);
+				if (Nested)
+					return Nested;
+
 				Child = GetWindow(Child, GW_HWNDNEXT);
 			}
+
 			return nullptr;
 		}
 
@@ -3289,28 +3298,13 @@ namespace cse
 			{
 				const int TemplateID = GetDlgCtrlID(hWnd);
 				HWND EnableToggle = FindChildButtonByText(hWnd, "Enable this type of data");
-				HWND OverrideToggle = FindChildButtonByText(hWnd, "Override");
 				HWND CopyObjectsButton = FindChildButtonByText(hWnd, "Copy Objects From Other Region");
 
-				RECT EnableRect = { 0 }, OverrideRect = { 0 };
+				RECT EnableRect = { 0 };
 				if (EnableToggle)
 					GetWindowRect(EnableToggle, &EnableRect);
-				if (OverrideToggle)
-					GetWindowRect(OverrideToggle, &OverrideRect);
 				MapWindowPoints(nullptr, hWnd, reinterpret_cast<LPPOINT>(&EnableRect), 2);
-				MapWindowPoints(nullptr, hWnd, reinterpret_cast<LPPOINT>(&OverrideRect), 2);
 
-				if (TemplateID == TESDialog::kDialogTemplate_RegionEditorSoundData && EnableToggle && OverrideToggle)
-				{
-					SetWindowPos(EnableToggle, nullptr,
-						OverrideRect.right + 8,
-						EnableRect.top,
-						0,
-						0,
-						SWP_NOZORDER | SWP_NOSIZE);
-					GetWindowRect(EnableToggle, &EnableRect);
-					MapWindowPoints(nullptr, hWnd, reinterpret_cast<LPPOINT>(&EnableRect), 2);
-				}
 
 				HFONT ButtonFont = nullptr;
 				if (CopyObjectsButton)
