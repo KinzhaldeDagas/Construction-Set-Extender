@@ -18,6 +18,7 @@
 #include <cctype>
 #include <fstream>
 #include <iterator>
+#include <map>
 #include <set>
 #include <vector>
 
@@ -397,7 +398,7 @@ namespace cse
 				BaseName.erase(LastDot);
 			if (BaseName.empty())
 				BaseName = "ActivePlugin";
-			return std::string("Data\\region_assets_") + BaseName + ".csv";
+			return std::string("Data\\CSVExports\\Regions\\region_assets_") + BaseName + ".csv";
 		}
 
 		struct RegionAssetExportRow
@@ -418,6 +419,36 @@ namespace cse
 				FormType == TESForm::kFormType_Static;
 		}
 
+		static bool StringContainsCaseInsensitive(const char* Haystack, const char* Needle)
+		{
+			if (Haystack == nullptr || Needle == nullptr || Needle[0] == 0)
+				return false;
+
+			std::string UpperHaystack(Haystack);
+			std::string UpperNeedle(Needle);
+			std::transform(UpperHaystack.begin(), UpperHaystack.end(), UpperHaystack.begin(), [](unsigned char Ch) { return static_cast<char>(toupper(Ch)); });
+			std::transform(UpperNeedle.begin(), UpperNeedle.end(), UpperNeedle.begin(), [](unsigned char Ch) { return static_cast<char>(toupper(Ch)); });
+
+			return UpperHaystack.find(UpperNeedle) != std::string::npos;
+		}
+
+		static bool IsRockStaticForm(TESForm* Form)
+		{
+			if (Form == nullptr || Form->formType != TESForm::kFormType_Static)
+				return false;
+
+			TESObjectSTAT* StaticForm = CS_CAST(Form, TESForm, TESObjectSTAT);
+			if (StaticForm == nullptr)
+				return false;
+
+			const char* ModelPath = StaticForm->modelPath.c_str();
+			const char* EditorID = Form->GetEditorID();
+			return StringContainsCaseInsensitive(ModelPath, "\\ROCKS\\") ||
+				StringContainsCaseInsensitive(ModelPath, "/ROCKS/") ||
+				StringContainsCaseInsensitive(ModelPath, "ROCK") ||
+				StringContainsCaseInsensitive(EditorID, "ROCK");
+		}
+
 		static bool TryBuildRegionAssetExportRow(TESForm* Form,
 			const std::vector<TESFile*>& AllowedFiles,
 			std::set<UInt32>& SeenFormIDs,
@@ -431,6 +462,12 @@ namespace cse
 				return false;
 
 			if (IsExportableRegionAssetFormType(Form->formType) == false)
+			{
+				SkippedUnsupported++;
+				return false;
+			}
+
+			if (Form->formType == TESForm::kFormType_Static && IsRockStaticForm(Form) == false)
 			{
 				SkippedUnsupported++;
 				return false;
@@ -458,7 +495,7 @@ namespace cse
 			char FormID[16] = { 0 };
 			FORMAT_STR(FormID, "%08X", Form->formID);
 
-			OutRow.FormType = TESForm::GetFormTypeIDLongName(Form->formType);
+			OutRow.FormType = (Form->formType == TESForm::kFormType_Static) ? "Rock" : TESForm::GetFormTypeIDLongName(Form->formType);
 			OutRow.FormIDHex = FormID;
 			OutRow.EditorID = Form->GetEditorID() ? Form->GetEditorID() : "";
 			OutRow.Plugin = Source->fileName;
@@ -507,6 +544,22 @@ namespace cse
 
 			std::vector<TESFile*> AllowedFiles;
 			CollectActivePluginAndMasters(AllowedFiles);
+
+			const bool IncludeOblivionMaster = BGSEEUI->MsgBoxI(hWnd,
+				MB_YESNO,
+				"Do you want to include Oblivion.esm?\n\n"
+				"Yes = include Oblivion.esm rows\n"
+				"No = exclude Oblivion.esm rows") == IDYES;
+
+			if (IncludeOblivionMaster == false)
+			{
+				AllowedFiles.erase(
+					std::remove_if(AllowedFiles.begin(), AllowedFiles.end(), [](TESFile* File)
+					{
+						return File && _stricmp(File->fileName, "Oblivion.esm") == 0;
+					}),
+					AllowedFiles.end());
+			}
 
 			std::vector<RegionAssetExportRow> Rows;
 			Rows.reserve(1024);
@@ -560,42 +613,89 @@ namespace cse
 				return Left.FormIDValue < Right.FormIDValue;
 			});
 
-			std::ofstream Out(FilePath, std::ios::trunc);
-			if (!Out.good())
-			{
-				BGSEEUI->MsgBoxE("Couldn't open output CSV:\n%s", FilePath.c_str());
-				return;
-			}
+			CreateDirectoryA("Data", nullptr);
+			CreateDirectoryA("Data\\CSVExports", nullptr);
+			CreateDirectoryA("Data\\CSVExports\\Regions", nullptr);
 
-			Out << "Schema,FormType,FormID,EditorID,Plugin\n";
-			for (const auto& Row : Rows)
-			{
-				Out << "region-assets-v1," << EscapeCSVField(Row.FormType.c_str()) << ","
-					<< EscapeCSVField(Row.FormIDHex.c_str()) << ","
-					<< EscapeCSVField(Row.EditorID.c_str()) << ","
-					<< EscapeCSVField(Row.Plugin.c_str()) << "\n";
-			}
+			const bool SplitByType = BGSEEUI->MsgBoxI(hWnd,
+				MB_YESNO,
+				"Do you want to split CSVs?\n\n"
+				"Yes = create FILENAME_FLORA.csv, FILENAME_TREE.csv etc\n"
+				"No = create one combined CSV") == IDYES;
 
-			Out.flush();
-			if (!Out.good())
-			{
-				BGSEEUI->MsgBoxE("Error while writing region asset CSV:\n%s", FilePath.c_str());
-				return;
-			}
+			size_t LastSlash = FilePath.find_last_of("\\/");
+			std::string FileNameOnly = LastSlash == std::string::npos ? FilePath : FilePath.substr(LastSlash + 1);
+			size_t LastDot = FileNameOnly.find_last_of('.');
+			std::string BaseName = LastDot == std::string::npos ? FileNameOnly : FileNameOnly.substr(0, LastDot);
+			if (BaseName.empty())
+				BaseName = "region_assets";
 
-			BGSEEUI->MsgBoxI("Region asset export complete.\n"
-				"Rows exported: %u\n"
-				"Skipped duplicates: %u\n"
-				"Skipped unsupported types: %u\n"
-				"Skipped out-of-scope: %u\n"
-				"Skipped unresolved source plugin: %u\n"
-				"Path: %s",
-				static_cast<UInt32>(Rows.size()),
-				SkippedDuplicate,
-				SkippedUnsupported,
-				SkippedScope,
-				SkippedNoSource,
-				FilePath.c_str());
+			auto WriteRows = [](const std::string& Path, const std::vector<RegionAssetExportRow>& SourceRows) -> bool
+			{
+				std::ofstream Out(Path, std::ios::trunc);
+				if (!Out.good())
+					return false;
+
+				Out << "Schema,FormType,FormID,EditorID,Plugin\n";
+				for (const auto& Row : SourceRows)
+				{
+					Out << "region-assets-v1," << EscapeCSVField(Row.FormType.c_str()) << ","
+						<< EscapeCSVField(Row.FormIDHex.c_str()) << ","
+						<< EscapeCSVField(Row.EditorID.c_str()) << ","
+						<< EscapeCSVField(Row.Plugin.c_str()) << "\n";
+				}
+
+				Out.flush();
+				return Out.good();
+			};
+
+			const std::string OutputDir = "Data\\CSVExports\\Regions";
+			if (SplitByType)
+			{
+				std::map<std::string, std::vector<RegionAssetExportRow>> Buckets;
+				for (const auto& Row : Rows)
+				{
+					std::string TypeToken = "OTHER";
+					if (_stricmp(Row.FormType.c_str(), "Flora") == 0) TypeToken = "FLORA";
+					else if (_stricmp(Row.FormType.c_str(), "Tree") == 0) TypeToken = "TREE";
+					else if (_stricmp(Row.FormType.c_str(), "Grass") == 0) TypeToken = "GRASS";
+					else if (_stricmp(Row.FormType.c_str(), "LandTexture") == 0) TypeToken = "LANDTEXTURE";
+					else if (_stricmp(Row.FormType.c_str(), "Rock") == 0) TypeToken = "ROCK";
+					Buckets[TypeToken].push_back(Row);
+				}
+
+				UInt32 WrittenFiles = 0;
+				for (auto& Bucket : Buckets)
+				{
+					if (Bucket.second.empty())
+						continue;
+					std::string SplitPath = OutputDir + "\\" + BaseName + "_" + Bucket.first + ".csv";
+					if (WriteRows(SplitPath, Bucket.second) == false)
+					{
+						BGSEEUI->MsgBoxE("Couldn't write split CSV:\n%s", SplitPath.c_str());
+						return;
+					}
+					WrittenFiles++;
+				}
+
+				BGSEEUI->MsgBoxI("Region asset export complete (split mode).\nRows exported: %u\nFiles written: %u\nFolder: %s",
+					static_cast<UInt32>(Rows.size()),
+					WrittenFiles,
+					OutputDir.c_str());
+			}
+			else
+			{
+				std::string CombinedPath = OutputDir + "\\" + BaseName + ".csv";
+				if (WriteRows(CombinedPath, Rows) == false)
+				{
+					BGSEEUI->MsgBoxE("Couldn't open output CSV:\n%s", CombinedPath.c_str());
+					return;
+				}
+
+				BGSEEUI->MsgBoxI("Region asset export complete.\nRows exported: %u\nPath: %s",
+					static_cast<UInt32>(Rows.size()),
+					CombinedPath.c_str());
+			}
 		}
 
 
@@ -682,7 +782,8 @@ namespace cse
 				_stricmp(FormType.c_str(), "Flora") == 0 ||
 				_stricmp(FormType.c_str(), "Grass") == 0 ||
 				_stricmp(FormType.c_str(), "LandTexture") == 0 ||
-				_stricmp(FormType.c_str(), "Static") == 0;
+				_stricmp(FormType.c_str(), "Static") == 0 ||
+				_stricmp(FormType.c_str(), "Rock") == 0;
 		}
 
 		static bool IsSupportedRegionAssetFormType(UInt8 FormType)
@@ -848,11 +949,23 @@ namespace cse
 					continue;
 				}
 
-				const char* ActualTypeName = TESForm::GetFormTypeIDLongName(Form->formType);
-				if (EqualsCI(ActualTypeName, TypeToken.c_str()) == false)
+				const bool TokenIsRock = _stricmp(TypeToken.c_str(), "Rock") == 0;
+				if (TokenIsRock)
 				{
-					RejectedTypeMismatch++;
-					continue;
+					if (Form->formType != TESForm::kFormType_Static || IsRockStaticForm(Form) == false)
+					{
+						RejectedTypeMismatch++;
+						continue;
+					}
+				}
+				else
+				{
+					const char* ActualTypeName = TESForm::GetFormTypeIDLongName(Form->formType);
+					if (EqualsCI(ActualTypeName, TypeToken.c_str()) == false)
+					{
+						RejectedTypeMismatch++;
+						continue;
+					}
 				}
 
 				if (SeenFormIDs.insert(Form->formID).second == false)
