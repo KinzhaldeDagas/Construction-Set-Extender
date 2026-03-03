@@ -8,9 +8,21 @@ New Features [TESTED]
 
 -Organized the [View] drop down menu into catorgries "i forgot what they were as of writing so expect that later" each catorgory is opens another dropdown menu and they're named after their use case.
 
+-Viewports, Object and Cell Windows all snap into the construction set frame on startup, so Object is top left, cell is bottom left under object and the entire right half is the render window the console floats on top and is not snapped.
+
+-Region Editor added Export/Import to CSV for Objects, Object (more) and Sound tabs buttons, only Sound tab export has been tested and works the other tabs Exporting is broken.
+
+-Decoded some more region editor stuff
+
+-Region Editor Dump toggle to dump whats going on during interaction (helped with decoding some stuff) disabled in build now.
+
 [UNTESTED STUFF] will change...
 
 -JSON to Plugin but will probably not finish this, but it would make merges easier and github intergration...
+
+-Region Editor and exporting Object, Object (more) tabs and importing to overwrite.
+
+-Region Editor Sound tab import to overwrite.
 
 
 
