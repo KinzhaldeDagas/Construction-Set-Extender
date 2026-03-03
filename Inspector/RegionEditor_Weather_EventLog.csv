@@ -1,5 +1,0 @@
-Timestamp,TemplateID,TabName,ControlID,ClassName,Caption,SemanticLabel,NotifyCode,BeforeValue,AfterValue
-"2026-03-03 00:40:50.051",251,"Weather",2028,"Edit","","Priority:",1024,"",""
-"2026-03-03 00:40:50.067",251,"Weather",2028,"Edit","","Priority:",768,"",""
-"2026-03-03 00:40:50.084",251,"Weather",2028,"Edit","50","Priority:",1024,"","50"
-"2026-03-03 00:40:50.089",251,"Weather",2028,"Edit","50","Priority:",768,"50","50"
