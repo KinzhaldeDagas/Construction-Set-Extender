@@ -1,0 +1,9 @@
+TabTemplateID,TabName,ControlID,ClassName,Caption,StyleHex,ExStyleHex,Left,Top,Width,Height,ParentControlID,TabOrder,SemanticLabel
+256,"Map",2023,"Button","Enable this type of data","50010003","00000004",11,13,140,16,0,1,"Priority:"
+256,"Map",-1,"Static","Priority:","50020000","00000004",374,13,38,13,0,2,"Priority:"
+256,"Map",2025,"Edit","50","50010080","00000204",419,11,31,20,0,3,"Priority:"
+256,"Map",2026,"msctls_updown32","","50000036","00000004",448,11,18,20,0,4,"Priority:"
+256,"Map",2027,"Button","Override","50010003","00000004",510,13,66,16,0,5,"Priority:"
+256,"Map",-1,"Static","Map Name","50020000","00000004",11,57,51,13,0,6,"Map Name"
+256,"Map",2024,"Edit","Default Region Name","50010080","00000204",86,54,303,24,0,7,"Map Name"
+256,"Map",9403,"Button","Dump Control Map","50010001","00000000",11,13,118,22,0,8,"Priority:"

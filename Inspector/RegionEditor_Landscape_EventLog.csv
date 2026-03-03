@@ -1,0 +1,6 @@
+Timestamp,TemplateID,TabName,ControlID,ClassName,Caption,SemanticLabel,NotifyCode,BeforeValue,AfterValue
+"2026-03-03 00:40:58.510",3214,"Landscape",2025,"Edit","","Priority:",1024,"",""
+"2026-03-03 00:40:58.528",3214,"Landscape",2025,"Edit","","Priority:",768,"",""
+"2026-03-03 00:40:58.537",3214,"Landscape",2024,"Edit","","Map Name",1024,"",""
+"2026-03-03 00:40:58.542",3214,"Landscape",2024,"Edit","","Map Name",768,"",""
+"2026-03-03 00:40:59.723",3214,"Landscape",2117,"Button","Enable this type of data","Priority:",0,"Unchecked","Checked"
