@@ -1,9 +1,0 @@
-Timestamp,TemplateID,TabName,ControlID,ClassName,Caption,SemanticLabel,NotifyCode,BeforeValue,AfterValue
-"2026-03-03 00:13:58.912",0,"Unknown",2025,"Edit","","Priority:",1024,"",""
-"2026-03-03 00:13:58.935",0,"Unknown",2025,"Edit","","Priority:",768,"",""
-"2026-03-03 00:13:58.945",0,"Unknown",2024,"Edit","","Map Name",1024,"",""
-"2026-03-03 00:13:58.951",0,"Unknown",2024,"Edit","","Map Name",768,"",""
-"2026-03-03 00:13:58.973",0,"Unknown",2028,"Edit","50","Priority:",1024,"","50"
-"2026-03-03 00:13:58.981",0,"Unknown",2028,"Edit","50","Priority:",768,"50","50"
-"2026-03-03 00:14:00.668",0,"Unknown",2028,"Edit","","Priority:",1024,"",""
-"2026-03-03 00:14:00.687",0,"Unknown",2028,"Edit","","Priority:",768,"",""
