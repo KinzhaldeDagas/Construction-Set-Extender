@@ -1,7 +1,0 @@
-TabTemplateID,TabName,ControlID,ClassName,Caption,StyleHex,ExStyleHex,Left,Top,Width,Height,ParentControlID,TabOrder,SemanticLabel
-3214,"Landscape",2117,"Button","Enable this type of data","50010003","00000004",11,13,140,16,0,1,"Priority:"
-3214,"Landscape",-1,"Static","Priority:","50020000","00000004",374,13,38,13,0,2,"Priority:"
-3214,"Landscape",2118,"Edit","0","50010080","00000204",419,11,31,20,0,3,"Priority:"
-3214,"Landscape",2119,"msctls_updown32","","50000036","00000004",448,11,18,20,0,4,"Priority:"
-3214,"Landscape",2120,"Button","Override","50010003","00000004",510,13,66,16,0,5,"Priority:"
-3214,"Landscape",9403,"Button","Dump Control Map","50010000","00000000",11,13,118,22,0,6,"Priority:"
