@@ -4232,6 +4232,30 @@ namespace cse
 			UpdateWindow(Parent);
 		}
 
+		static void FlushRegionEditorSelectionChange(HWND Dialog, HWND ListView)
+		{
+			if (Dialog == nullptr && ListView == nullptr)
+				return;
+
+			// Region Editor list content refresh is not always synchronous with CBN_SELCHANGE.
+			for (int i = 0; i < 6; i++)
+			{
+				MSG Message = { 0 };
+				while (PeekMessageA(&Message, nullptr, 0, 0, PM_REMOVE))
+				{
+					TranslateMessage(&Message);
+					DispatchMessageA(&Message);
+				}
+
+				if (ListView)
+					UpdateWindow(ListView);
+				if (Dialog)
+					UpdateWindow(Dialog);
+
+				Sleep(10);
+			}
+		}
+
 		static bool ExportRegionObjectsDataRowsCSV(HWND hWnd, HWND ListView, std::ofstream& Out, const std::string& RegionName)
 		{
 			struct FieldDef
@@ -4316,6 +4340,7 @@ namespace cse
 				if (ComboBox_SetCurSel(RegionCombo, i) == CB_ERR)
 					continue;
 				NotifyComboSelectionChange(RegionCombo);
+				FlushRegionEditorSelectionChange(hWnd, ListView);
 
 				char RegionName[512] = { 0 };
 				ComboBox_GetLBText(RegionCombo, i, RegionName);
@@ -4328,6 +4353,7 @@ namespace cse
 			{
 				ComboBox_SetCurSel(RegionCombo, OriginalSelection);
 				NotifyComboSelectionChange(RegionCombo);
+				FlushRegionEditorSelectionChange(hWnd, ListView);
 			}
 
 			return true;
@@ -4336,7 +4362,6 @@ namespace cse
 		static bool ExportRegionObjectsListViewCSV(HWND hWnd, HWND ListView, const std::string& Path, bool ExportAllRegions)
 		{
 			int ColCount = Header_GetItemCount(ListView_GetHeader(ListView));
-			int RowCount = ListView_GetItemCount(ListView);
 			if (ColCount <= 0)
 				return false;
 
@@ -4387,24 +4412,70 @@ namespace cse
 			}
 			Out << "\n";
 
-			const std::string RegionName = ResolveRegionEditorName(hWnd);
-			for (int r = 0; r < RowCount; r++)
+			auto WriteCurrentRows = [&](const std::string& RegionName)
 			{
-				if (UseStrictSchemaHeaders)
+				const int LocalRowCount = ListView_GetItemCount(ListView);
+				for (int r = 0; r < LocalRowCount; r++)
 				{
-					Out << EscapeRegionCSVCell(RegionName.c_str());
-					if (ColCount > 0)
-						Out << ',';
+					if (UseStrictSchemaHeaders)
+					{
+						Out << EscapeRegionCSVCell(RegionName.c_str());
+						if (ColCount > 0)
+							Out << ',';
+					}
+					for (int c = 0; c < ColCount; c++)
+					{
+						char Cell[512] = { 0 };
+						ListView_GetItemText(ListView, r, c, Cell, sizeof(Cell));
+						Out << EscapeRegionCSVCell(Cell);
+						if (c + 1 < ColCount)
+							Out << ',';
+					}
+					Out << "\n";
 				}
-				for (int c = 0; c < ColCount; c++)
+
+				return Out.good();
+			};
+
+			if (!UseStrictSchemaHeaders || ExportAllRegions == false)
+			{
+				const std::string RegionName = ResolveRegionEditorName(hWnd);
+				if (!WriteCurrentRows(RegionName))
+					return false;
+			}
+			else
+			{
+				HWND RegionCombo = FindBestRegionSelectionCombo(hWnd);
+				if (RegionCombo == nullptr)
 				{
-					char Cell[512] = { 0 };
-					ListView_GetItemText(ListView, r, c, Cell, sizeof(Cell));
-					Out << EscapeRegionCSVCell(Cell);
-					if (c + 1 < ColCount)
-						Out << ',';
+					if (!WriteCurrentRows(ResolveRegionEditorName(hWnd)))
+						return false;
 				}
-				Out << "\n";
+				else
+				{
+					const int OriginalSelection = ComboBox_GetCurSel(RegionCombo);
+					const int RegionCount = ComboBox_GetCount(RegionCombo);
+					for (int i = 0; i < RegionCount; i++)
+					{
+						if (ComboBox_SetCurSel(RegionCombo, i) == CB_ERR)
+							continue;
+						NotifyComboSelectionChange(RegionCombo);
+						FlushRegionEditorSelectionChange(hWnd, ListView);
+
+						char RegionName[512] = { 0 };
+						ComboBox_GetLBText(RegionCombo, i, RegionName);
+						std::string RegionValue = RegionName[0] ? RegionName : ResolveRegionEditorName(hWnd);
+						if (!WriteCurrentRows(RegionValue))
+							break;
+					}
+
+					if (OriginalSelection >= 0)
+					{
+						ComboBox_SetCurSel(RegionCombo, OriginalSelection);
+						NotifyComboSelectionChange(RegionCombo);
+						FlushRegionEditorSelectionChange(hWnd, ListView);
+					}
+				}
 			}
 
 			Out.flush();
