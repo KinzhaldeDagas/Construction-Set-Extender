@@ -2417,7 +2417,111 @@ namespace cse
 			return DlgProcResult;
 		}
 
+
+		static bool IsBottomDockLikeChildWindow(HWND hWnd)
+		{
+			if (hWnd == nullptr || IsWindowVisible(hWnd) == FALSE)
+				return false;
+
+			char ClassName[64] = { 0 };
+			GetClassNameA(hWnd, ClassName, sizeof(ClassName));
+			return _stricmp(ClassName, "msctls_statusbar32") == 0 ||
+				_stricmp(ClassName, "msctls_progress32") == 0 ||
+				_stricmp(ClassName, "ToolbarWindow32") == 0;
+		}
+
+		static bool TryGetMainWindowViewportLayoutRect(HWND MainWindow, RECT& OutRect)
+		{
+			if (MainWindow == nullptr || IsWindow(MainWindow) == FALSE)
+				return false;
+
+			if (GetClientRect(MainWindow, &OutRect) == FALSE)
+				return false;
+
+			if (*TESCSMain::MainToolbarHandle && IsWindowVisible(*TESCSMain::MainToolbarHandle))
+			{
+				RECT ToolbarRect = { 0 };
+				if (GetWindowRect(*TESCSMain::MainToolbarHandle, &ToolbarRect))
+				{
+					MapWindowPoints(nullptr, MainWindow, reinterpret_cast<LPPOINT>(&ToolbarRect), 2);
+					OutRect.top = std::max<LONG>(OutRect.top, ToolbarRect.bottom);
+				}
+			}
+
+			LONG BottomDockTop = OutRect.bottom;
+			for (HWND Child = GetWindow(MainWindow, GW_CHILD); Child; Child = GetWindow(Child, GW_HWNDNEXT))
+			{
+				if (IsBottomDockLikeChildWindow(Child) == false)
+					continue;
+
+				if (Child == *TESCSMain::MainToolbarHandle || Child == *TESObjectWindow::WindowHandle ||
+					Child == *TESCellViewWindow::WindowHandle || Child == *TESRenderWindow::WindowHandle)
+				{
+					continue;
+				}
+
+				RECT ChildRect = { 0 };
+				if (GetWindowRect(Child, &ChildRect) == FALSE)
+					continue;
+
+				MapWindowPoints(nullptr, MainWindow, reinterpret_cast<LPPOINT>(&ChildRect), 2);
+				if (ChildRect.top >= (OutRect.bottom / 2))
+					BottomDockTop = std::min(BottomDockTop, ChildRect.top);
+			}
+
+			OutRect.bottom = std::max<LONG>(OutRect.top + 120, BottomDockTop);
+			return (OutRect.right - OutRect.left) > 300 && (OutRect.bottom - OutRect.top) > 250;
+		}
+
+		static void AutoSnapMainViewports(HWND MainWindow)
+		{
+			if (MainWindow == nullptr || IsWindow(MainWindow) == FALSE)
+				return;
+
+			HWND ObjectWindow = *TESObjectWindow::WindowHandle;
+			HWND CellViewWindow = *TESCellViewWindow::WindowHandle;
+			HWND RenderWindow = *TESRenderWindow::WindowHandle;
+			if (ObjectWindow == nullptr || CellViewWindow == nullptr || RenderWindow == nullptr)
+				return;
+
+			if (IsWindowVisible(ObjectWindow) == FALSE || IsWindowVisible(CellViewWindow) == FALSE || IsWindowVisible(RenderWindow) == FALSE)
+				return;
+
+			RECT LayoutRect = { 0 };
+			if (TryGetMainWindowViewportLayoutRect(MainWindow, LayoutRect) == false)
+				return;
+
+			const int LayoutWidth = std::max<LONG>(0, LayoutRect.right - LayoutRect.left);
+			const int LayoutHeight = std::max<LONG>(0, LayoutRect.bottom - LayoutRect.top);
+			const int LeftColumnWidth = std::max(320, std::min(720, (LayoutWidth * 36) / 100));
+			const int RightColumnWidth = std::max(320, LayoutWidth - LeftColumnWidth);
+			const int ObjectHeight = std::max(220, (LayoutHeight * 66) / 100);
+			const int CellHeight = std::max(160, LayoutHeight - ObjectHeight);
+
+			SetWindowPos(ObjectWindow, nullptr,
+				LayoutRect.left,
+				LayoutRect.top,
+				LeftColumnWidth,
+				std::max(220, ObjectHeight),
+				SWP_NOZORDER | SWP_NOACTIVATE);
+
+			SetWindowPos(CellViewWindow, nullptr,
+				LayoutRect.left,
+				LayoutRect.top + std::max(220, ObjectHeight),
+				LeftColumnWidth,
+				std::max(160, CellHeight),
+				SWP_NOZORDER | SWP_NOACTIVATE);
+
+			SetWindowPos(RenderWindow, nullptr,
+				LayoutRect.left + LeftColumnWidth,
+				LayoutRect.top,
+				RightColumnWidth,
+				LayoutHeight,
+				SWP_NOZORDER | SWP_NOACTIVATE);
+		}
+
 #define ID_PATHGRIDTOOLBARBUTTION_TIMERID		0x99
+#define ID_AUTOSNAPVIEWPORTS_TIMERID		0x9A
 
 		LRESULT CALLBACK MainWindowMiscSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
 													bgsee::WindowSubclassProcCollection::SubclassProcExtraParams* SubclassParams)
@@ -2436,6 +2540,7 @@ namespace cse
 			case WM_MAINWINDOW_INIT_DIALOG:
 				{
 					SetTimer(hWnd, ID_PATHGRIDTOOLBARBUTTION_TIMERID, 500, nullptr);
+					SetTimer(hWnd, ID_AUTOSNAPVIEWPORTS_TIMERID, 750, nullptr);
 					SubclassParams->Out.MarkMessageAsHandled = true;
 				}
 
@@ -2443,6 +2548,7 @@ namespace cse
 			case WM_DESTROY:
 				{
 					KillTimer(hWnd, ID_PATHGRIDTOOLBARBUTTION_TIMERID);
+					KillTimer(hWnd, ID_AUTOSNAPVIEWPORTS_TIMERID);
 
 					MainWindowMiscData* xData = BGSEE_GETWINDOWXDATA(MainWindowMiscData, SubclassParams->In.ExtraData);
 					if (xData)
@@ -2489,6 +2595,9 @@ namespace cse
 				}
 
 				break;
+			case WM_SIZE:
+				AutoSnapMainViewports(hWnd);
+				break;
 			case WM_TIMER:
 				DlgProcResult = TRUE;
 				SubclassParams->Out.MarkMessageAsHandled = true;
@@ -2499,6 +2608,11 @@ namespace cse
 					// autosave timer, needs to be handled here as the org wndproc doesn't compare the timerID
 					if (*TESCSMain::AllowAutoSaveFlag != 0 && *TESCSMain::ExittingCSFlag == 0)
 						TESCSMain::AutoSave();
+
+					break;
+				case ID_AUTOSNAPVIEWPORTS_TIMERID:
+					AutoSnapMainViewports(hWnd);
+					KillTimer(hWnd, ID_AUTOSNAPVIEWPORTS_TIMERID);
 
 					break;
 				case ID_PATHGRIDTOOLBARBUTTION_TIMERID:
