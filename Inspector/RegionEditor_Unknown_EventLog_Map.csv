@@ -1,0 +1,10 @@
+Timestamp,TemplateID,TabName,ControlID,ClassName,Caption,SemanticLabel,NotifyCode,BeforeValue,AfterValue
+"2026-03-03 00:12:47.723",0,"Unknown",2023,"Button","Enable this type of data","Priority:",0,"Checked","Unchecked"
+"2026-03-03 00:12:47.744",0,"Unknown",2025,"Edit","","Priority:",1024,"50",""
+"2026-03-03 00:12:47.749",0,"Unknown",2025,"Edit","","Priority:",768,"",""
+"2026-03-03 00:12:47.762",0,"Unknown",2024,"Edit","","Map Name",1024,"The Great Forest",""
+"2026-03-03 00:12:47.766",0,"Unknown",2024,"Edit","","Map Name",768,"",""
+"2026-03-03 00:12:47.775",0,"Unknown",2025,"Edit","50","Priority:",1024,"","50"
+"2026-03-03 00:12:47.789",0,"Unknown",2025,"Edit","50","Priority:",768,"50","50"
+"2026-03-03 00:12:47.799",0,"Unknown",2024,"Edit","Default Region Name","Map Name",1024,"","Default Region Name"
+"2026-03-03 00:12:47.799",0,"Unknown",2024,"Edit","Default Region Name","Map Name",768,"Default Region Name","Default Region Name"
