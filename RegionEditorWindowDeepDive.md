@@ -173,4 +173,37 @@ CSE installs a Region Editor hook (`RegionEditorCreateDataCopy`) that guards aga
 ## 8) Known boundaries
 
 - This repository exposes **template identity and CSE overlay mechanics** for all tabs.
-- Deep native control-by-control behavior for General/Map/Weather/Landscape/Grass is not implemented in CSE code here and therefore is not further introspectable from this source tree alone.
+- Deep native behavior for non-CSV tabs can now be captured through the Region Inspector pipeline below; semantic mapping remains heuristic and should be validated in-editor for final authoring docs.
+
+## 9) Implemented Region Inspector pipeline (Phase 1-4)
+
+CSE now includes a non-CSV Region tab inspector subclass for:
+- General (`253`)
+- Map (`256`)
+- Weather (`251`)
+- Landscape (`3214`)
+- Grass (`3220`)
+
+### Phase 1 — Static control map capture
+On `WM_INITDIALOG`, the inspector recursively captures all child controls and writes:
+- `Data\\CSVExports\\Regions\\Inspector\\RegionEditor_<Tab>_ControlMap.csv`
+
+Captured columns include template ID/name, control ID, class, caption, style/ex-style (hex), bounds, parent control ID, tab-order ordinal, and nearest inferred static-label semantic.
+
+### Phase 2 — Dynamic event map
+For runtime `WM_COMMAND` events from controls, the inspector appends:
+- `Data\\CSVExports\\Regions\\Inspector\\RegionEditor_<Tab>_EventLog.csv`
+
+Each event row records timestamp, template/tab, source control ID/class/caption, notify code, semantic label, and before/after value snapshots.
+
+### Phase 3 — Semantic mapping
+A nearest-label heuristic associates controls with nearby `Static` captions to infer semantic names. This is used in both the control-map CSV and event-log rows.
+
+### Phase 4 — Generated markdown documentation
+On initialization (and on-demand), the inspector writes:
+- `Data\\CSVExports\\Regions\\Inspector\\RegionEditor_<Tab>_ControlMap.md`
+
+This file contains a per-tab table of controls and references the tab event log for behavior traces.
+
+### Operator action
+A `Dump Control Map` button is injected into inspected non-CSV tabs so users can force regeneration of CSV + markdown snapshots at any time without restarting the editor.
