@@ -415,10 +415,6 @@ BEGIN
             MENUITEM "Books",                       40535
             MENUITEM "Descriptions",                40493
             MENUITEM "Faction Rank Names",          40538
-            POPUP "Region Asset CSVs"
-            BEGIN
-                MENUITEM "Active Plugin + Parent Masters", IDC_MAINMENU_IMPORT_REGIONASSETCSV_ACTIVEPLUGIN
-            END
             POPUP "JSON to ESM/ESP"
             BEGIN
                 MENUITEM "Loaded list of plugins",      IDC_MAINMENU_IMPORT_JSONTOPLUGIN

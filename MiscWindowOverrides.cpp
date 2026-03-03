@@ -3049,7 +3049,6 @@ namespace cse
 
 		#define IDC_REGIONOBJ_EXPORTBTN 9401
 		#define IDC_REGIONOBJ_IMPORTBTN 9402
-		#define IDC_REGIONINSPECT_DUMPNOWBTN 9403
 
 		struct RegionInspectorControlSnapshot
 		{
@@ -4779,37 +4778,12 @@ static bool ValidateRegionCSVHeaderForTemplate(int TemplateID, const std::vector
 				CaptureRegionInspectorControls(hWnd, Rows);
 				WriteRegionInspectorControlCSV(hWnd, TemplateID, Rows);
 				WriteRegionInspectorControlMarkdown(hWnd, TemplateID, Rows);
-
-				if (FindChildButtonByText(hWnd, "Dump Control Map") == nullptr)
-				{
-					HWND EnableToggle = FindChildButtonByText(hWnd, "Enable this type of data");
-					RECT RefRect = { 8, 8, 100, 28 };
-					if (EnableToggle)
-					{
-						GetWindowRect(EnableToggle, &RefRect);
-						MapWindowPoints(nullptr, hWnd, reinterpret_cast<LPPOINT>(&RefRect), 2);
-					}
-
-					CreateWindowExA(0, "BUTTON", "Dump Control Map", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
-						std::max<LONG>(8, RefRect.left), std::max<LONG>(8, RefRect.top), 118, 22,
-						hWnd, reinterpret_cast<HMENU>(IDC_REGIONINSPECT_DUMPNOWBTN), *TESCSMain::Instance, nullptr);
-				}
 				break;
 			}
 			case WM_COMMAND:
 			{
 				const HWND Source = reinterpret_cast<HWND>(lParam);
 				const UINT NotifyCode = HIWORD(wParam);
-				if (LOWORD(wParam) == IDC_REGIONINSPECT_DUMPNOWBTN)
-				{
-					std::vector<RegionInspectorControlSnapshot> Rows;
-					CaptureRegionInspectorControls(hWnd, Rows);
-					if (WriteRegionInspectorControlCSV(hWnd, TemplateID, Rows) && WriteRegionInspectorControlMarkdown(hWnd, TemplateID, Rows))
-						BGSEEUI->MsgBoxI("Region inspector control map dumped for %s tab.", GetRegionTemplateDebugName(TemplateID));
-					else
-						BGSEEUI->MsgBoxE("Failed to dump region inspector control map.");
-					break;
-				}
 
 				if (Source && IsWindow(Source))
 					AppendRegionInspectorEvent(hWnd, TemplateID, Source, NotifyCode);
