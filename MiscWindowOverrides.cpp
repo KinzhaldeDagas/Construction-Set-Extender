@@ -3137,6 +3137,103 @@ namespace cse
 			return BuildRegionInspectorOutputPath(TabName, "ControlMap.md");
 		}
 
+		static bool TryResolveRegionInspectorTemplateIDFromTabControl(HWND hWnd, int& OutTemplateID)
+		{
+			HWND Current = hWnd;
+			for (int Depth = 0; Current && Depth < 12; Depth++)
+			{
+				HWND Child = GetWindow(Current, GW_CHILD);
+				while (Child)
+				{
+					char ClassName[64] = { 0 };
+					GetClassNameA(Child, ClassName, sizeof(ClassName));
+					if (_stricmp(ClassName, "SysTabControl32") == 0)
+					{
+						const int TabIndex = TabCtrl_GetCurSel(Child);
+						if (TabIndex >= 0)
+						{
+							char TabText[256] = { 0 };
+							TCITEMA TabItem = { 0 };
+							TabItem.mask = TCIF_TEXT;
+							TabItem.pszText = TabText;
+							TabItem.cchTextMax = sizeof(TabText);
+							if (TabCtrl_GetItem(Child, TabIndex, &TabItem))
+							{
+								if (_stricmp(TabText, "General") == 0)
+								{
+									OutTemplateID = TESDialog::kDialogTemplate_RegionEditorGeneral;
+									return true;
+								}
+								if (_stricmp(TabText, "Map") == 0)
+								{
+									OutTemplateID = TESDialog::kDialogTemplate_RegionEditorMapData;
+									return true;
+								}
+								if (_stricmp(TabText, "Weather") == 0)
+								{
+									OutTemplateID = TESDialog::kDialogTemplate_RegionEditorWeatherData;
+									return true;
+								}
+								if (_stricmp(TabText, "Landscape") == 0)
+								{
+									OutTemplateID = TESDialog::kDialogTemplate_RegionEditorLandscapeData;
+									return true;
+								}
+								if (_stricmp(TabText, "Grass") == 0)
+								{
+									OutTemplateID = TESDialog::kDialogTemplate_RegionEditorGrassData;
+									return true;
+								}
+							}
+						}
+					}
+					Child = GetWindow(Child, GW_HWNDNEXT);
+				}
+
+				Current = GetParent(Current);
+			}
+
+			return false;
+		}
+
+		static int ResolveRegionInspectorTemplateID(HWND hWnd)
+		{
+			const int RawTemplateID = GetDlgCtrlID(hWnd);
+			switch (RawTemplateID)
+			{
+			case TESDialog::kDialogTemplate_RegionEditorGeneral:
+			case TESDialog::kDialogTemplate_RegionEditorMapData:
+			case TESDialog::kDialogTemplate_RegionEditorWeatherData:
+			case TESDialog::kDialogTemplate_RegionEditorLandscapeData:
+			case TESDialog::kDialogTemplate_RegionEditorGrassData:
+				return RawTemplateID;
+			}
+
+			int TabTemplateID = 0;
+			if (TryResolveRegionInspectorTemplateIDFromTabControl(hWnd, TabTemplateID))
+				return TabTemplateID;
+
+			HWND Current = hWnd;
+			for (int Depth = 0; Current && Depth < 10; Depth++)
+			{
+				char Title[256] = { 0 };
+				GetWindowTextA(Current, Title, sizeof(Title));
+				if (_stricmp(Title, "General") == 0)
+					return TESDialog::kDialogTemplate_RegionEditorGeneral;
+				if (_stricmp(Title, "Map") == 0)
+					return TESDialog::kDialogTemplate_RegionEditorMapData;
+				if (_stricmp(Title, "Weather") == 0)
+					return TESDialog::kDialogTemplate_RegionEditorWeatherData;
+				if (_stricmp(Title, "Landscape") == 0)
+					return TESDialog::kDialogTemplate_RegionEditorLandscapeData;
+				if (_stricmp(Title, "Grass") == 0)
+					return TESDialog::kDialogTemplate_RegionEditorGrassData;
+				Current = GetParent(Current);
+			}
+
+			return RawTemplateID;
+		}
+
 		static std::string EscapeRegionCSVCell(const char* Value)
 		{
 			const char* Source = Value ? Value : "";
@@ -4404,7 +4501,7 @@ static bool ValidateRegionCSVHeaderForTemplate(int TemplateID, const std::vector
 			LRESULT DlgProcResult = FALSE;
 			SubclassParams->Out.MarkMessageAsHandled = false;
 
-			const int TemplateID = GetDlgCtrlID(hWnd);
+			const int TemplateID = ResolveRegionInspectorTemplateID(hWnd);
 			switch (uMsg)
 			{
 			case WM_INITDIALOG:
