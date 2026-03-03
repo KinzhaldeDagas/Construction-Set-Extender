@@ -2223,10 +2223,6 @@ namespace cse
 					ImportJSONToPlugin(hWnd);
 
 					break;
-				case IDC_MAINMENU_IMPORT_REGIONASSETCSV_ACTIVEPLUGIN:
-					ImportRegionAssetFormsCSV(hWnd);
-
-					break;
 				case IDC_MAINMENU_SAVEOPTIONS_CREATEBACKUPBEFORESAVING:
 					settings::versionControl::kBackupOnSave.ToggleData();
 
