@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <vector>
 #include <string>
+#include <map>
 
 namespace cse
 {
@@ -3048,6 +3049,91 @@ namespace cse
 
 		#define IDC_REGIONOBJ_EXPORTBTN 9401
 		#define IDC_REGIONOBJ_IMPORTBTN 9402
+		#define IDC_REGIONINSPECT_DUMPNOWBTN 9403
+
+		struct RegionInspectorControlSnapshot
+		{
+			HWND Handle = nullptr;
+			int ControlID = 0;
+			std::string ClassName;
+			std::string Caption;
+			DWORD Style = 0;
+			DWORD ExStyle = 0;
+			RECT Rect = { 0 };
+			int ParentControlID = 0;
+			int TabOrder = 0;
+		};
+
+		static std::map<HWND, std::string> s_RegionInspectorLastControlValues;
+
+		static const char* GetRegionTemplateDebugName(int TemplateID)
+		{
+			switch (TemplateID)
+			{
+			case TESDialog::kDialogTemplate_RegionEditorGeneral:
+				return "General";
+			case TESDialog::kDialogTemplate_RegionEditorMapData:
+				return "Map";
+			case TESDialog::kDialogTemplate_RegionEditorWeatherData:
+				return "Weather";
+			case TESDialog::kDialogTemplate_RegionEditorLandscapeData:
+				return "Landscape";
+			case TESDialog::kDialogTemplate_RegionEditorGrassData:
+				return "Grass";
+			case TESDialog::kDialogTemplate_RegionEditorObjectsData:
+				return "Objects";
+			case TESDialog::kDialogTemplate_RegionEditorObjectsExtraData:
+				return "ObjectsMore";
+			case TESDialog::kDialogTemplate_RegionEditorSoundData:
+				return "Sound";
+			default:
+				return "Unknown";
+			}
+		}
+
+		static std::string EscapeRegionInspectorCSVCell(const char* Value)
+		{
+			const char* Source = Value ? Value : "";
+			std::string Out = "\"";
+			for (const char* P = Source; *P; ++P)
+			{
+				if (*P == '\"')
+					Out += "\"\"";
+				else if (*P == '\r' || *P == '\n')
+					Out.push_back(' ');
+				else
+					Out.push_back(*P);
+			}
+			Out += "\"";
+			return Out;
+		}
+
+		static std::string BuildRegionInspectorOutputPath(const char* TabName, const char* Suffix)
+		{
+			CreateDirectoryA("Data", nullptr);
+			CreateDirectoryA("Data\\CSVExports", nullptr);
+			CreateDirectoryA("Data\\CSVExports\\Regions", nullptr);
+			CreateDirectoryA("Data\\CSVExports\\Regions\\Inspector", nullptr);
+
+			char FileName[256] = { 0 };
+			FORMAT_STR(FileName, "RegionEditor_%s_%s", TabName ? TabName : "Unknown", Suffix ? Suffix : "Output.csv");
+			return std::string("Data\\CSVExports\\Regions\\Inspector\\") + FileName;
+		}
+
+		static std::string BuildRegionInspectorWindowPath(const char* TabName)
+		{
+			return BuildRegionInspectorOutputPath(TabName, "ControlMap.csv");
+		}
+
+		static std::string BuildRegionInspectorEventPath(const char* TabName)
+		{
+			return BuildRegionInspectorOutputPath(TabName, "EventLog.csv");
+		}
+
+		static std::string BuildRegionInspectorMarkdownPath(const char* TabName)
+		{
+			return BuildRegionInspectorOutputPath(TabName, "ControlMap.md");
+		}
 
 		static std::string EscapeRegionCSVCell(const char* Value)
 		{
@@ -3480,6 +3566,235 @@ namespace cse
 			char Buffer[512] = { 0 };
 			GetWindowTextA(Window, Buffer, sizeof(Buffer));
 			return Buffer;
+		}
+
+		static std::string GetRegionInspectorControlValue(HWND Control)
+		{
+			if (Control == nullptr)
+				return "";
+
+			char ClassName[64] = { 0 };
+			GetClassNameA(Control, ClassName, sizeof(ClassName));
+
+			if (_stricmp(ClassName, "Button") == 0)
+			{
+				const LRESULT Checked = SendMessageA(Control, BM_GETCHECK, 0, 0);
+				return Checked == BST_CHECKED ? "Checked" : "Unchecked";
+			}
+
+			if (_stricmp(ClassName, "ComboBox") == 0)
+			{
+				const int Index = ComboBox_GetCurSel(Control);
+				char Text[512] = { 0 };
+				if (Index >= 0)
+					ComboBox_GetLBText(Control, Index, Text);
+				else
+					GetWindowTextA(Control, Text, sizeof(Text));
+				char Value[768] = { 0 };
+				FORMAT_STR(Value, "%d:%s", Index, Text);
+				return Value;
+			}
+
+			if (_stricmp(ClassName, "Edit") == 0)
+				return GetWindowTextString(Control);
+
+			return GetWindowTextString(Control);
+		}
+
+		static std::string FindNearestRegionStaticLabel(HWND Root, HWND Control)
+		{
+			if (Root == nullptr || Control == nullptr)
+				return "";
+
+			RECT ControlRect = { 0 };
+			if (!GetWindowRect(Control, &ControlRect))
+				return "";
+			MapWindowPoints(nullptr, Root, reinterpret_cast<LPPOINT>(&ControlRect), 2);
+
+			std::vector<HWND> Children;
+			CollectChildWindowsRecursive(Root, Children);
+
+			HWND BestLabel = nullptr;
+			int BestScore = INT_MAX;
+			for (HWND Child : Children)
+			{
+				char ClassName[64] = { 0 };
+				GetClassNameA(Child, ClassName, sizeof(ClassName));
+				if (_stricmp(ClassName, "Static") != 0)
+					continue;
+
+				std::string Caption = GetWindowTextString(Child);
+				if (Caption.empty())
+					continue;
+
+				RECT LabelRect = { 0 };
+				if (!GetWindowRect(Child, &LabelRect))
+					continue;
+				MapWindowPoints(nullptr, Root, reinterpret_cast<LPPOINT>(&LabelRect), 2);
+
+				const int Dy = abs(((LabelRect.top + LabelRect.bottom) / 2) - ((ControlRect.top + ControlRect.bottom) / 2));
+				if (Dy > 20)
+					continue;
+
+				const int Dx = std::max(0L, ControlRect.left - LabelRect.right);
+				const int Score = Dy * 100 + Dx;
+				if (Score < BestScore)
+				{
+					BestScore = Score;
+					BestLabel = Child;
+				}
+			}
+
+			return BestLabel ? GetWindowTextString(BestLabel) : "";
+		}
+
+		static void CaptureRegionInspectorControls(HWND hWnd, std::vector<RegionInspectorControlSnapshot>& Out)
+		{
+			Out.clear();
+			if (hWnd == nullptr)
+				return;
+
+			std::vector<HWND> Children;
+			CollectChildWindowsRecursive(hWnd, Children);
+
+			int TabOrder = 0;
+			char ClassName[64] = { 0 };
+			for (HWND Child : Children)
+			{
+				RegionInspectorControlSnapshot Row;
+				Row.Handle = Child;
+				Row.ControlID = GetDlgCtrlID(Child);
+				GetClassNameA(Child, ClassName, sizeof(ClassName));
+				Row.ClassName = ClassName;
+				Row.Caption = GetWindowTextString(Child);
+				Row.Style = static_cast<DWORD>(GetWindowLongPtrA(Child, GWL_STYLE));
+				Row.ExStyle = static_cast<DWORD>(GetWindowLongPtrA(Child, GWL_EXSTYLE));
+				GetWindowRect(Child, &Row.Rect);
+				MapWindowPoints(nullptr, hWnd, reinterpret_cast<LPPOINT>(&Row.Rect), 2);
+				HWND Parent = GetParent(Child);
+				Row.ParentControlID = Parent ? GetDlgCtrlID(Parent) : 0;
+				Row.TabOrder = ++TabOrder;
+				Out.push_back(Row);
+
+				s_RegionInspectorLastControlValues[Child] = GetRegionInspectorControlValue(Child);
+			}
+		}
+
+		static bool WriteRegionInspectorControlCSV(HWND hWnd, int TemplateID, const std::vector<RegionInspectorControlSnapshot>& Rows)
+		{
+			const char* TabName = GetRegionTemplateDebugName(TemplateID);
+			std::ofstream Out(BuildRegionInspectorWindowPath(TabName), std::ios::trunc);
+			if (!Out.good())
+				return false;
+
+			Out << "TabTemplateID,TabName,ControlID,ClassName,Caption,StyleHex,ExStyleHex,Left,Top,Width,Height,ParentControlID,TabOrder,SemanticLabel\n";
+			for (const auto& Row : Rows)
+			{
+				const int Width = std::max<LONG>(0, Row.Rect.right - Row.Rect.left);
+				const int Height = std::max<LONG>(0, Row.Rect.bottom - Row.Rect.top);
+				char StyleHex[16] = { 0 };
+				char ExStyleHex[16] = { 0 };
+				FORMAT_STR(StyleHex, "%08X", Row.Style);
+				FORMAT_STR(ExStyleHex, "%08X", Row.ExStyle);
+				const std::string SemanticLabel = FindNearestRegionStaticLabel(hWnd, Row.Handle);
+				Out << TemplateID << ','
+					<< EscapeRegionInspectorCSVCell(TabName) << ','
+					<< Row.ControlID << ','
+					<< EscapeRegionInspectorCSVCell(Row.ClassName.c_str()) << ','
+					<< EscapeRegionInspectorCSVCell(Row.Caption.c_str()) << ','
+					<< EscapeRegionInspectorCSVCell(StyleHex) << ','
+					<< EscapeRegionInspectorCSVCell(ExStyleHex) << ','
+					<< Row.Rect.left << ',' << Row.Rect.top << ',' << Width << ',' << Height << ','
+					<< Row.ParentControlID << ',' << Row.TabOrder << ','
+					<< EscapeRegionInspectorCSVCell(SemanticLabel.c_str())
+					<< "\n";
+			}
+
+			Out.flush();
+			return Out.good();
+		}
+
+		static bool WriteRegionInspectorControlMarkdown(HWND hWnd, int TemplateID, const std::vector<RegionInspectorControlSnapshot>& Rows)
+		{
+			const char* TabName = GetRegionTemplateDebugName(TemplateID);
+			std::ofstream Out(BuildRegionInspectorMarkdownPath(TabName), std::ios::trunc);
+			if (!Out.good())
+				return false;
+
+			Out << "# Region Editor " << TabName << " tab - control inventory\n\n";
+			Out << "Template ID: `" << TemplateID << "`\n\n";
+			Out << "| TabOrder | ControlID | Class | Caption | Semantic Label | Bounds (L,T,W,H) | Style | ExStyle |\n";
+			Out << "|---:|---:|---|---|---|---|---|---|\n";
+			for (const auto& Row : Rows)
+			{
+				const int Width = std::max<LONG>(0, Row.Rect.right - Row.Rect.left);
+				const int Height = std::max<LONG>(0, Row.Rect.bottom - Row.Rect.top);
+				const std::string SemanticLabel = FindNearestRegionStaticLabel(hWnd, Row.Handle);
+				char StyleHex[16] = { 0 };
+				char ExStyleHex[16] = { 0 };
+				FORMAT_STR(StyleHex, "%08X", Row.Style);
+				FORMAT_STR(ExStyleHex, "%08X", Row.ExStyle);
+				Out << "| " << Row.TabOrder
+					<< " | " << Row.ControlID
+					<< " | " << Row.ClassName
+					<< " | " << Row.Caption
+					<< " | " << SemanticLabel
+					<< " | " << Row.Rect.left << "," << Row.Rect.top << "," << Width << "," << Height
+					<< " | " << StyleHex
+					<< " | " << ExStyleHex << " |\n";
+			}
+
+			Out << "\n## Runtime behavior capture\n\n";
+			Out << "Event data is appended to `" << BuildRegionInspectorEventPath(TabName) << "`.\n";
+			Out.flush();
+			return Out.good();
+		}
+
+		static void AppendRegionInspectorEvent(HWND hWnd, int TemplateID, HWND SourceControl, UINT NotifyCode)
+		{
+			if (hWnd == nullptr || SourceControl == nullptr)
+				return;
+
+			const char* TabName = GetRegionTemplateDebugName(TemplateID);
+			const std::string Path = BuildRegionInspectorEventPath(TabName);
+
+			std::ifstream Existing(Path);
+			const bool NeedsHeader = !Existing.good() || Existing.peek() == std::ifstream::traits_type::eof();
+			Existing.close();
+
+			std::ofstream Out(Path, std::ios::app);
+			if (!Out.good())
+				return;
+
+			if (NeedsHeader)
+			{
+				Out << "Timestamp,TemplateID,TabName,ControlID,ClassName,Caption,SemanticLabel,NotifyCode,BeforeValue,AfterValue\n";
+			}
+
+			SYSTEMTIME Time = { 0 };
+			GetLocalTime(&Time);
+			char Timestamp[64] = { 0 };
+			FORMAT_STR(Timestamp, "%04d-%02d-%02d %02d:%02d:%02d.%03d",
+				Time.wYear, Time.wMonth, Time.wDay,
+				Time.wHour, Time.wMinute, Time.wSecond, Time.wMilliseconds);
+
+			char ClassName[64] = { 0 };
+			GetClassNameA(SourceControl, ClassName, sizeof(ClassName));
+
+			const std::string Before = s_RegionInspectorLastControlValues[SourceControl];
+			const std::string After = GetRegionInspectorControlValue(SourceControl);
+			s_RegionInspectorLastControlValues[SourceControl] = After;
+
+			Out << EscapeRegionInspectorCSVCell(Timestamp) << ','
+				<< TemplateID << ','
+				<< EscapeRegionInspectorCSVCell(TabName) << ','
+				<< GetDlgCtrlID(SourceControl) << ','
+				<< EscapeRegionInspectorCSVCell(ClassName) << ','
+				<< EscapeRegionInspectorCSVCell(GetWindowTextString(SourceControl).c_str()) << ','
+				<< EscapeRegionInspectorCSVCell(FindNearestRegionStaticLabel(hWnd, SourceControl).c_str()) << ','
+				<< NotifyCode << ','
+				<< EscapeRegionInspectorCSVCell(Before.c_str()) << ','
+				<< EscapeRegionInspectorCSVCell(After.c_str()) << "\n";
 		}
 
 		static HWND FindRegionFieldControl(HWND Root, const char* FieldLabel, bool Checkbox)
@@ -4081,6 +4396,70 @@ static bool ValidateRegionCSVHeaderForTemplate(int TemplateID, const std::vector
 			return DlgProcResult;
 		}
 
+		LRESULT CALLBACK RegionTabControlInspectorSubClassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
+			bgsee::WindowSubclassProcCollection::SubclassProcExtraParams* SubclassParams)
+		{
+			LRESULT DlgProcResult = FALSE;
+			SubclassParams->Out.MarkMessageAsHandled = false;
+
+			const int TemplateID = GetDlgCtrlID(hWnd);
+			switch (uMsg)
+			{
+			case WM_INITDIALOG:
+			{
+				std::vector<RegionInspectorControlSnapshot> Rows;
+				CaptureRegionInspectorControls(hWnd, Rows);
+				WriteRegionInspectorControlCSV(hWnd, TemplateID, Rows);
+				WriteRegionInspectorControlMarkdown(hWnd, TemplateID, Rows);
+
+				if (FindChildButtonByText(hWnd, "Dump Control Map") == nullptr)
+				{
+					HWND EnableToggle = FindChildButtonByText(hWnd, "Enable this type of data");
+					RECT RefRect = { 8, 8, 100, 28 };
+					if (EnableToggle)
+					{
+						GetWindowRect(EnableToggle, &RefRect);
+						MapWindowPoints(nullptr, hWnd, reinterpret_cast<LPPOINT>(&RefRect), 2);
+					}
+
+					CreateWindowExA(0, "BUTTON", "Dump Control Map", WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
+						std::max<LONG>(8, RefRect.left), std::max<LONG>(8, RefRect.top), 118, 22,
+						hWnd, reinterpret_cast<HMENU>(IDC_REGIONINSPECT_DUMPNOWBTN), *TESCSMain::Instance, nullptr);
+				}
+				break;
+			}
+			case WM_COMMAND:
+			{
+				const HWND Source = reinterpret_cast<HWND>(lParam);
+				const UINT NotifyCode = HIWORD(wParam);
+				if (LOWORD(wParam) == IDC_REGIONINSPECT_DUMPNOWBTN)
+				{
+					std::vector<RegionInspectorControlSnapshot> Rows;
+					CaptureRegionInspectorControls(hWnd, Rows);
+					if (WriteRegionInspectorControlCSV(hWnd, TemplateID, Rows) && WriteRegionInspectorControlMarkdown(hWnd, TemplateID, Rows))
+						BGSEEUI->MsgBoxI("Region inspector control map dumped for %s tab.", GetRegionTemplateDebugName(TemplateID));
+					else
+						BGSEEUI->MsgBoxE("Failed to dump region inspector control map.");
+					break;
+				}
+
+				if (Source && IsWindow(Source))
+					AppendRegionInspectorEvent(hWnd, TemplateID, Source, NotifyCode);
+				break;
+			}
+			case WM_DESTROY:
+			{
+				std::vector<HWND> Children;
+				CollectChildWindowsRecursive(hWnd, Children);
+				for (HWND Child : Children)
+					s_RegionInspectorLastControlValues.erase(Child);
+				break;
+			}
+			}
+
+			return DlgProcResult;
+		}
+
 		LRESULT CALLBACK WindowPosDlgSubClassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
 												  bgsee::WindowSubclassProcCollection::SubclassProcExtraParams* SubclassParams)
 		{
@@ -4338,6 +4717,12 @@ static bool ValidateRegionCSVHeaderForTemplate(int TemplateID, const std::vector
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorObjectsData, RegionObjectsGeneratedCSVSubClassProc);
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorObjectsExtraData, RegionObjectsGeneratedCSVSubClassProc);
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorSoundData, RegionObjectsGeneratedCSVSubClassProc);
+
+			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorGeneral, RegionTabControlInspectorSubClassProc);
+			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorMapData, RegionTabControlInspectorSubClassProc);
+			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorWeatherData, RegionTabControlInspectorSubClassProc);
+			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorLandscapeData, RegionTabControlInspectorSubClassProc);
+			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_RegionEditorGrassData, RegionTabControlInspectorSubClassProc);
 
 			BGSEEUI->GetSubclasser()->RegisterSubclassForDialogResourceTemplate(TESDialog::kDialogTemplate_CellEdit, TESObjectCELLDlgSubClassProc);
 		}
