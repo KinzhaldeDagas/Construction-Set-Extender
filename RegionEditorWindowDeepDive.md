@@ -186,7 +186,7 @@ CSE now includes a non-CSV Region tab inspector subclass for:
 
 ### Phase 1 — Static control map capture
 On `WM_INITDIALOG`, the inspector recursively captures all child controls and writes:
-- `Data\\CSVExports\\Regions\\Inspector\\RegionEditor_<Tab>_ControlMap.csv`
+- `Data\\CSVExports\\Regions\\Inspector\\RegionEditor_<Tab>_ControlMap_TabTemplateID.csv`
 
 Captured columns include template ID/name, control ID, class, caption, style/ex-style (hex), bounds, parent control ID, tab-order ordinal, and nearest inferred static-label semantic.
 

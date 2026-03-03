@@ -3122,7 +3122,7 @@ namespace cse
 
 		static std::string BuildRegionInspectorWindowPath(const char* TabName)
 		{
-			return BuildRegionInspectorOutputPath(TabName, "ControlMap.csv");
+			return BuildRegionInspectorOutputPath(TabName, "ControlMap_TabTemplateID.csv");
 		}
 
 		static std::string BuildRegionInspectorEventPath(const char* TabName)
