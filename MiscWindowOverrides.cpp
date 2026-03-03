@@ -4249,6 +4249,8 @@ namespace cse
 			UpdateWindow(Parent);
 		}
 
+		static void FlushRegionEditorSelectionChange(HWND Dialog, HWND ListView);
+
 		static void RefreshCurrentRegionSelection(HWND Dialog, HWND ListView)
 		{
 			HWND RegionCombo = FindBestRegionSelectionCombo(Dialog);
