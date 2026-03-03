@@ -3139,7 +3139,7 @@ namespace cse
 			}
 		}
 
-		static HWND FindBestRegionObjectsListView(HWND hWnd)
+		static HWND FindBestRegionObjectsListView(HWND hWnd, int TemplateID)
 		{
 			if (hWnd == nullptr)
 				return nullptr;
@@ -3184,6 +3184,25 @@ namespace cse
 				const int RowCount = ListView_GetItemCount(Candidate);
 
 				int Score = (Width * Height) / 100;
+				if (TemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsData)
+				{
+					if (ColCount == 8)
+						Score += 2200;
+					else if (ColCount < 6)
+						Score -= 1500;
+				}
+				else if (TemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsExtraData)
+				{
+					if (ColCount == 14)
+						Score += 2200;
+					else if (ColCount < 10)
+						Score -= 1500;
+				}
+				else if (TemplateID == TESDialog::kDialogTemplate_RegionEditorSoundData)
+				{
+					if (ColCount >= 2 && ColCount <= 8)
+						Score += 500;
+				}
 				if ((Style & LVS_TYPEMASK) == LVS_REPORT)
 					Score += 1200;
 				else
@@ -3254,17 +3273,21 @@ namespace cse
 				return RawTemplateID;
 			}
 
-			char Title[256] = { 0 };
-			GetWindowTextA(hWnd, Title, sizeof(Title));
-			std::string TabTitle = Title;
-			if (_stricmp(TabTitle.c_str(), "Objects (more)") == 0)
-				return TESDialog::kDialogTemplate_RegionEditorObjectsExtraData;
-			if (_stricmp(TabTitle.c_str(), "Objects") == 0)
-				return TESDialog::kDialogTemplate_RegionEditorObjectsData;
-			if (_stricmp(TabTitle.c_str(), "Sound") == 0)
-				return TESDialog::kDialogTemplate_RegionEditorSoundData;
+			HWND Current = hWnd;
+			for (int Depth = 0; Current && Depth < 10; Depth++)
+			{
+				char Title[256] = { 0 };
+				GetWindowTextA(Current, Title, sizeof(Title));
+				if (_stricmp(Title, "Objects (more)") == 0)
+					return TESDialog::kDialogTemplate_RegionEditorObjectsExtraData;
+				if (_stricmp(Title, "Objects") == 0)
+					return TESDialog::kDialogTemplate_RegionEditorObjectsData;
+				if (_stricmp(Title, "Sound") == 0)
+					return TESDialog::kDialogTemplate_RegionEditorSoundData;
+				Current = GetParent(Current);
+			}
 
-			return TESDialog::kDialogTemplate_RegionEditorObjectsData;
+			return RawTemplateID;
 		}
 
 
@@ -3479,8 +3502,6 @@ namespace cse
 				return false;
 			if (!ValidateRegionCSVHeaderForTemplate(TemplateID, Fields))
 				return false;
-			if (!ValidateRegionCSVHeaderForTemplate(TemplateID, Fields))
-				return false;
 
 			ListView_DeleteAllItems(ListView);
 			std::string Line;
@@ -3622,7 +3643,8 @@ namespace cse
 			case WM_COMMAND:
 				if (LOWORD(wParam) == IDC_REGIONOBJ_EXPORTBTN || LOWORD(wParam) == IDC_REGIONOBJ_IMPORTBTN)
 				{
-					HWND ListView = FindBestRegionObjectsListView(hWnd);
+					const int TemplateID = ResolveRegionCSVTemplateID(hWnd);
+					HWND ListView = FindBestRegionObjectsListView(hWnd, TemplateID);
 					if (!ListView)
 					{
 						BGSEEUI->MsgBoxE("Couldn't find generated objects list in this tab.");
