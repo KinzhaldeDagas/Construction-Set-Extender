@@ -3773,52 +3773,102 @@ namespace cse
 
 		static std::string ResolveRegionInspectorSemanticLabelFromCSVFindings(int TemplateID, int ControlID, const std::string& ClassName, const std::string& Caption)
 		{
+			auto IsClass = [&](const char* Name)
+			{
+				return _stricmp(ClassName.c_str(), Name) == 0;
+			};
+
+			// Shared IDs observed across multiple Region Editor tabs in Inspector CSV captures.
+			if (IsClass("Edit"))
+			{
+				switch (ControlID)
+				{
+				case 2028:
+					return "Priority:";
+				case 2144:
+					return "Object Name";
+				case 2138:
+					return "Effective Density:";
+				case 2140:
+					return "Min Slope:";
+				case 2142:
+					return "Max Slope:";
+				case 2132:
+				case 2133:
+					return "units from water";
+				case 2145:
+					return "Position Range:";
+				case 2146:
+					return "Height Range:";
+				case 2147:
+					return "Color Range:";
+				case 2148:
+					return "Wave Period:";
+				}
+			}
+
 			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorGeneral)
 			{
-				if (ControlID == 1048 && _stricmp(ClassName.c_str(), "Edit") == 0)
+				if (ControlID == 1048 && IsClass("Edit"))
 					return "Region Name";
-				if (ControlID == 1045 && _stricmp(ClassName.c_str(), "Button") == 0)
+				if (ControlID == 1049 && IsClass("Edit"))
+					return "Edge Fall-off (World Units)";
+				if (ControlID == 1045 && IsClass("Button"))
 					return "Worldspace";
-				if (ControlID == 1046 && _stricmp(ClassName.c_str(), "Button") == 0)
+				if (ControlID == 1046 && IsClass("Button"))
 					return "Editor Region?";
 			}
 
 			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorMapData)
 			{
-				if (ControlID == 2023 && _stricmp(ClassName.c_str(), "Button") == 0)
+				if (ControlID == 2023 && IsClass("Button"))
 					return "Enable this type of data";
-				if (ControlID == 2024 && _stricmp(ClassName.c_str(), "Edit") == 0)
+				if (ControlID == 2024 && IsClass("Edit"))
 					return "Map Name";
-				if (ControlID == 2025 && _stricmp(ClassName.c_str(), "Edit") == 0)
+				if (ControlID == 2025 && IsClass("Edit"))
 					return "Priority:";
 			}
 
 			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorWeatherData)
 			{
-				if (ControlID == 1062 && _stricmp(ClassName.c_str(), "Button") == 0)
+				if (ControlID == 1062 && IsClass("Button"))
 					return "Enable this type of data";
-				if (ControlID == 2028 && _stricmp(ClassName.c_str(), "Edit") == 0)
+				if (ControlID == 2028 && IsClass("Edit"))
 					return "Priority:";
-				if (_stricmp(ClassName.c_str(), "ComboBox") == 0)
+				if (IsClass("ComboBox"))
 					return "Weather Type";
+				if (ControlID == 2033 && IsClass("SysListView32"))
+					return "Weather entries";
 			}
 
 			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorLandscapeData)
 			{
-				if (ControlID == 2117 && _stricmp(ClassName.c_str(), "Button") == 0)
+				if (ControlID == 2117 && IsClass("Button"))
 					return "Enable this type of data";
-				if (ControlID == 2025 && _stricmp(ClassName.c_str(), "Edit") == 0)
+				if (ControlID == 2025 && IsClass("Edit"))
 					return "Priority:";
+				if (ControlID == 2024 && IsClass("Edit"))
+					return "Map Name";
 			}
 
 			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorGrassData)
 			{
-				if (ControlID == 2127 && _stricmp(ClassName.c_str(), "Button") == 0)
+				if (ControlID == 2127 && IsClass("Button"))
 					return "Enable this type of data";
-				if (ControlID == 2128 && _stricmp(ClassName.c_str(), "Edit") == 0)
+				if (ControlID == 2128 && IsClass("Edit"))
 					return "Priority:";
-				if (_stricmp(ClassName.c_str(), "SysTreeView32") == 0)
+				if (IsClass("SysTreeView32"))
 					return "Grass list";
+			}
+
+			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorSoundData)
+			{
+				if (ControlID == 2127 && IsClass("Button"))
+					return "Enable this type of data";
+				if (ControlID == 2128 && IsClass("Edit"))
+					return "Priority:";
+				if (ControlID == 2131 && IsClass("SysTreeView32"))
+					return "Sound list";
 			}
 
 			if (_stricmp(Caption.c_str(), "Enable this type of data") == 0)
