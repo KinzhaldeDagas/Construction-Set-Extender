@@ -3701,8 +3701,20 @@ namespace cse
 
 			if (_stricmp(ClassName, "Button") == 0)
 			{
-				const LRESULT Checked = SendMessageA(Control, BM_GETCHECK, 0, 0);
-				return Checked == BST_CHECKED ? "Checked" : "Unchecked";
+				const LONG Style = static_cast<LONG>(GetWindowLongPtrA(Control, GWL_STYLE));
+				const LONG ButtonType = (Style & BS_TYPEMASK);
+				const bool IsCheckable =
+					ButtonType == BS_CHECKBOX || ButtonType == BS_AUTOCHECKBOX ||
+					ButtonType == BS_3STATE || ButtonType == BS_AUTO3STATE ||
+					ButtonType == BS_RADIOBUTTON || ButtonType == BS_AUTORADIOBUTTON;
+				if (IsCheckable)
+				{
+					const LRESULT Checked = SendMessageA(Control, BM_GETCHECK, 0, 0);
+					if (Checked == BST_INDETERMINATE)
+						return "Indeterminate";
+					return Checked == BST_CHECKED ? "Checked" : "Unchecked";
+				}
+				return GetWindowTextString(Control);
 			}
 
 			if (_stricmp(ClassName, "ComboBox") == 0)
@@ -3773,52 +3785,102 @@ namespace cse
 
 		static std::string ResolveRegionInspectorSemanticLabelFromCSVFindings(int TemplateID, int ControlID, const std::string& ClassName, const std::string& Caption)
 		{
+			auto IsClass = [&](const char* Name)
+			{
+				return _stricmp(ClassName.c_str(), Name) == 0;
+			};
+
+			// Shared IDs observed across multiple Region Editor tabs in Inspector CSV captures.
+			if (IsClass("Edit"))
+			{
+				switch (ControlID)
+				{
+				case 2028:
+					return "Priority:";
+				case 2144:
+					return "Object Name";
+				case 2138:
+					return "Effective Density:";
+				case 2140:
+					return "Min Slope:";
+				case 2142:
+					return "Max Slope:";
+				case 2132:
+				case 2133:
+					return "units from water";
+				case 2145:
+					return "Position Range:";
+				case 2146:
+					return "Height Range:";
+				case 2147:
+					return "Color Range:";
+				case 2148:
+					return "Wave Period:";
+				}
+			}
+
 			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorGeneral)
 			{
-				if (ControlID == 1048 && _stricmp(ClassName.c_str(), "Edit") == 0)
+				if (ControlID == 1048 && IsClass("Edit"))
 					return "Region Name";
-				if (ControlID == 1045 && _stricmp(ClassName.c_str(), "Button") == 0)
+				if (ControlID == 1049 && IsClass("Edit"))
+					return "Edge Fall-off (World Units)";
+				if (ControlID == 1045 && IsClass("Button"))
 					return "Worldspace";
-				if (ControlID == 1046 && _stricmp(ClassName.c_str(), "Button") == 0)
+				if (ControlID == 1046 && IsClass("Button"))
 					return "Editor Region?";
 			}
 
 			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorMapData)
 			{
-				if (ControlID == 2023 && _stricmp(ClassName.c_str(), "Button") == 0)
+				if (ControlID == 2023 && IsClass("Button"))
 					return "Enable this type of data";
-				if (ControlID == 2024 && _stricmp(ClassName.c_str(), "Edit") == 0)
+				if (ControlID == 2024 && IsClass("Edit"))
 					return "Map Name";
-				if (ControlID == 2025 && _stricmp(ClassName.c_str(), "Edit") == 0)
+				if (ControlID == 2025 && IsClass("Edit"))
 					return "Priority:";
 			}
 
 			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorWeatherData)
 			{
-				if (ControlID == 1062 && _stricmp(ClassName.c_str(), "Button") == 0)
+				if (ControlID == 1062 && IsClass("Button"))
 					return "Enable this type of data";
-				if (ControlID == 2028 && _stricmp(ClassName.c_str(), "Edit") == 0)
+				if (ControlID == 2028 && IsClass("Edit"))
 					return "Priority:";
-				if (_stricmp(ClassName.c_str(), "ComboBox") == 0)
+				if (IsClass("ComboBox"))
 					return "Weather Type";
+				if (ControlID == 2033 && IsClass("SysListView32"))
+					return "Weather entries";
 			}
 
 			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorLandscapeData)
 			{
-				if (ControlID == 2117 && _stricmp(ClassName.c_str(), "Button") == 0)
+				if (ControlID == 2117 && IsClass("Button"))
 					return "Enable this type of data";
-				if (ControlID == 2025 && _stricmp(ClassName.c_str(), "Edit") == 0)
+				if (ControlID == 2025 && IsClass("Edit"))
 					return "Priority:";
+				if (ControlID == 2024 && IsClass("Edit"))
+					return "Map Name";
 			}
 
 			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorGrassData)
 			{
-				if (ControlID == 2127 && _stricmp(ClassName.c_str(), "Button") == 0)
+				if (ControlID == 2127 && IsClass("Button"))
 					return "Enable this type of data";
-				if (ControlID == 2128 && _stricmp(ClassName.c_str(), "Edit") == 0)
+				if (ControlID == 2128 && IsClass("Edit"))
 					return "Priority:";
-				if (_stricmp(ClassName.c_str(), "SysTreeView32") == 0)
+				if (IsClass("SysTreeView32"))
 					return "Grass list";
+			}
+
+			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorSoundData)
+			{
+				if (ControlID == 2127 && IsClass("Button"))
+					return "Enable this type of data";
+				if (ControlID == 2128 && IsClass("Edit"))
+					return "Priority:";
+				if (ControlID == 2131 && IsClass("SysTreeView32"))
+					return "Sound list";
 			}
 
 			if (_stricmp(Caption.c_str(), "Enable this type of data") == 0)
@@ -3835,14 +3897,18 @@ namespace cse
 			char ClassName[64] = { 0 };
 			GetClassNameA(Control, ClassName, sizeof(ClassName));
 
+			const std::string LabelFromCSV = ResolveRegionInspectorSemanticLabelFromCSVFindings(TemplateID,
+				GetDlgCtrlID(Control),
+				ClassName,
+				GetWindowTextString(Control));
+			if (LabelFromCSV.empty() == false)
+				return LabelFromCSV;
+
 			const std::string LabelFromGeometry = FindNearestRegionStaticLabel(Root, Control);
 			if (LabelFromGeometry.empty() == false)
 				return LabelFromGeometry;
 
-			return ResolveRegionInspectorSemanticLabelFromCSVFindings(TemplateID,
-				GetDlgCtrlID(Control),
-				ClassName,
-				GetWindowTextString(Control));
+			return "";
 		}
 
 		static void CaptureRegionInspectorControls(HWND hWnd, std::vector<RegionInspectorControlSnapshot>& Out)
@@ -4166,6 +4232,30 @@ namespace cse
 			UpdateWindow(Parent);
 		}
 
+		static void FlushRegionEditorSelectionChange(HWND Dialog, HWND ListView)
+		{
+			if (Dialog == nullptr && ListView == nullptr)
+				return;
+
+			// Region Editor list content refresh is not always synchronous with CBN_SELCHANGE.
+			for (int i = 0; i < 6; i++)
+			{
+				MSG Message = { 0 };
+				while (PeekMessageA(&Message, nullptr, 0, 0, PM_REMOVE))
+				{
+					TranslateMessage(&Message);
+					DispatchMessageA(&Message);
+				}
+
+				if (ListView)
+					UpdateWindow(ListView);
+				if (Dialog)
+					UpdateWindow(Dialog);
+
+				Sleep(10);
+			}
+		}
+
 		static bool ExportRegionObjectsDataRowsCSV(HWND hWnd, HWND ListView, std::ofstream& Out, const std::string& RegionName)
 		{
 			struct FieldDef
@@ -4250,6 +4340,7 @@ namespace cse
 				if (ComboBox_SetCurSel(RegionCombo, i) == CB_ERR)
 					continue;
 				NotifyComboSelectionChange(RegionCombo);
+				FlushRegionEditorSelectionChange(hWnd, ListView);
 
 				char RegionName[512] = { 0 };
 				ComboBox_GetLBText(RegionCombo, i, RegionName);
@@ -4262,6 +4353,7 @@ namespace cse
 			{
 				ComboBox_SetCurSel(RegionCombo, OriginalSelection);
 				NotifyComboSelectionChange(RegionCombo);
+				FlushRegionEditorSelectionChange(hWnd, ListView);
 			}
 
 			return true;
@@ -4270,7 +4362,6 @@ namespace cse
 		static bool ExportRegionObjectsListViewCSV(HWND hWnd, HWND ListView, const std::string& Path, bool ExportAllRegions)
 		{
 			int ColCount = Header_GetItemCount(ListView_GetHeader(ListView));
-			int RowCount = ListView_GetItemCount(ListView);
 			if (ColCount <= 0)
 				return false;
 
@@ -4321,24 +4412,70 @@ namespace cse
 			}
 			Out << "\n";
 
-			const std::string RegionName = ResolveRegionEditorName(hWnd);
-			for (int r = 0; r < RowCount; r++)
+			auto WriteCurrentRows = [&](const std::string& RegionName)
 			{
-				if (UseStrictSchemaHeaders)
+				const int LocalRowCount = ListView_GetItemCount(ListView);
+				for (int r = 0; r < LocalRowCount; r++)
 				{
-					Out << EscapeRegionCSVCell(RegionName.c_str());
-					if (ColCount > 0)
-						Out << ',';
+					if (UseStrictSchemaHeaders)
+					{
+						Out << EscapeRegionCSVCell(RegionName.c_str());
+						if (ColCount > 0)
+							Out << ',';
+					}
+					for (int c = 0; c < ColCount; c++)
+					{
+						char Cell[512] = { 0 };
+						ListView_GetItemText(ListView, r, c, Cell, sizeof(Cell));
+						Out << EscapeRegionCSVCell(Cell);
+						if (c + 1 < ColCount)
+							Out << ',';
+					}
+					Out << "\n";
 				}
-				for (int c = 0; c < ColCount; c++)
+
+				return Out.good();
+			};
+
+			if (!UseStrictSchemaHeaders || ExportAllRegions == false)
+			{
+				const std::string RegionName = ResolveRegionEditorName(hWnd);
+				if (!WriteCurrentRows(RegionName))
+					return false;
+			}
+			else
+			{
+				HWND RegionCombo = FindBestRegionSelectionCombo(hWnd);
+				if (RegionCombo == nullptr)
 				{
-					char Cell[512] = { 0 };
-					ListView_GetItemText(ListView, r, c, Cell, sizeof(Cell));
-					Out << EscapeRegionCSVCell(Cell);
-					if (c + 1 < ColCount)
-						Out << ',';
+					if (!WriteCurrentRows(ResolveRegionEditorName(hWnd)))
+						return false;
 				}
-				Out << "\n";
+				else
+				{
+					const int OriginalSelection = ComboBox_GetCurSel(RegionCombo);
+					const int RegionCount = ComboBox_GetCount(RegionCombo);
+					for (int i = 0; i < RegionCount; i++)
+					{
+						if (ComboBox_SetCurSel(RegionCombo, i) == CB_ERR)
+							continue;
+						NotifyComboSelectionChange(RegionCombo);
+						FlushRegionEditorSelectionChange(hWnd, ListView);
+
+						char RegionName[512] = { 0 };
+						ComboBox_GetLBText(RegionCombo, i, RegionName);
+						std::string RegionValue = RegionName[0] ? RegionName : ResolveRegionEditorName(hWnd);
+						if (!WriteCurrentRows(RegionValue))
+							break;
+					}
+
+					if (OriginalSelection >= 0)
+					{
+						ComboBox_SetCurSel(RegionCombo, OriginalSelection);
+						NotifyComboSelectionChange(RegionCombo);
+						FlushRegionEditorSelectionChange(hWnd, ListView);
+					}
+				}
 			}
 
 			Out.flush();
