@@ -3120,9 +3120,11 @@ namespace cse
 			return std::string("Data\\CSVExports\\Regions\\Inspector\\") + FileName;
 		}
 
-		static std::string BuildRegionInspectorWindowPath(const char* TabName)
+		static std::string BuildRegionInspectorWindowPath(const char* TabName, int TemplateID)
 		{
-			return BuildRegionInspectorOutputPath(TabName, "ControlMap_TabTemplateID.csv");
+			char Suffix[96] = { 0 };
+			FORMAT_STR(Suffix, "ControlMap_TabTemplateID_%d.csv", TemplateID);
+			return BuildRegionInspectorOutputPath(TabName, Suffix);
 		}
 
 		static std::string BuildRegionInspectorEventPath(const char* TabName)
@@ -3683,7 +3685,7 @@ namespace cse
 		static bool WriteRegionInspectorControlCSV(HWND hWnd, int TemplateID, const std::vector<RegionInspectorControlSnapshot>& Rows)
 		{
 			const char* TabName = GetRegionTemplateDebugName(TemplateID);
-			std::ofstream Out(BuildRegionInspectorWindowPath(TabName), std::ios::trunc);
+			std::ofstream Out(BuildRegionInspectorWindowPath(TabName, TemplateID), std::ios::trunc);
 			if (!Out.good())
 				return false;
 
