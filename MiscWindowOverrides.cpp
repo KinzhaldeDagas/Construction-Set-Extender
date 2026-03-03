@@ -3184,6 +3184,21 @@ namespace cse
 									OutTemplateID = TESDialog::kDialogTemplate_RegionEditorGrassData;
 									return true;
 								}
+								if (_stricmp(TabText, "Objects") == 0)
+								{
+									OutTemplateID = TESDialog::kDialogTemplate_RegionEditorObjectsData;
+									return true;
+								}
+								if (_stricmp(TabText, "Objects (more)") == 0)
+								{
+									OutTemplateID = TESDialog::kDialogTemplate_RegionEditorObjectsExtraData;
+									return true;
+								}
+								if (_stricmp(TabText, "Sound") == 0)
+								{
+									OutTemplateID = TESDialog::kDialogTemplate_RegionEditorSoundData;
+									return true;
+								}
 							}
 						}
 					}
@@ -3206,6 +3221,9 @@ namespace cse
 			case TESDialog::kDialogTemplate_RegionEditorWeatherData:
 			case TESDialog::kDialogTemplate_RegionEditorLandscapeData:
 			case TESDialog::kDialogTemplate_RegionEditorGrassData:
+			case TESDialog::kDialogTemplate_RegionEditorObjectsData:
+			case TESDialog::kDialogTemplate_RegionEditorObjectsExtraData:
+			case TESDialog::kDialogTemplate_RegionEditorSoundData:
 				return RawTemplateID;
 			}
 
@@ -3228,6 +3246,12 @@ namespace cse
 					return TESDialog::kDialogTemplate_RegionEditorLandscapeData;
 				if (_stricmp(Title, "Grass") == 0)
 					return TESDialog::kDialogTemplate_RegionEditorGrassData;
+				if (_stricmp(Title, "Objects") == 0)
+					return TESDialog::kDialogTemplate_RegionEditorObjectsData;
+				if (_stricmp(Title, "Objects (more)") == 0)
+					return TESDialog::kDialogTemplate_RegionEditorObjectsExtraData;
+				if (_stricmp(Title, "Sound") == 0)
+					return TESDialog::kDialogTemplate_RegionEditorSoundData;
 				Current = GetParent(Current);
 			}
 
@@ -3747,6 +3771,80 @@ namespace cse
 			return BestLabel ? GetWindowTextString(BestLabel) : "";
 		}
 
+		static std::string ResolveRegionInspectorSemanticLabelFromCSVFindings(int TemplateID, int ControlID, const std::string& ClassName, const std::string& Caption)
+		{
+			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorGeneral)
+			{
+				if (ControlID == 1048 && _stricmp(ClassName.c_str(), "Edit") == 0)
+					return "Region Name";
+				if (ControlID == 1045 && _stricmp(ClassName.c_str(), "Button") == 0)
+					return "Worldspace";
+				if (ControlID == 1046 && _stricmp(ClassName.c_str(), "Button") == 0)
+					return "Editor Region?";
+			}
+
+			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorMapData)
+			{
+				if (ControlID == 2023 && _stricmp(ClassName.c_str(), "Button") == 0)
+					return "Enable this type of data";
+				if (ControlID == 2024 && _stricmp(ClassName.c_str(), "Edit") == 0)
+					return "Map Name";
+				if (ControlID == 2025 && _stricmp(ClassName.c_str(), "Edit") == 0)
+					return "Priority:";
+			}
+
+			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorWeatherData)
+			{
+				if (ControlID == 1062 && _stricmp(ClassName.c_str(), "Button") == 0)
+					return "Enable this type of data";
+				if (ControlID == 2028 && _stricmp(ClassName.c_str(), "Edit") == 0)
+					return "Priority:";
+				if (_stricmp(ClassName.c_str(), "ComboBox") == 0)
+					return "Weather Type";
+			}
+
+			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorLandscapeData)
+			{
+				if (ControlID == 2117 && _stricmp(ClassName.c_str(), "Button") == 0)
+					return "Enable this type of data";
+				if (ControlID == 2025 && _stricmp(ClassName.c_str(), "Edit") == 0)
+					return "Priority:";
+			}
+
+			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorGrassData)
+			{
+				if (ControlID == 2127 && _stricmp(ClassName.c_str(), "Button") == 0)
+					return "Enable this type of data";
+				if (ControlID == 2128 && _stricmp(ClassName.c_str(), "Edit") == 0)
+					return "Priority:";
+				if (_stricmp(ClassName.c_str(), "SysTreeView32") == 0)
+					return "Grass list";
+			}
+
+			if (_stricmp(Caption.c_str(), "Enable this type of data") == 0)
+				return "Enable this type of data";
+
+			return "";
+		}
+
+		static std::string ResolveRegionInspectorSemanticLabel(HWND Root, int TemplateID, HWND Control)
+		{
+			if (Control == nullptr)
+				return "";
+
+			char ClassName[64] = { 0 };
+			GetClassNameA(Control, ClassName, sizeof(ClassName));
+
+			const std::string LabelFromGeometry = FindNearestRegionStaticLabel(Root, Control);
+			if (LabelFromGeometry.empty() == false)
+				return LabelFromGeometry;
+
+			return ResolveRegionInspectorSemanticLabelFromCSVFindings(TemplateID,
+				GetDlgCtrlID(Control),
+				ClassName,
+				GetWindowTextString(Control));
+		}
+
 		static void CaptureRegionInspectorControls(HWND hWnd, std::vector<RegionInspectorControlSnapshot>& Out)
 		{
 			Out.clear();
@@ -3795,7 +3893,7 @@ namespace cse
 				char ExStyleHex[16] = { 0 };
 				FORMAT_STR(StyleHex, "%08X", Row.Style);
 				FORMAT_STR(ExStyleHex, "%08X", Row.ExStyle);
-				const std::string SemanticLabel = FindNearestRegionStaticLabel(hWnd, Row.Handle);
+				const std::string SemanticLabel = ResolveRegionInspectorSemanticLabel(hWnd, TemplateID, Row.Handle);
 				Out << TemplateID << ','
 					<< EscapeRegionInspectorCSVCell(TabName) << ','
 					<< Row.ControlID << ','
@@ -3828,7 +3926,7 @@ namespace cse
 			{
 				const int Width = std::max<LONG>(0, Row.Rect.right - Row.Rect.left);
 				const int Height = std::max<LONG>(0, Row.Rect.bottom - Row.Rect.top);
-				const std::string SemanticLabel = FindNearestRegionStaticLabel(hWnd, Row.Handle);
+				const std::string SemanticLabel = ResolveRegionInspectorSemanticLabel(hWnd, TemplateID, Row.Handle);
 				char StyleHex[16] = { 0 };
 				char ExStyleHex[16] = { 0 };
 				FORMAT_STR(StyleHex, "%08X", Row.Style);
@@ -3890,7 +3988,7 @@ namespace cse
 				<< GetDlgCtrlID(SourceControl) << ','
 				<< EscapeRegionInspectorCSVCell(ClassName) << ','
 				<< EscapeRegionInspectorCSVCell(GetWindowTextString(SourceControl).c_str()) << ','
-				<< EscapeRegionInspectorCSVCell(FindNearestRegionStaticLabel(hWnd, SourceControl).c_str()) << ','
+				<< EscapeRegionInspectorCSVCell(ResolveRegionInspectorSemanticLabel(hWnd, TemplateID, SourceControl).c_str()) << ','
 				<< NotifyCode << ','
 				<< EscapeRegionInspectorCSVCell(Before.c_str()) << ','
 				<< EscapeRegionInspectorCSVCell(After.c_str()) << "\n";
