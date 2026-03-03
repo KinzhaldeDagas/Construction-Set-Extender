@@ -3614,7 +3614,47 @@ namespace cse
 			return -1;
 		}
 
-		static bool ExportRegionObjectsDataCSV(HWND hWnd, HWND ListView, std::ofstream& Out)
+		static HWND FindBestRegionSelectionCombo(HWND hWnd)
+		{
+			HWND Best = nullptr;
+			int BestCount = 0;
+			HWND Current = hWnd;
+			for (int Depth = 0; Current && Depth < 12; Depth++)
+			{
+				std::vector<HWND> Children;
+				CollectChildWindowsRecursive(Current, Children);
+				for (HWND Child : Children)
+				{
+					char ClassName[64] = { 0 };
+					GetClassNameA(Child, ClassName, sizeof(ClassName));
+					if (_stricmp(ClassName, "ComboBox") != 0)
+						continue;
+					const int ItemCount = ComboBox_GetCount(Child);
+					if (ItemCount > BestCount)
+					{
+						BestCount = ItemCount;
+						Best = Child;
+					}
+				}
+				Current = GetParent(Current);
+			}
+			return BestCount > 1 ? Best : nullptr;
+		}
+
+		static void NotifyComboSelectionChange(HWND Combo)
+		{
+			if (Combo == nullptr)
+				return;
+			HWND Parent = GetParent(Combo);
+			if (Parent == nullptr)
+				return;
+			const UINT_PTR ComboID = static_cast<UINT_PTR>(GetDlgCtrlID(Combo));
+			SendMessageA(Parent, WM_COMMAND, MAKEWPARAM(ComboID, CBN_SELCHANGE), reinterpret_cast<LPARAM>(Combo));
+			UpdateWindow(Combo);
+			UpdateWindow(Parent);
+		}
+
+		static bool ExportRegionObjectsDataRowsCSV(HWND hWnd, HWND ListView, std::ofstream& Out, const std::string& RegionName)
 		{
 			struct FieldDef
 			{
@@ -3641,18 +3681,12 @@ namespace cse
 				{ "Override", { "Override" }, "Override", true },
 			};
 
-			Out << "\"Region\"";
-			for (const auto& Field : Fields)
-				Out << ',' << EscapeRegionCSVCell(Field.Header);
-			Out << "\n";
-
 			std::vector<int> ColumnByField;
 			ColumnByField.reserve(Fields.size());
 			for (const auto& Field : Fields)
 				ColumnByField.push_back(FindListViewColumnByAliases(ListView, Field.HeaderAliases));
 
 			const int RowCount = ListView_GetItemCount(ListView);
-			const std::string RegionName = ResolveRegionEditorName(hWnd);
 			for (int r = 0; r < RowCount; r++)
 			{
 				Out << EscapeRegionCSVCell(RegionName.c_str());
@@ -3669,7 +3703,59 @@ namespace cse
 			return true;
 		}
 
-		static bool ExportRegionObjectsListViewCSV(HWND hWnd, HWND ListView, const std::string& Path)
+		static bool ExportRegionObjectsDataCSV(HWND hWnd, HWND ListView, std::ofstream& Out, bool ExportAllRegions)
+		{
+			Out << "\"Region\""
+				<< ",\"Object\""
+				<< ",\"Density\""
+				<< ",\"MinSlope\""
+				<< ",\"MaxSlope\""
+				<< ",\"MinHeight\""
+				<< ",\"MaxHeight\""
+				<< ",\"Clustering\""
+				<< ",\"Radius\""
+				<< ",\"RadiusWrtParent\""
+				<< ",\"IsTree\""
+				<< ",\"IsHugeRock\""
+				<< ",\"Priority\""
+				<< ",\"Override\"\n";
+
+			if (ExportAllRegions == false)
+			{
+				return ExportRegionObjectsDataRowsCSV(hWnd, ListView, Out, ResolveRegionEditorName(hWnd));
+			}
+
+			HWND RegionCombo = FindBestRegionSelectionCombo(hWnd);
+			if (RegionCombo == nullptr)
+			{
+				return ExportRegionObjectsDataRowsCSV(hWnd, ListView, Out, ResolveRegionEditorName(hWnd));
+			}
+
+			const int OriginalSelection = ComboBox_GetCurSel(RegionCombo);
+			const int RegionCount = ComboBox_GetCount(RegionCombo);
+			for (int i = 0; i < RegionCount; i++)
+			{
+				if (ComboBox_SetCurSel(RegionCombo, i) == CB_ERR)
+					continue;
+				NotifyComboSelectionChange(RegionCombo);
+
+				char RegionName[512] = { 0 };
+				ComboBox_GetLBText(RegionCombo, i, RegionName);
+				std::string RegionValue = RegionName[0] ? RegionName : ResolveRegionEditorName(hWnd);
+				if (!ExportRegionObjectsDataRowsCSV(hWnd, ListView, Out, RegionValue))
+					break;
+			}
+
+			if (OriginalSelection >= 0)
+			{
+				ComboBox_SetCurSel(RegionCombo, OriginalSelection);
+				NotifyComboSelectionChange(RegionCombo);
+			}
+
+			return true;
+		}
+
+		static bool ExportRegionObjectsListViewCSV(HWND hWnd, HWND ListView, const std::string& Path, bool ExportAllRegions)
 		{
 			int ColCount = Header_GetItemCount(ListView_GetHeader(ListView));
 			int RowCount = ListView_GetItemCount(ListView);
@@ -3683,7 +3769,7 @@ namespace cse
 			const int TemplateID = ResolveRegionCSVTemplateID(hWnd);
 			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsData)
 			{
-				if (!ExportRegionObjectsDataCSV(hWnd, ListView, Out))
+				if (!ExportRegionObjectsDataCSV(hWnd, ListView, Out, ExportAllRegions))
 					return false;
 				Out.flush();
 				return Out.good();
@@ -3747,7 +3833,7 @@ namespace cse
 			return Out.good();
 		}
 
-		static bool ValidateRegionCSVHeaderForTemplate(int TemplateID, const std::vector<std::string>& HeaderFields)
+static bool ValidateRegionCSVHeaderForTemplate(int TemplateID, const std::vector<std::string>& HeaderFields)
 		{
 			if (!IsRegionObjectsSchemaTemplate(TemplateID))
 				return true;
@@ -3791,9 +3877,9 @@ namespace cse
 			return true;
 		}
 
-		static bool ExportRegionTabListViewCSV(HWND hWnd, HWND ListView, const std::string& Path)
+		static bool ExportRegionTabListViewCSV(HWND hWnd, HWND ListView, const std::string& Path, bool ExportAllRegions)
 		{
-			return ExportRegionObjectsListViewCSV(hWnd, ListView, Path);
+			return ExportRegionObjectsListViewCSV(hWnd, ListView, Path, ExportAllRegions);
 		}
 
 		static bool ImportRegionObjectsListViewCSV(HWND ListView, const std::string& Path, int TemplateID);
@@ -3972,9 +4058,12 @@ namespace cse
 					}
 
 					std::string Path = BuildRegionObjectsCSVPath(hWnd);
+					bool ExportAllRegions = false;
 					if (LOWORD(wParam) == IDC_REGIONOBJ_EXPORTBTN)
 					{
-						if (ExportRegionTabListViewCSV(hWnd, ListView, Path))
+						int Choice = MessageBoxA(hWnd, "Export for selected region only?\n\nYes = selected region only\nNo = export for all regions", "Region CSV Export Scope", MB_ICONQUESTION | MB_YESNO);
+						ExportAllRegions = (Choice == IDNO);
+						if (ExportRegionTabListViewCSV(hWnd, ListView, Path, ExportAllRegions))
 							BGSEEUI->MsgBoxI("Generated objects exported to:\n%s", Path.c_str());
 						else
 							BGSEEUI->MsgBoxE("Failed to export generated objects CSV.");
