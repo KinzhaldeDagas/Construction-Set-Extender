@@ -4232,6 +4232,19 @@ namespace cse
 			UpdateWindow(Parent);
 		}
 
+		static void RefreshCurrentRegionSelection(HWND Dialog, HWND ListView)
+		{
+			HWND RegionCombo = FindBestRegionSelectionCombo(Dialog);
+			if (RegionCombo == nullptr)
+				return;
+
+			if (ComboBox_GetCurSel(RegionCombo) == CB_ERR)
+				return;
+
+			NotifyComboSelectionChange(RegionCombo);
+			FlushRegionEditorSelectionChange(Dialog, ListView);
+		}
+
 		static void FlushRegionEditorSelectionChange(HWND Dialog, HWND ListView)
 		{
 			if (Dialog == nullptr && ListView == nullptr)
@@ -4324,6 +4337,7 @@ namespace cse
 
 			if (ExportAllRegions == false)
 			{
+				RefreshCurrentRegionSelection(hWnd, ListView);
 				return ExportRegionObjectsDataRowsCSV(hWnd, ListView, Out, ResolveRegionEditorName(hWnd));
 			}
 
@@ -4439,6 +4453,7 @@ namespace cse
 
 			if (!UseStrictSchemaHeaders || ExportAllRegions == false)
 			{
+				RefreshCurrentRegionSelection(hWnd, ListView);
 				const std::string RegionName = ResolveRegionEditorName(hWnd);
 				if (!WriteCurrentRows(RegionName))
 					return false;
