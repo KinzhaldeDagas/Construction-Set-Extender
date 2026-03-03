@@ -1,0 +1,10 @@
+Timestamp,TemplateID,TabName,ControlID,ClassName,Caption,SemanticLabel,NotifyCode,BeforeValue,AfterValue
+"2026-03-03 00:24:45.014",251,"Weather",2028,"Edit","","Priority:",1024,"",""
+"2026-03-03 00:24:45.031",251,"Weather",2028,"Edit","","Priority:",768,"",""
+"2026-03-03 00:24:45.044",251,"Weather",2028,"Edit","50","Priority:",1024,"","50"
+"2026-03-03 00:24:45.051",251,"Weather",2028,"Edit","50","Priority:",768,"50","50"
+"2026-03-03 00:24:46.455",251,"Weather",1062,"Button","Enable this type of data","Priority:",0,"Unchecked","Unchecked"
+"2026-03-03 00:24:46.473",251,"Weather",2028,"Edit","","Priority:",1024,"50",""
+"2026-03-03 00:24:46.493",251,"Weather",2028,"Edit","","Priority:",768,"",""
+"2026-03-03 00:24:46.501",251,"Weather",2028,"Edit","50","Priority:",1024,"","50"
+"2026-03-03 00:24:46.504",251,"Weather",2028,"Edit","50","Priority:",768,"50","50"
