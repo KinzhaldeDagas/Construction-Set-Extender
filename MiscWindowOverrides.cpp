@@ -4070,25 +4070,40 @@ namespace cse
 			CollectChildWindowsRecursive(Root, Children);
 
 			char ClassName[64] = { 0 };
-			for (HWND Child : Children)
+			auto IsVisibleControl = [](HWND Control)
 			{
-				GetClassNameA(Child, ClassName, sizeof(ClassName));
-				if (Checkbox == false && _stricmp(ClassName, "Button") == 0)
-					continue;
-				if (Checkbox && _stricmp(ClassName, "Button") != 0)
-					continue;
+				return Control && IsWindowVisible(Control);
+			};
 
-				std::string Caption = NormalizeRegionToken(GetWindowTextString(Child));
-				if (Caption.empty())
-					continue;
-				if (Caption == Target || Caption.find(Target) != std::string::npos || Target.find(Caption) != std::string::npos)
-					return Child;
+			if (Checkbox)
+			{
+				HWND FuzzyMatch = nullptr;
+				for (HWND Child : Children)
+				{
+					if (!IsVisibleControl(Child))
+						continue;
+					GetClassNameA(Child, ClassName, sizeof(ClassName));
+					if (_stricmp(ClassName, "Button") != 0)
+						continue;
+
+					std::string Caption = NormalizeRegionToken(GetWindowTextString(Child));
+					if (Caption.empty())
+						continue;
+					if (Caption == Target)
+						return Child;
+					if (FuzzyMatch == nullptr && (Caption.find(Target) != std::string::npos || Target.find(Caption) != std::string::npos))
+						FuzzyMatch = Child;
+				}
+				if (FuzzyMatch)
+					return FuzzyMatch;
 			}
 
 			HWND BestLabel = nullptr;
 			RECT BestLabelRect = { 0 };
 			for (HWND Child : Children)
 			{
+				if (!IsVisibleControl(Child))
+					continue;
 				GetClassNameA(Child, ClassName, sizeof(ClassName));
 				if (_stricmp(ClassName, "Static") != 0)
 					continue;
@@ -4111,6 +4126,8 @@ namespace cse
 			int BestScore = INT_MAX;
 			for (HWND Child : Children)
 			{
+				if (!IsVisibleControl(Child))
+					continue;
 				GetClassNameA(Child, ClassName, sizeof(ClassName));
 				const bool IsEditLike = (_stricmp(ClassName, "Edit") == 0) || (_stricmp(ClassName, "ComboBox") == 0) || (Checkbox && _stricmp(ClassName, "Button") == 0);
 				if (!IsEditLike)
@@ -4232,6 +4249,19 @@ namespace cse
 			UpdateWindow(Parent);
 		}
 
+		static void RefreshCurrentRegionSelection(HWND Dialog, HWND ListView)
+		{
+			HWND RegionCombo = FindBestRegionSelectionCombo(Dialog);
+			if (RegionCombo == nullptr)
+				return;
+
+			if (ComboBox_GetCurSel(RegionCombo) == CB_ERR)
+				return;
+
+			NotifyComboSelectionChange(RegionCombo);
+			FlushRegionEditorSelectionChange(Dialog, ListView);
+		}
+
 		static void FlushRegionEditorSelectionChange(HWND Dialog, HWND ListView)
 		{
 			if (Dialog == nullptr && ListView == nullptr)
@@ -4276,9 +4306,9 @@ namespace cse
 				{ "MaxHeight", { "MaxHeight", "Max Height" }, "Max Height", false },
 				{ "Clustering", { "Clustering" }, "Clustering", false },
 				{ "Radius", { "Radius" }, "Radius", false },
-				{ "RadiusWrtParent", { "RadiusWrtParent", "Radius wrt Parent" }, "Radius wrt Parent", false },
+				{ "RadiusWrtParent", { "RadiusWrtParent", "Radius wrt Parent", "Radius w.r.t Parent", "Parent Radius" }, "Radius wrt Parent", false },
 				{ "IsTree", { "IsTree", "Is a Tree" }, "Is a Tree", true },
-				{ "IsHugeRock", { "IsHugeRock", "Is a Huge Rock" }, "Is a Huge Rock", true },
+				{ "IsHugeRock", { "IsHugeRock", "Is a Huge Rock", "Huge Rock" }, "Is a Huge Rock", true },
 				{ "Priority", { "Priority" }, "Priority", false },
 				{ "Override", { "Override" }, "Override", true },
 			};
@@ -4324,6 +4354,7 @@ namespace cse
 
 			if (ExportAllRegions == false)
 			{
+				RefreshCurrentRegionSelection(hWnd, ListView);
 				return ExportRegionObjectsDataRowsCSV(hWnd, ListView, Out, ResolveRegionEditorName(hWnd));
 			}
 
@@ -4439,6 +4470,7 @@ namespace cse
 
 			if (!UseStrictSchemaHeaders || ExportAllRegions == false)
 			{
+				RefreshCurrentRegionSelection(hWnd, ListView);
 				const std::string RegionName = ResolveRegionEditorName(hWnd);
 				if (!WriteCurrentRows(RegionName))
 					return false;
