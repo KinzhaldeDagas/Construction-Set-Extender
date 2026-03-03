@@ -3701,8 +3701,20 @@ namespace cse
 
 			if (_stricmp(ClassName, "Button") == 0)
 			{
-				const LRESULT Checked = SendMessageA(Control, BM_GETCHECK, 0, 0);
-				return Checked == BST_CHECKED ? "Checked" : "Unchecked";
+				const LONG Style = static_cast<LONG>(GetWindowLongPtrA(Control, GWL_STYLE));
+				const LONG ButtonType = (Style & BS_TYPEMASK);
+				const bool IsCheckable =
+					ButtonType == BS_CHECKBOX || ButtonType == BS_AUTOCHECKBOX ||
+					ButtonType == BS_3STATE || ButtonType == BS_AUTO3STATE ||
+					ButtonType == BS_RADIOBUTTON || ButtonType == BS_AUTORADIOBUTTON;
+				if (IsCheckable)
+				{
+					const LRESULT Checked = SendMessageA(Control, BM_GETCHECK, 0, 0);
+					if (Checked == BST_INDETERMINATE)
+						return "Indeterminate";
+					return Checked == BST_CHECKED ? "Checked" : "Unchecked";
+				}
+				return GetWindowTextString(Control);
 			}
 
 			if (_stricmp(ClassName, "ComboBox") == 0)
@@ -3885,14 +3897,18 @@ namespace cse
 			char ClassName[64] = { 0 };
 			GetClassNameA(Control, ClassName, sizeof(ClassName));
 
+			const std::string LabelFromCSV = ResolveRegionInspectorSemanticLabelFromCSVFindings(TemplateID,
+				GetDlgCtrlID(Control),
+				ClassName,
+				GetWindowTextString(Control));
+			if (LabelFromCSV.empty() == false)
+				return LabelFromCSV;
+
 			const std::string LabelFromGeometry = FindNearestRegionStaticLabel(Root, Control);
 			if (LabelFromGeometry.empty() == false)
 				return LabelFromGeometry;
 
-			return ResolveRegionInspectorSemanticLabelFromCSVFindings(TemplateID,
-				GetDlgCtrlID(Control),
-				ClassName,
-				GetWindowTextString(Control));
+			return "";
 		}
 
 		static void CaptureRegionInspectorControls(HWND hWnd, std::vector<RegionInspectorControlSnapshot>& Out)
