@@ -3240,6 +3240,56 @@ namespace cse
 			return Best;
 		}
 
+
+		static bool TryResolveRegionCSVTemplateIDFromTabControl(HWND hWnd, int& OutTemplateID)
+		{
+			HWND Current = hWnd;
+			for (int Depth = 0; Current && Depth < 12; Depth++)
+			{
+				HWND Child = GetWindow(Current, GW_CHILD);
+				while (Child)
+				{
+					char ClassName[64] = { 0 };
+					GetClassNameA(Child, ClassName, sizeof(ClassName));
+					if (_stricmp(ClassName, "SysTabControl32") == 0)
+					{
+						const int TabIndex = TabCtrl_GetCurSel(Child);
+						if (TabIndex >= 0)
+						{
+							char TabText[256] = { 0 };
+							TCITEMA TabItem = { 0 };
+							TabItem.mask = TCIF_TEXT;
+							TabItem.pszText = TabText;
+							TabItem.cchTextMax = sizeof(TabText);
+							if (TabCtrl_GetItem(Child, TabIndex, &TabItem))
+							{
+								if (_stricmp(TabText, "Sound") == 0)
+								{
+									OutTemplateID = TESDialog::kDialogTemplate_RegionEditorSoundData;
+									return true;
+								}
+								if (_stricmp(TabText, "Objects (more)") == 0)
+								{
+									OutTemplateID = TESDialog::kDialogTemplate_RegionEditorObjectsExtraData;
+									return true;
+								}
+								if (_stricmp(TabText, "Objects") == 0)
+								{
+									OutTemplateID = TESDialog::kDialogTemplate_RegionEditorObjectsData;
+									return true;
+								}
+							}
+						}
+					}
+					Child = GetWindow(Child, GW_HWNDNEXT);
+				}
+
+				Current = GetParent(Current);
+			}
+
+			return false;
+		}
+
 		static int ResolveRegionCSVTemplateID(HWND hWnd);
 
 		static std::string BuildRegionObjectsCSVPath(HWND hWnd)
@@ -3265,6 +3315,10 @@ namespace cse
 
 		static int ResolveRegionCSVTemplateID(HWND hWnd)
 		{
+			int TabTemplateID = 0;
+			if (TryResolveRegionCSVTemplateIDFromTabControl(hWnd, TabTemplateID))
+				return TabTemplateID;
+
 			const int RawTemplateID = GetDlgCtrlID(hWnd);
 			if (RawTemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsData ||
 				RawTemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsExtraData ||
@@ -3380,7 +3434,328 @@ namespace cse
 			return Fallback;
 		}
 
-		static bool ExportRegionObjectsListViewCSV(HWND hWnd, HWND ListView, const std::string& Path)
+		static bool IsAffirmativeRegionCSVValue(const std::string& Value)
+		{
+			return EqualsInsensitive(Value, "1") ||
+				EqualsInsensitive(Value, "true") ||
+				EqualsInsensitive(Value, "yes") ||
+				EqualsInsensitive(Value, "y") ||
+				EqualsInsensitive(Value, "checked") ||
+				EqualsInsensitive(Value, "x");
+		}
+
+		static std::string NormalizeRegionToken(const std::string& Value)
+		{
+			std::string Out;
+			Out.reserve(Value.size());
+			for (char Ch : Value)
+			{
+				if ((Ch >= 'A' && Ch <= 'Z') || (Ch >= 'a' && Ch <= 'z') || (Ch >= '0' && Ch <= '9'))
+				{
+					if (Ch >= 'A' && Ch <= 'Z')
+						Out.push_back(Ch + ('a' - 'A'));
+					else
+						Out.push_back(Ch);
+				}
+			}
+			return Out;
+		}
+
+		static void CollectChildWindowsRecursive(HWND Parent, std::vector<HWND>& Out)
+		{
+			if (Parent == nullptr)
+				return;
+
+			HWND Child = GetWindow(Parent, GW_CHILD);
+			while (Child)
+			{
+				Out.push_back(Child);
+				CollectChildWindowsRecursive(Child, Out);
+				Child = GetWindow(Child, GW_HWNDNEXT);
+			}
+		}
+
+		static std::string GetWindowTextString(HWND Window)
+		{
+			char Buffer[512] = { 0 };
+			GetWindowTextA(Window, Buffer, sizeof(Buffer));
+			return Buffer;
+		}
+
+		static HWND FindRegionFieldControl(HWND Root, const char* FieldLabel, bool Checkbox)
+		{
+			if (Root == nullptr || FieldLabel == nullptr)
+				return nullptr;
+
+			const std::string Target = NormalizeRegionToken(FieldLabel);
+			std::vector<HWND> Children;
+			CollectChildWindowsRecursive(Root, Children);
+
+			char ClassName[64] = { 0 };
+			for (HWND Child : Children)
+			{
+				GetClassNameA(Child, ClassName, sizeof(ClassName));
+				if (Checkbox == false && _stricmp(ClassName, "Button") == 0)
+					continue;
+				if (Checkbox && _stricmp(ClassName, "Button") != 0)
+					continue;
+
+				std::string Caption = NormalizeRegionToken(GetWindowTextString(Child));
+				if (Caption.empty())
+					continue;
+				if (Caption == Target || Caption.find(Target) != std::string::npos || Target.find(Caption) != std::string::npos)
+					return Child;
+			}
+
+			HWND BestLabel = nullptr;
+			RECT BestLabelRect = { 0 };
+			for (HWND Child : Children)
+			{
+				GetClassNameA(Child, ClassName, sizeof(ClassName));
+				if (_stricmp(ClassName, "Static") != 0)
+					continue;
+
+				std::string Caption = NormalizeRegionToken(GetWindowTextString(Child));
+				if (Caption.empty())
+					continue;
+				if (!(Caption == Target || Caption.find(Target) != std::string::npos || Target.find(Caption) != std::string::npos))
+					continue;
+
+				GetWindowRect(Child, &BestLabelRect);
+				MapWindowPoints(nullptr, Root, reinterpret_cast<LPPOINT>(&BestLabelRect), 2);
+				BestLabel = Child;
+				break;
+			}
+			if (!BestLabel)
+				return nullptr;
+
+			HWND BestControl = nullptr;
+			int BestScore = INT_MAX;
+			for (HWND Child : Children)
+			{
+				GetClassNameA(Child, ClassName, sizeof(ClassName));
+				const bool IsEditLike = (_stricmp(ClassName, "Edit") == 0) || (_stricmp(ClassName, "ComboBox") == 0) || (Checkbox && _stricmp(ClassName, "Button") == 0);
+				if (!IsEditLike)
+					continue;
+
+				RECT R = { 0 };
+				GetWindowRect(Child, &R);
+				MapWindowPoints(nullptr, Root, reinterpret_cast<LPPOINT>(&R), 2);
+				if (R.left < BestLabelRect.right - 8)
+					continue;
+				const int Dy = abs(((R.top + R.bottom) / 2) - ((BestLabelRect.top + BestLabelRect.bottom) / 2));
+				const int Dx = std::max(0L, R.left - BestLabelRect.right);
+				const int Score = Dy * 100 + Dx;
+				if (Score < BestScore)
+				{
+					BestScore = Score;
+					BestControl = Child;
+				}
+			}
+
+			return BestControl;
+		}
+
+		static std::string ReadRegionFieldValueForRow(HWND Dialog, HWND ListView, int RowIndex, int ListColumnIndex, const char* FieldLabel, bool Checkbox)
+		{
+			if (ListColumnIndex >= 0)
+			{
+				char Cell[512] = { 0 };
+				ListView_GetItemText(ListView, RowIndex, ListColumnIndex, Cell, sizeof(Cell));
+				if (Cell[0])
+				{
+					std::string Value = Cell;
+					if (Checkbox)
+						return IsAffirmativeRegionCSVValue(Value) ? "Yes" : "No";
+					return Value;
+				}
+			}
+
+			if (Dialog == nullptr)
+				return Checkbox ? "No" : "";
+
+			ListView_SetItemState(ListView, -1, 0, LVIS_SELECTED | LVIS_FOCUSED);
+			ListView_SetItemState(ListView, RowIndex, LVIS_SELECTED | LVIS_FOCUSED, LVIS_SELECTED | LVIS_FOCUSED);
+			ListView_EnsureVisible(ListView, RowIndex, FALSE);
+			UpdateWindow(ListView);
+			UpdateWindow(Dialog);
+
+			HWND Control = FindRegionFieldControl(Dialog, FieldLabel, Checkbox);
+			if (Control == nullptr)
+				return Checkbox ? "No" : "";
+
+			if (Checkbox)
+				return SendMessage(Control, BM_GETCHECK, 0, 0) == BST_CHECKED ? "Yes" : "No";
+			return GetWindowTextString(Control);
+		}
+
+		static int FindListViewColumnByAliases(HWND ListView, const std::vector<std::string>& Aliases)
+		{
+			if (ListView == nullptr)
+				return -1;
+			const int ColCount = Header_GetItemCount(ListView_GetHeader(ListView));
+			for (int c = 0; c < ColCount; c++)
+			{
+				char HeaderText[256] = { 0 };
+				HDITEMA HeaderItem = { 0 };
+				HeaderItem.mask = HDI_TEXT;
+				HeaderItem.pszText = HeaderText;
+				HeaderItem.cchTextMax = sizeof(HeaderText);
+				if (!Header_GetItem(ListView_GetHeader(ListView), c, &HeaderItem))
+					continue;
+				const std::string NormalizedHeader = NormalizeRegionToken(HeaderText);
+				for (const auto& Alias : Aliases)
+				{
+					const std::string NormalizedAlias = NormalizeRegionToken(Alias);
+					if (NormalizedHeader == NormalizedAlias)
+						return c;
+				}
+			}
+			return -1;
+		}
+
+		static HWND FindBestRegionSelectionCombo(HWND hWnd)
+		{
+			HWND Best = nullptr;
+			int BestCount = 0;
+			HWND Current = hWnd;
+			for (int Depth = 0; Current && Depth < 12; Depth++)
+			{
+				std::vector<HWND> Children;
+				CollectChildWindowsRecursive(Current, Children);
+				for (HWND Child : Children)
+				{
+					char ClassName[64] = { 0 };
+					GetClassNameA(Child, ClassName, sizeof(ClassName));
+					if (_stricmp(ClassName, "ComboBox") != 0)
+						continue;
+					const int ItemCount = ComboBox_GetCount(Child);
+					if (ItemCount > BestCount)
+					{
+						BestCount = ItemCount;
+						Best = Child;
+					}
+				}
+				Current = GetParent(Current);
+			}
+			return BestCount > 1 ? Best : nullptr;
+		}
+
+		static void NotifyComboSelectionChange(HWND Combo)
+		{
+			if (Combo == nullptr)
+				return;
+			HWND Parent = GetParent(Combo);
+			if (Parent == nullptr)
+				return;
+			const UINT_PTR ComboID = static_cast<UINT_PTR>(GetDlgCtrlID(Combo));
+			SendMessageA(Parent, WM_COMMAND, MAKEWPARAM(ComboID, CBN_SELCHANGE), reinterpret_cast<LPARAM>(Combo));
+			UpdateWindow(Combo);
+			UpdateWindow(Parent);
+		}
+
+		static bool ExportRegionObjectsDataRowsCSV(HWND hWnd, HWND ListView, std::ofstream& Out, const std::string& RegionName)
+		{
+			struct FieldDef
+			{
+				const char* Header;
+				std::vector<std::string> HeaderAliases;
+				const char* ControlLabel;
+				bool Checkbox;
+			};
+
+			const std::vector<FieldDef> Fields =
+			{
+				{ "Object", { "Object" }, "Object", false },
+				{ "Density", { "Density" }, "Density", false },
+				{ "MinSlope", { "MinSlope", "Min Slope" }, "Min Slope", false },
+				{ "MaxSlope", { "MaxSlope", "Max Slope" }, "Max Slope", false },
+				{ "MinHeight", { "MinHeight", "Min Height" }, "Min Height", false },
+				{ "MaxHeight", { "MaxHeight", "Max Height" }, "Max Height", false },
+				{ "Clustering", { "Clustering" }, "Clustering", false },
+				{ "Radius", { "Radius" }, "Radius", false },
+				{ "RadiusWrtParent", { "RadiusWrtParent", "Radius wrt Parent" }, "Radius wrt Parent", false },
+				{ "IsTree", { "IsTree", "Is a Tree" }, "Is a Tree", true },
+				{ "IsHugeRock", { "IsHugeRock", "Is a Huge Rock" }, "Is a Huge Rock", true },
+				{ "Priority", { "Priority" }, "Priority", false },
+				{ "Override", { "Override" }, "Override", true },
+			};
+
+			std::vector<int> ColumnByField;
+			ColumnByField.reserve(Fields.size());
+			for (const auto& Field : Fields)
+				ColumnByField.push_back(FindListViewColumnByAliases(ListView, Field.HeaderAliases));
+
+			const int RowCount = ListView_GetItemCount(ListView);
+			for (int r = 0; r < RowCount; r++)
+			{
+				Out << EscapeRegionCSVCell(RegionName.c_str());
+				for (size_t i = 0; i < Fields.size(); i++)
+				{
+					const auto& Field = Fields[i];
+					const int ColumnIndex = ColumnByField[i];
+					std::string Value = ReadRegionFieldValueForRow(hWnd, ListView, r, ColumnIndex, Field.ControlLabel, Field.Checkbox);
+					Out << ',' << EscapeRegionCSVCell(Value.c_str());
+				}
+				Out << "\n";
+			}
+
+			return true;
+		}
+
+		static bool ExportRegionObjectsDataCSV(HWND hWnd, HWND ListView, std::ofstream& Out, bool ExportAllRegions)
+		{
+			Out << "\"Region\""
+				<< ",\"Object\""
+				<< ",\"Density\""
+				<< ",\"MinSlope\""
+				<< ",\"MaxSlope\""
+				<< ",\"MinHeight\""
+				<< ",\"MaxHeight\""
+				<< ",\"Clustering\""
+				<< ",\"Radius\""
+				<< ",\"RadiusWrtParent\""
+				<< ",\"IsTree\""
+				<< ",\"IsHugeRock\""
+				<< ",\"Priority\""
+				<< ",\"Override\"\n";
+
+			if (ExportAllRegions == false)
+			{
+				return ExportRegionObjectsDataRowsCSV(hWnd, ListView, Out, ResolveRegionEditorName(hWnd));
+			}
+
+			HWND RegionCombo = FindBestRegionSelectionCombo(hWnd);
+			if (RegionCombo == nullptr)
+			{
+				return ExportRegionObjectsDataRowsCSV(hWnd, ListView, Out, ResolveRegionEditorName(hWnd));
+			}
+
+			const int OriginalSelection = ComboBox_GetCurSel(RegionCombo);
+			const int RegionCount = ComboBox_GetCount(RegionCombo);
+			for (int i = 0; i < RegionCount; i++)
+			{
+				if (ComboBox_SetCurSel(RegionCombo, i) == CB_ERR)
+					continue;
+				NotifyComboSelectionChange(RegionCombo);
+
+				char RegionName[512] = { 0 };
+				ComboBox_GetLBText(RegionCombo, i, RegionName);
+				std::string RegionValue = RegionName[0] ? RegionName : ResolveRegionEditorName(hWnd);
+				if (!ExportRegionObjectsDataRowsCSV(hWnd, ListView, Out, RegionValue))
+					break;
+			}
+
+			if (OriginalSelection >= 0)
+			{
+				ComboBox_SetCurSel(RegionCombo, OriginalSelection);
+				NotifyComboSelectionChange(RegionCombo);
+			}
+
+			return true;
+		}
+
+		static bool ExportRegionObjectsListViewCSV(HWND hWnd, HWND ListView, const std::string& Path, bool ExportAllRegions)
 		{
 			int ColCount = Header_GetItemCount(ListView_GetHeader(ListView));
 			int RowCount = ListView_GetItemCount(ListView);
@@ -3392,6 +3767,14 @@ namespace cse
 				return false;
 
 			const int TemplateID = ResolveRegionCSVTemplateID(hWnd);
+			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsData)
+			{
+				if (!ExportRegionObjectsDataCSV(hWnd, ListView, Out, ExportAllRegions))
+					return false;
+				Out.flush();
+				return Out.good();
+			}
+
 			const bool UseStrictSchemaHeaders = IsRegionObjectsSchemaTemplate(TemplateID);
 			const int HeaderCount = UseStrictSchemaHeaders ? ColCount + 1 : ColCount;
 			for (int c = 0; c < HeaderCount; c++)
@@ -3450,10 +3833,33 @@ namespace cse
 			return Out.good();
 		}
 
-		static bool ValidateRegionCSVHeaderForTemplate(int TemplateID, const std::vector<std::string>& HeaderFields)
+static bool ValidateRegionCSVHeaderForTemplate(int TemplateID, const std::vector<std::string>& HeaderFields)
 		{
 			if (!IsRegionObjectsSchemaTemplate(TemplateID))
 				return true;
+
+			if (TemplateID == TESDialog::kDialogTemplate_RegionEditorObjectsData)
+			{
+				static const char* kExtendedObjectsHeaders[] =
+				{
+					"Region", "Object", "Density", "MinSlope", "MaxSlope", "MinHeight", "MaxHeight",
+					"Clustering", "Radius", "RadiusWrtParent", "IsTree", "IsHugeRock", "Priority", "Override"
+				};
+				if (HeaderFields.size() >= sizeof(kExtendedObjectsHeaders) / sizeof(kExtendedObjectsHeaders[0]))
+				{
+					bool MatchesExtended = true;
+					for (size_t i = 0; i < sizeof(kExtendedObjectsHeaders) / sizeof(kExtendedObjectsHeaders[0]); i++)
+					{
+						if (!EqualsInsensitive(HeaderFields[i], kExtendedObjectsHeaders[i]))
+						{
+							MatchesExtended = false;
+							break;
+						}
+					}
+					if (MatchesExtended)
+						return true;
+				}
+			}
 
 			for (int i = 0; ; i++)
 			{
@@ -3471,9 +3877,9 @@ namespace cse
 			return true;
 		}
 
-		static bool ExportRegionTabListViewCSV(HWND hWnd, HWND ListView, const std::string& Path)
+		static bool ExportRegionTabListViewCSV(HWND hWnd, HWND ListView, const std::string& Path, bool ExportAllRegions)
 		{
-			return ExportRegionObjectsListViewCSV(hWnd, ListView, Path);
+			return ExportRegionObjectsListViewCSV(hWnd, ListView, Path, ExportAllRegions);
 		}
 
 		static bool ImportRegionObjectsListViewCSV(HWND ListView, const std::string& Path, int TemplateID);
@@ -3652,9 +4058,12 @@ namespace cse
 					}
 
 					std::string Path = BuildRegionObjectsCSVPath(hWnd);
+					bool ExportAllRegions = false;
 					if (LOWORD(wParam) == IDC_REGIONOBJ_EXPORTBTN)
 					{
-						if (ExportRegionTabListViewCSV(hWnd, ListView, Path))
+						int Choice = MessageBoxA(hWnd, "Export for selected region only?\n\nYes = selected region only\nNo = export for all regions", "Region CSV Export Scope", MB_ICONQUESTION | MB_YESNO);
+						ExportAllRegions = (Choice == IDNO);
+						if (ExportRegionTabListViewCSV(hWnd, ListView, Path, ExportAllRegions))
 							BGSEEUI->MsgBoxI("Generated objects exported to:\n%s", Path.c_str());
 						else
 							BGSEEUI->MsgBoxE("Failed to export generated objects CSV.");
