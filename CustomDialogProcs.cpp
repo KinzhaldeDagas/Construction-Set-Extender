@@ -593,14 +593,46 @@ namespace cse
 				return;
 			}
 
+			TESObject* MarkerBase = CS_CAST(TESForm::LookupByEditorID("MapMarker"), TESForm, TESObject);
+			if (MarkerBase == nullptr)
+			{
+				BGSEEUI->MsgBoxE("Couldn't find the MapMarker base form.");
+				return;
+			}
+
+			float MarkerX = (State->SelectedCellX * 4096.0f) + 2048.0f;
+			float MarkerY = (State->SelectedCellY * 4096.0f) + 2048.0f;
+
+			bool CreateCell = true;
+			TESObjectCELL* ExteriorCell = _DATAHANDLER->GetExteriorCell(MarkerX, MarkerY, Worldspace, CreateCell);
+			if (ExteriorCell == nullptr)
+			{
+				BGSEEUI->MsgBoxE("Couldn't resolve or create exterior cell (%d, %d).", State->SelectedCellX, State->SelectedCellY);
+				return;
+			}
+
+			if (_TES->currentWorldSpace != Worldspace)
+				_TES->SetCurrentWorldspace(Worldspace);
+
+			Vector3 Position(MarkerX, MarkerY, 0.0f);
+			Vector3 Rotation(0.0f, 0.0f, 0.0f);
+			TESObjectREFR* PlacedRef = _DATAHANDLER->PlaceObjectRef(MarkerBase, &Position, &Rotation, ExteriorCell, Worldspace, nullptr);
+			if (PlacedRef == nullptr)
+			{
+				BGSEEUI->MsgBoxE("Couldn't place map marker in cell (%d, %d).", State->SelectedCellX, State->SelectedCellY);
+				return;
+			}
+
+			TESRenderWindow::Redraw();
+
 			char Buffer[0x200] = { 0 };
 			FORMAT_STR(Buffer, "Marker %03d | %s | %s | Cell (%d, %d) | Center (%0.1f, %0.1f)",
 				State->NextMarkerIndex++,
 				MarkerPlacement_GetWorldspaceName(Worldspace),
 				MarkerType,
 				State->SelectedCellX, State->SelectedCellY,
-				(State->SelectedCellX * 4096.0f) + 2048.0f,
-				(State->SelectedCellY * 4096.0f) + 2048.0f);
+				MarkerX,
+				MarkerY);
 
 			SendDlgItemMessage(hWnd, IDC_MARKERPLACEMENT_MARKERLIST, LB_ADDSTRING, 0, (LPARAM)Buffer);
 		}

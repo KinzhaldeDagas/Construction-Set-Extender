@@ -391,6 +391,8 @@ BEGIN
         MENUITEM "&Version Control...",         239
         POPUP "Tools"
         BEGIN
+            MENUITEM "Marker Placement...",         IDC_MAINMENU_MARKERPLACEMENT
+            MENUITEM SEPARATOR
             MENUITEM "&Combine Loaded Plugins",     40339
             MENUITEM "Create &Difference Plugin",   40547
             MENUITEM "Create F&iltered Difference Plugin", 40562
