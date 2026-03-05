@@ -660,6 +660,14 @@ namespace cse
 					objectPrefabs::ObjectPrefabManager::Instance.Show();
 
 					break;
+				case IDC_MAINMENU_MARKERPLACEMENT:
+					BGSEEUI->ModelessDialog(BGSEEMAIN->GetExtenderHandle(),
+						MAKEINTRESOURCE(IDD_MARKERPLACEMENT),
+						hWnd,
+						(DLGPROC)MarkerPlacementDlgProc);
+
+					break;
+
 				case IDC_MAINMENU_PARENTCHILDINDICATORS:
 					settings::renderer::kParentChildVisualIndicator.ToggleData();
 					TESRenderWindow::Redraw();

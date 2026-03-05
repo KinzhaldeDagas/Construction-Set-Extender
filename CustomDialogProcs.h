@@ -11,5 +11,6 @@ namespace cse
 		LRESULT CALLBACK		CreateGlobalScriptDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 		BOOL CALLBACK			BindScriptDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 		BOOL CALLBACK			EditResultScriptDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+		LRESULT CALLBACK		MarkerPlacementDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 	}
 }

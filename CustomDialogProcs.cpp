@@ -2,6 +2,7 @@
 #include "Construction Set Extender_Resource.h"
 #include "Hooks\Hooks-AssetSelector.h"
 #include "Achievements.h"
+#include "EditorAPI/Core.h"
 
 namespace cse
 {
@@ -485,6 +486,144 @@ namespace cse
 				GetWindowText(ResultScriptEditBox, Buffer, sizeof(Buffer));
 				SetDlgItemText(hWnd, IDC_EDITRESULTSCRIPT_SCRIPTTEXT, (LPSTR)Buffer);
 
+				break;
+			}
+
+			return FALSE;
+		}
+
+
+		struct MarkerPlacementState
+		{
+			int NextMarkerIndex = 1;
+			int SelectedCellX = 0;
+			int SelectedCellY = 0;
+		};
+
+		static void MarkerPlacement_PopulateWorldspaces(HWND hWnd)
+		{
+			HWND WorldspaceCombo = GetDlgItem(hWnd, IDC_MARKERPLACEMENT_WORLDSPACES);
+			SendMessage(WorldspaceCombo, CB_RESETCONTENT, 0, 0);
+
+			for (auto Itr = _DATAHANDLER->worldSpaces.Begin(); Itr.End() == false && Itr.Get(); ++Itr)
+			{
+				TESWorldSpace* Worldspace = Itr.Get();
+				const char* Name = Worldspace->name.c_str();
+				if (Name == nullptr || strlen(Name) == 0)
+					Name = Worldspace->GetEditorID();
+				if (Name == nullptr || strlen(Name) == 0)
+					Name = "<Unnamed Worldspace>";
+
+				int ItemIndex = (int)SendMessage(WorldspaceCombo, CB_ADDSTRING, 0, (LPARAM)Name);
+				SendMessage(WorldspaceCombo, CB_SETITEMDATA, ItemIndex, (LPARAM)Worldspace);
+			}
+
+			if (SendMessage(WorldspaceCombo, CB_GETCOUNT, 0, 0) > 0)
+				SendMessage(WorldspaceCombo, CB_SETCURSEL, 0, 0);
+		}
+
+		static void MarkerPlacement_AddPlacedMarker(HWND hWnd, MarkerPlacementState* State)
+		{
+			SME_ASSERT(State);
+
+			HWND WorldspaceCombo = GetDlgItem(hWnd, IDC_MARKERPLACEMENT_WORLDSPACES);
+			HWND MarkerList = GetDlgItem(hWnd, IDC_MARKERPLACEMENT_MARKERLIST);
+
+			int Selection = (int)SendMessage(WorldspaceCombo, CB_GETCURSEL, 0, 0);
+			if (Selection < 0)
+			{
+				BGSEEUI->MsgBoxW(hWnd, 0, "Please select a worldspace first.");
+				return;
+			}
+
+			TESWorldSpace* Worldspace = (TESWorldSpace*)SendMessage(WorldspaceCombo, CB_GETITEMDATA, Selection, 0);
+			const char* WorldspaceName = nullptr;
+			if (Worldspace)
+			{
+				WorldspaceName = Worldspace->name.c_str();
+				if (WorldspaceName == nullptr || strlen(WorldspaceName) == 0)
+					WorldspaceName = Worldspace->GetEditorID();
+			}
+			if (WorldspaceName == nullptr || strlen(WorldspaceName) == 0)
+				WorldspaceName = "<Worldspace>";
+
+			char Buffer[0x200] = { 0 };
+			FORMAT_STR(Buffer, "Marker %03d | %s | Cell (%d, %d) | Center (%0.1f, %0.1f)",
+				State->NextMarkerIndex++,
+				WorldspaceName,
+				State->SelectedCellX, State->SelectedCellY,
+				(State->SelectedCellX * 4096.0f) + 2048.0f,
+				(State->SelectedCellY * 4096.0f) + 2048.0f);
+
+			SendMessage(MarkerList, LB_ADDSTRING, 0, (LPARAM)Buffer);
+		}
+
+		LRESULT CALLBACK MarkerPlacementDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+		{
+			auto* State = (MarkerPlacementState*)GetWindowLongPtr(hWnd, GWLP_USERDATA);
+
+			switch (uMsg)
+			{
+			case WM_INITDIALOG:
+				{
+					auto* NewState = new MarkerPlacementState();
+					SetWindowLongPtr(hWnd, GWLP_USERDATA, (LONG_PTR)NewState);
+
+					MarkerPlacement_PopulateWorldspaces(hWnd);
+					CheckDlgButton(hWnd, IDC_MARKERPLACEMENT_MARKERTYPE_CITY, BST_CHECKED);
+					SetDlgItemText(hWnd, IDC_MARKERPLACEMENT_CELLGRID, "Selected Cell: (0, 0)\r\nRight-click in this pane to place map marker at cell center.");
+				}
+				return TRUE;
+			case WM_DESTROY:
+				if (State)
+					delete State;
+				SetWindowLongPtr(hWnd, GWLP_USERDATA, 0);
+				return TRUE;
+			case WM_CONTEXTMENU:
+				if (State && (HWND)wParam == GetDlgItem(hWnd, IDC_MARKERPLACEMENT_CELLGRID))
+				{
+					POINT Cursor = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+					RECT GridRect = { 0 };
+					HWND Grid = GetDlgItem(hWnd, IDC_MARKERPLACEMENT_CELLGRID);
+					GetWindowRect(Grid, &GridRect);
+
+					int Width = (GridRect.right - GridRect.left);
+					int Height = (GridRect.bottom - GridRect.top);
+					if (Width <= 0 || Height <= 0)
+						return TRUE;
+
+					int LocalX = Cursor.x - GridRect.left;
+					int LocalY = Cursor.y - GridRect.top;
+					if (LocalX < 0) LocalX = 0;
+					if (LocalY < 0) LocalY = 0;
+					if (LocalX >= Width) LocalX = Width - 1;
+					if (LocalY >= Height) LocalY = Height - 1;
+
+					const int GridCells = 16;
+					State->SelectedCellX = (LocalX * GridCells) / Width - (GridCells / 2);
+					State->SelectedCellY = ((Height - 1 - LocalY) * GridCells) / Height - (GridCells / 2);
+
+					char SelectedCellText[0x100] = { 0 };
+					FORMAT_STR(SelectedCellText, "Selected Cell: (%d, %d)\r\nRight-click in this pane to place map marker at cell center.",
+						State->SelectedCellX,
+						State->SelectedCellY);
+					SetDlgItemText(hWnd, IDC_MARKERPLACEMENT_CELLGRID, SelectedCellText);
+
+					MarkerPlacement_AddPlacedMarker(hWnd, State);
+					return TRUE;
+				}
+				break;
+			case WM_COMMAND:
+				switch (LOWORD(wParam))
+				{
+				case IDC_MARKERPLACEMENT_PLACEBTN:
+					if (State)
+						MarkerPlacement_AddPlacedMarker(hWnd, State);
+					return TRUE;
+				case IDC_MARKERPLACEMENT_CLOSEBTN:
+					DestroyWindow(hWnd);
+					return TRUE;
+				}
 				break;
 			}
 
