@@ -625,6 +625,7 @@ namespace cse
 				if (State)
 					delete State;
 				SetWindowLongPtr(hWnd, GWLP_USERDATA, 0);
+				NotifyMarkerPlacementDialogDestroyed(hWnd);
 				return FALSE;
 			case WM_CONTEXTMENU:
 				if (State && (HWND)wParam == GetDlgItem(hWnd, IDC_MARKERPLACEMENT_CELLGRID))

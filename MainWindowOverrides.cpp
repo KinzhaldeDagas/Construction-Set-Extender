@@ -31,6 +31,12 @@ namespace cse
 	{
 		static HWND g_MarkerPlacementDialog = nullptr;
 
+		void NotifyMarkerPlacementDialogDestroyed(HWND Dialog)
+		{
+			if (Dialog && g_MarkerPlacementDialog == Dialog)
+				g_MarkerPlacementDialog = nullptr;
+		}
+
 		MainWindowMiscData::MainWindowMiscData() :
 			bgsee::WindowExtraData(kTypeID)
 		{
@@ -2582,6 +2588,10 @@ namespace cse
 				{
 					KillTimer(hWnd, ID_PATHGRIDTOOLBARBUTTION_TIMERID);
 					KillTimer(hWnd, ID_AUTOSNAPVIEWPORTS_TIMERID);
+
+					if (g_MarkerPlacementDialog && IsWindow(g_MarkerPlacementDialog))
+						DestroyWindow(g_MarkerPlacementDialog);
+					g_MarkerPlacementDialog = nullptr;
 
 					MainWindowMiscData* xData = BGSEE_GETWINDOWXDATA(MainWindowMiscData, SubclassParams->In.ExtraData);
 					if (xData)

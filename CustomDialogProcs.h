@@ -12,5 +12,6 @@ namespace cse
 		BOOL CALLBACK			BindScriptDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 		BOOL CALLBACK			EditResultScriptDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 		BOOL CALLBACK			MarkerPlacementDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+		void					NotifyMarkerPlacementDialogDestroyed(HWND Dialog);
 	}
 }
