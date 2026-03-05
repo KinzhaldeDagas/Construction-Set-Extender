@@ -36,6 +36,8 @@ namespace cse
 		LRESULT CALLBACK		MainWindowToolbarSubClassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
 															bgsee::WindowSubclassProcCollection::SubclassProcExtraParams* SubclassParams);
 
+		void NotifyMarkerPlacementDialogDestroyed(HWND Dialog);
+
 		void InitializeMainWindowOverrides();
 	}
 }

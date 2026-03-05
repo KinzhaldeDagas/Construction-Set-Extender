@@ -31,6 +31,12 @@ namespace cse
 	{
 		static HWND g_MarkerPlacementDialog = nullptr;
 
+		void NotifyMarkerPlacementDialogDestroyed(HWND Dialog)
+		{
+			if (Dialog && g_MarkerPlacementDialog == Dialog)
+				g_MarkerPlacementDialog = nullptr;
+		}
+
 		MainWindowMiscData::MainWindowMiscData() :
 			bgsee::WindowExtraData(kTypeID)
 		{
@@ -2322,6 +2328,7 @@ namespace cse
 				case IDC_MAINMENU_MARKERPLACEMENT:
 					if (g_MarkerPlacementDialog && IsWindow(g_MarkerPlacementDialog))
 					{
+						ShowWindow(g_MarkerPlacementDialog, SW_RESTORE);
 						SetForegroundWindow(g_MarkerPlacementDialog);
 						break;
 					}
@@ -2332,7 +2339,21 @@ namespace cse
 						(DLGPROC)MarkerPlacementDlgProc);
 
 					if (g_MarkerPlacementDialog == nullptr)
+					{
+						g_MarkerPlacementDialog = CreateDialogParam(BGSEEMAIN->GetExtenderHandle(),
+							MAKEINTRESOURCE(IDD_MARKERPLACEMENT),
+							hWnd,
+							(DLGPROC)MarkerPlacementDlgProc,
+							0);
+					}
+
+					if (g_MarkerPlacementDialog == nullptr)
 						BGSEECONSOLE_ERROR("Couldn't create marker placement dialog");
+					else
+					{
+						ShowWindow(g_MarkerPlacementDialog, SW_SHOW);
+						SetForegroundWindow(g_MarkerPlacementDialog);
+					}
 
 					break;
 
@@ -2567,6 +2588,10 @@ namespace cse
 				{
 					KillTimer(hWnd, ID_PATHGRIDTOOLBARBUTTION_TIMERID);
 					KillTimer(hWnd, ID_AUTOSNAPVIEWPORTS_TIMERID);
+
+					if (g_MarkerPlacementDialog && IsWindow(g_MarkerPlacementDialog))
+						DestroyWindow(g_MarkerPlacementDialog);
+					g_MarkerPlacementDialog = nullptr;
 
 					MainWindowMiscData* xData = BGSEE_GETWINDOWXDATA(MainWindowMiscData, SubclassParams->In.ExtraData);
 					if (xData)

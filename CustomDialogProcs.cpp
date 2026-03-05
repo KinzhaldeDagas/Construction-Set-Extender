@@ -542,6 +542,34 @@ namespace cse
 			return (TESWorldSpace*)SendMessage(WorldspaceCombo, CB_GETITEMDATA, Selection, 0);
 		}
 
+		static void MarkerPlacement_UpdateCellCaption(HWND hWnd, MarkerPlacementState* State);
+
+		static bool MarkerPlacement_SelectCellFromScreenPoint(HWND hWnd, MarkerPlacementState* State, POINT CursorPos)
+		{
+			SME_ASSERT(State);
+
+			RECT GridRect = { 0 };
+			HWND Grid = GetDlgItem(hWnd, IDC_MARKERPLACEMENT_CELLGRID);
+			if (Grid == nullptr || GetWindowRect(Grid, &GridRect) == FALSE)
+				return false;
+
+			int Width = (GridRect.right - GridRect.left);
+			int Height = (GridRect.bottom - GridRect.top);
+			if (Width <= 0 || Height <= 0)
+				return false;
+
+			int LocalX = CursorPos.x - GridRect.left;
+			int LocalY = CursorPos.y - GridRect.top;
+			if (LocalX < 0 || LocalY < 0 || LocalX >= Width || LocalY >= Height)
+				return false;
+
+			const int GridCells = 16;
+			State->SelectedCellX = (LocalX * GridCells) / Width - (GridCells / 2);
+			State->SelectedCellY = ((Height - 1 - LocalY) * GridCells) / Height - (GridCells / 2);
+			MarkerPlacement_UpdateCellCaption(hWnd, State);
+			return true;
+		}
+
 		static void MarkerPlacement_UpdateCellCaption(HWND hWnd, MarkerPlacementState* State)
 		{
 			SME_ASSERT(State);
@@ -657,6 +685,7 @@ namespace cse
 				if (State)
 					delete State;
 				SetWindowLongPtr(hWnd, GWLP_USERDATA, 0);
+				NotifyMarkerPlacementDialogDestroyed(hWnd);
 				return FALSE;
 			case WM_CONTEXTMENU:
 				if (State && (HWND)wParam == GetDlgItem(hWnd, IDC_MARKERPLACEMENT_CELLGRID))
@@ -665,28 +694,9 @@ namespace cse
 					if (Cursor.x == -1 && Cursor.y == -1)
 						GetCursorPos(&Cursor);
 
-					RECT GridRect = { 0 };
-					HWND Grid = GetDlgItem(hWnd, IDC_MARKERPLACEMENT_CELLGRID);
-					GetWindowRect(Grid, &GridRect);
+					if (MarkerPlacement_SelectCellFromScreenPoint(hWnd, State, Cursor))
+						MarkerPlacement_AddPlacedMarker(hWnd, State);
 
-					int Width = (GridRect.right - GridRect.left);
-					int Height = (GridRect.bottom - GridRect.top);
-					if (Width <= 0 || Height <= 0)
-						return TRUE;
-
-					int LocalX = Cursor.x - GridRect.left;
-					int LocalY = Cursor.y - GridRect.top;
-					if (LocalX < 0) LocalX = 0;
-					if (LocalY < 0) LocalY = 0;
-					if (LocalX >= Width) LocalX = Width - 1;
-					if (LocalY >= Height) LocalY = Height - 1;
-
-					const int GridCells = 16;
-					State->SelectedCellX = (LocalX * GridCells) / Width - (GridCells / 2);
-					State->SelectedCellY = ((Height - 1 - LocalY) * GridCells) / Height - (GridCells / 2);
-
-					MarkerPlacement_UpdateCellCaption(hWnd, State);
-					MarkerPlacement_AddPlacedMarker(hWnd, State);
 					return TRUE;
 				}
 				break;
@@ -714,6 +724,15 @@ namespace cse
 
 				switch (LOWORD(wParam))
 				{
+				case IDC_MARKERPLACEMENT_CELLGRID:
+					if (HIWORD(wParam) == STN_CLICKED && State)
+					{
+						POINT Cursor = { 0 };
+						GetCursorPos(&Cursor);
+						MarkerPlacement_SelectCellFromScreenPoint(hWnd, State, Cursor);
+						return TRUE;
+					}
+					break;
 				case IDC_MARKERPLACEMENT_WORLDSPACES:
 					if (HIWORD(wParam) == CBN_SELCHANGE)
 					{
