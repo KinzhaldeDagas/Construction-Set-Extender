@@ -2,6 +2,7 @@
 #include "Construction Set Extender_Resource.h"
 #include "Hooks\Hooks-AssetSelector.h"
 #include "Achievements.h"
+#include "EditorAPI/Core.h"
 
 namespace cse
 {
@@ -485,6 +486,218 @@ namespace cse
 				GetWindowText(ResultScriptEditBox, Buffer, sizeof(Buffer));
 				SetDlgItemText(hWnd, IDC_EDITRESULTSCRIPT_SCRIPTTEXT, (LPSTR)Buffer);
 
+				break;
+			}
+
+			return FALSE;
+		}
+
+
+		struct MarkerPlacementState
+		{
+			int NextMarkerIndex = 1;
+			int SelectedCellX = 0;
+			int SelectedCellY = 0;
+		};
+
+		static const char* MarkerPlacement_GetWorldspaceName(TESWorldSpace* Worldspace)
+		{
+			if (Worldspace == nullptr)
+				return "<Worldspace>";
+
+			const char* Name = Worldspace->name.c_str();
+			if (Name == nullptr || strlen(Name) == 0)
+				Name = Worldspace->GetEditorID();
+
+			if (Name == nullptr || strlen(Name) == 0)
+				Name = "<Unnamed Worldspace>";
+
+			return Name;
+		}
+
+		static const char* MarkerPlacement_GetMarkerType(HWND hWnd)
+		{
+			if (IsDlgButtonChecked(hWnd, IDC_MARKERPLACEMENT_MARKERTYPE_CITY) == BST_CHECKED)
+				return "City";
+			if (IsDlgButtonChecked(hWnd, IDC_MARKERPLACEMENT_MARKERTYPE_TOWN) == BST_CHECKED)
+				return "Town";
+			if (IsDlgButtonChecked(hWnd, IDC_MARKERPLACEMENT_MARKERTYPE_SETTLEMENT) == BST_CHECKED)
+				return "Settlement";
+			if (IsDlgButtonChecked(hWnd, IDC_MARKERPLACEMENT_MARKERTYPE_CAVE) == BST_CHECKED)
+				return "Cave";
+			if (IsDlgButtonChecked(hWnd, IDC_MARKERPLACEMENT_MARKERTYPE_FORT) == BST_CHECKED)
+				return "Fort";
+
+			return nullptr;
+		}
+
+		static TESWorldSpace* MarkerPlacement_GetSelectedWorldspace(HWND hWnd)
+		{
+			HWND WorldspaceCombo = GetDlgItem(hWnd, IDC_MARKERPLACEMENT_WORLDSPACES);
+			int Selection = (int)SendMessage(WorldspaceCombo, CB_GETCURSEL, 0, 0);
+			if (Selection < 0)
+				return nullptr;
+
+			return (TESWorldSpace*)SendMessage(WorldspaceCombo, CB_GETITEMDATA, Selection, 0);
+		}
+
+		static void MarkerPlacement_UpdateCellCaption(HWND hWnd, MarkerPlacementState* State)
+		{
+			SME_ASSERT(State);
+
+			char Buffer[0x100] = { 0 };
+			FORMAT_STR(Buffer,
+				"Selected Cell: (%d, %d)\r\nRight-click in this pane to place map marker at cell center.",
+				State->SelectedCellX,
+				State->SelectedCellY);
+			SetDlgItemText(hWnd, IDC_MARKERPLACEMENT_CELLGRID, Buffer);
+		}
+
+		static void MarkerPlacement_PopulateWorldspaces(HWND hWnd)
+		{
+			HWND WorldspaceCombo = GetDlgItem(hWnd, IDC_MARKERPLACEMENT_WORLDSPACES);
+			SendMessage(WorldspaceCombo, CB_RESETCONTENT, 0, 0);
+
+			int CurrentWorldspaceSelection = -1;
+			int ItemIndex = 0;
+			for (auto Itr = _DATAHANDLER->worldSpaces.Begin(); Itr.End() == false && Itr.Get(); ++Itr, ++ItemIndex)
+			{
+				TESWorldSpace* Worldspace = Itr.Get();
+				int Added = (int)SendMessage(WorldspaceCombo, CB_ADDSTRING, 0, (LPARAM)MarkerPlacement_GetWorldspaceName(Worldspace));
+				SendMessage(WorldspaceCombo, CB_SETITEMDATA, Added, (LPARAM)Worldspace);
+
+				if (_TES->currentWorldSpace == Worldspace)
+					CurrentWorldspaceSelection = ItemIndex;
+			}
+
+			if (SendMessage(WorldspaceCombo, CB_GETCOUNT, 0, 0) > 0)
+				SendMessage(WorldspaceCombo, CB_SETCURSEL, max(0, CurrentWorldspaceSelection), 0);
+		}
+
+		static void MarkerPlacement_AddPlacedMarker(HWND hWnd, MarkerPlacementState* State)
+		{
+			SME_ASSERT(State);
+
+			TESWorldSpace* Worldspace = MarkerPlacement_GetSelectedWorldspace(hWnd);
+			if (Worldspace == nullptr)
+			{
+				BGSEEUI->MsgBoxW(hWnd, 0, "Please select a worldspace first.");
+				return;
+			}
+
+			const char* MarkerType = MarkerPlacement_GetMarkerType(hWnd);
+			if (MarkerType == nullptr)
+			{
+				BGSEEUI->MsgBoxW(hWnd, 0, "Please select at least one map marker type.");
+				return;
+			}
+
+			char Buffer[0x200] = { 0 };
+			FORMAT_STR(Buffer, "Marker %03d | %s | %s | Cell (%d, %d) | Center (%0.1f, %0.1f)",
+				State->NextMarkerIndex++,
+				MarkerPlacement_GetWorldspaceName(Worldspace),
+				MarkerType,
+				State->SelectedCellX, State->SelectedCellY,
+				(State->SelectedCellX * 4096.0f) + 2048.0f,
+				(State->SelectedCellY * 4096.0f) + 2048.0f);
+
+			SendDlgItemMessage(hWnd, IDC_MARKERPLACEMENT_MARKERLIST, LB_ADDSTRING, 0, (LPARAM)Buffer);
+		}
+
+		BOOL CALLBACK MarkerPlacementDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+		{
+			auto* State = (MarkerPlacementState*)GetWindowLongPtr(hWnd, GWLP_USERDATA);
+
+			switch (uMsg)
+			{
+			case WM_INITDIALOG:
+				{
+					auto* NewState = new MarkerPlacementState();
+					SetWindowLongPtr(hWnd, GWLP_USERDATA, (LONG_PTR)NewState);
+
+					MarkerPlacement_PopulateWorldspaces(hWnd);
+					CheckDlgButton(hWnd, IDC_MARKERPLACEMENT_MARKERTYPE_CITY, BST_CHECKED);
+					MarkerPlacement_UpdateCellCaption(hWnd, NewState);
+				}
+				return TRUE;
+			case WM_NCDESTROY:
+				if (State)
+					delete State;
+				SetWindowLongPtr(hWnd, GWLP_USERDATA, 0);
+				return FALSE;
+			case WM_CONTEXTMENU:
+				if (State && (HWND)wParam == GetDlgItem(hWnd, IDC_MARKERPLACEMENT_CELLGRID))
+				{
+					POINT Cursor = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+					if (Cursor.x == -1 && Cursor.y == -1)
+						GetCursorPos(&Cursor);
+
+					RECT GridRect = { 0 };
+					HWND Grid = GetDlgItem(hWnd, IDC_MARKERPLACEMENT_CELLGRID);
+					GetWindowRect(Grid, &GridRect);
+
+					int Width = (GridRect.right - GridRect.left);
+					int Height = (GridRect.bottom - GridRect.top);
+					if (Width <= 0 || Height <= 0)
+						return TRUE;
+
+					int LocalX = Cursor.x - GridRect.left;
+					int LocalY = Cursor.y - GridRect.top;
+					if (LocalX < 0) LocalX = 0;
+					if (LocalY < 0) LocalY = 0;
+					if (LocalX >= Width) LocalX = Width - 1;
+					if (LocalY >= Height) LocalY = Height - 1;
+
+					const int GridCells = 16;
+					State->SelectedCellX = (LocalX * GridCells) / Width - (GridCells / 2);
+					State->SelectedCellY = ((Height - 1 - LocalY) * GridCells) / Height - (GridCells / 2);
+
+					MarkerPlacement_UpdateCellCaption(hWnd, State);
+					MarkerPlacement_AddPlacedMarker(hWnd, State);
+					return TRUE;
+				}
+				break;
+			case WM_COMMAND:
+				if (HIWORD(wParam) == BN_CLICKED)
+				{
+					const int MarkerTypes[] = {
+						IDC_MARKERPLACEMENT_MARKERTYPE_CITY,
+						IDC_MARKERPLACEMENT_MARKERTYPE_TOWN,
+						IDC_MARKERPLACEMENT_MARKERTYPE_SETTLEMENT,
+						IDC_MARKERPLACEMENT_MARKERTYPE_CAVE,
+						IDC_MARKERPLACEMENT_MARKERTYPE_FORT
+					};
+
+					for (auto TypeID : MarkerTypes)
+					{
+						if ((int)LOWORD(wParam) == TypeID)
+						{
+							for (auto OtherTypeID : MarkerTypes)
+								CheckDlgButton(hWnd, OtherTypeID, OtherTypeID == TypeID ? BST_CHECKED : BST_UNCHECKED);
+							return TRUE;
+						}
+					}
+				}
+
+				switch (LOWORD(wParam))
+				{
+				case IDC_MARKERPLACEMENT_WORLDSPACES:
+					if (HIWORD(wParam) == CBN_SELCHANGE)
+					{
+						TESWorldSpace* SelectedWorldspace = MarkerPlacement_GetSelectedWorldspace(hWnd);
+						if (SelectedWorldspace)
+							_TES->SetCurrentWorldspace(SelectedWorldspace);
+						return TRUE;
+					}
+					break;
+				case IDC_MARKERPLACEMENT_PLACEBTN:
+					if (State)
+						MarkerPlacement_AddPlacedMarker(hWnd, State);
+					return TRUE;
+				case IDC_MARKERPLACEMENT_CLOSEBTN:
+					DestroyWindow(hWnd);
+					return TRUE;
+				}
 				break;
 			}
 
