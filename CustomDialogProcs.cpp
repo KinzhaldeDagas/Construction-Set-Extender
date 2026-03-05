@@ -50,6 +50,7 @@ namespace cse
 
 				break;
 			case WM_INITDIALOG:
+				HWND ComboBox = GetDlgItem(hWnd, IDC_ASSETSELECTOR_FORMLIST);
 				TESComboBox::PopulateWithForms(ComboBox, lParam, true, false);
 				TESComboBox::SetSelectedItemByIndex(ComboBox, 0);
 
@@ -1055,6 +1056,7 @@ namespace cse
 				}
 				break;
 			case WM_COMMAND:
+				{
 				if (HIWORD(wParam) == BN_CLICKED)
 				{
 					const int MarkerTypes[] = {
@@ -1128,6 +1130,7 @@ namespace cse
 					return TRUE;
 				}
 				break;
+				}
 			case WM_DRAWITEM:
 				if (wParam == IDC_MARKERPLACEMENT_CELLGRID)
 				{
