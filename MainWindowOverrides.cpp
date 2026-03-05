@@ -21,6 +21,7 @@ namespace cse
 {
 	namespace uiManager
 	{
+		static HWND g_MarkerPlacementDialog = nullptr;
 
 		MainWindowMiscData::MainWindowMiscData() :
 			bgsee::WindowExtraData(kTypeID)
@@ -661,10 +662,19 @@ namespace cse
 
 					break;
 				case IDC_MAINMENU_MARKERPLACEMENT:
-					BGSEEUI->ModelessDialog(BGSEEMAIN->GetExtenderHandle(),
+					if (g_MarkerPlacementDialog && IsWindow(g_MarkerPlacementDialog))
+					{
+						SetForegroundWindow(g_MarkerPlacementDialog);
+						break;
+					}
+
+					g_MarkerPlacementDialog = BGSEEUI->ModelessDialog(BGSEEMAIN->GetExtenderHandle(),
 						MAKEINTRESOURCE(IDD_MARKERPLACEMENT),
 						hWnd,
 						(DLGPROC)MarkerPlacementDlgProc);
+
+					if (g_MarkerPlacementDialog == nullptr)
+						BGSEECONSOLE_ERROR("Couldn't create marker placement dialog");
 
 					break;
 
