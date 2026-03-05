@@ -5,6 +5,7 @@
 #include "EditorAPI/Core.h"
 #include <algorithm>
 #include <cmath>
+#include <vector>
 
 namespace cse
 {
@@ -507,6 +508,7 @@ namespace cse
 			float PanCellY = 0.0f;
 			bool Dragging = false;
 			POINT DragLastScreenPos = { 0, 0 };
+			std::vector<POINT> ExistingMarkerCells;
 		};
 
 		static const char* MarkerPlacement_GetWorldspaceName(TESWorldSpace* Worldspace)
@@ -560,6 +562,95 @@ namespace cse
 			float Top = 8.0f;
 		};
 
+		static MarkerPlacementWorldspaceBounds MarkerPlacement_GetWorldspaceBounds(TESWorldSpace* Worldspace);
+
+		static TESObject* MarkerPlacement_GetMapMarkerBase()
+		{
+			return CS_CAST(TESForm::LookupByEditorID("MapMarker"), TESForm, TESObject);
+		}
+
+		static float MarkerPlacement_GetTerrainZ(TESObjectCELL* Cell)
+		{
+			if (Cell == nullptr || Cell->IsInterior())
+				return 0.0f;
+
+			TESObjectLAND* Land = Cell->GetLand();
+			if (Land && Land->landData && Land->landData->heightMap)
+			{
+				auto HeightMap = Land->landData->heightMap;
+				float Sum = 0.0f;
+				int Count = 0;
+				for (int q = 0; q < 4; q++)
+				{
+					auto Quad = HeightMap->quadrants[q];
+					if (Quad == nullptr)
+						continue;
+					Sum += Quad->verts[8][8].z;
+					Count++;
+				}
+				if (Count > 0)
+					return Sum / Count;
+			}
+
+			if (Land)
+			{
+				TESObjectLAND::LandHeightLimit Limits = { 0 };
+				if (Land->GetHeightLimits(&Limits))
+					return (Limits.minHeight + Limits.maxHeight) * 0.5f;
+			}
+
+			return 0.0f;
+		}
+
+		static void MarkerPlacement_RefreshExistingMarkers(HWND hWnd, MarkerPlacementState* State, TESWorldSpace* Worldspace)
+		{
+			if (State == nullptr)
+				return;
+			State->ExistingMarkerCells.clear();
+			if (Worldspace == nullptr)
+				return;
+
+			TESObject* MarkerBase = MarkerPlacement_GetMapMarkerBase();
+			if (MarkerBase == nullptr)
+				return;
+
+			auto Bounds = MarkerPlacement_GetWorldspaceBounds(Worldspace);
+			const int MinCellX = (int)floor(Bounds.Left);
+			const int MaxCellX = (int)ceil(Bounds.Right);
+			const int MinCellY = (int)floor(Bounds.Bottom);
+			const int MaxCellY = (int)ceil(Bounds.Top);
+
+			const int ScanWidth = MaxCellX - MinCellX + 1;
+			const int ScanHeight = MaxCellY - MinCellY + 1;
+			if ((long long)ScanWidth * (long long)ScanHeight > 4096)
+				return;
+
+			for (int cx = MinCellX; cx <= MaxCellX; cx++)
+			{
+				for (int cy = MinCellY; cy <= MaxCellY; cy++)
+				{
+					float X = (cx * 4096.0f) + 2048.0f;
+					float Y = (cy * 4096.0f) + 2048.0f;
+					TESObjectCELL* Cell = _DATAHANDLER->GetExteriorCell(X, Y, Worldspace, false);
+					if (Cell == nullptr)
+						continue;
+
+					for (auto RefItr = Cell->objectList.Begin(); !RefItr.End(); ++RefItr)
+					{
+						TESObjectREFR* Ref = RefItr.Get();
+						if (Ref && Ref->baseForm == MarkerBase)
+						{
+							POINT MarkerCell = { cx, cy };
+							State->ExistingMarkerCells.push_back(MarkerCell);
+							break;
+						}
+					}
+				}
+			}
+
+			MarkerPlacement_UpdateCellCaption(hWnd, State);
+		}
+
 		static MarkerPlacementWorldspaceBounds MarkerPlacement_GetWorldspaceBounds(TESWorldSpace* Worldspace)
 		{
 			MarkerPlacementWorldspaceBounds Result;
@@ -604,6 +695,7 @@ namespace cse
 			const float SpanY = (std::max)(1.0f, Bounds.Top - Bounds.Bottom);
 			const float Span = (std::max)(SpanX, SpanY) + 2.0f;
 			State->Zoom = (std::max)(0.25f, (std::min)(8.0f, 16.0f / Span));
+			MarkerPlacement_RefreshExistingMarkers(hWnd, State, Worldspace);
 
 			MarkerPlacement_UpdateCellCaption(hWnd, State);
 		}
@@ -766,6 +858,26 @@ namespace cse
 
 			if (State)
 			{
+				HPEN MarkerPen = CreatePen(PS_SOLID, 2, RGB(255, 235, 64));
+				SelectObject(DC, MarkerPen);
+				for (auto& MarkerCell : State->ExistingMarkerCells)
+				{
+					int CellX = MarkerCell.x;
+					int CellY = MarkerCell.y;
+					const int CenterX = (int)(OriginX + (((CellX + 0.5f) - (PanX - HalfCellsVisible)) * PixelsPerCell));
+					const int CenterY = (int)(OriginY + ((PanY + HalfCellsVisible - (CellY + 0.5f)) * PixelsPerCell));
+					const int Radius = (std::max)(3, (int)(PixelsPerCell * 0.35f));
+					MoveToEx(DC, CenterX - Radius, CenterY - Radius, nullptr);
+					LineTo(DC, CenterX + Radius, CenterY + Radius);
+					MoveToEx(DC, CenterX - Radius, CenterY + Radius, nullptr);
+					LineTo(DC, CenterX + Radius, CenterY - Radius);
+				}
+				SelectObject(DC, GridPen);
+				DeleteObject(MarkerPen);
+			}
+
+			if (State)
+			{
 				RECT CellRect = {
 					(int)(OriginX + ((State->SelectedCellX - (PanX - HalfCellsVisible)) * PixelsPerCell)),
 					(int)(OriginY + ((PanY + HalfCellsVisible - (State->SelectedCellY + 1)) * PixelsPerCell)),
@@ -781,12 +893,13 @@ namespace cse
 
 				char OverlayText[0x120] = { 0 };
 				FORMAT_STR(OverlayText,
-					"Cell:(%d,%d) Zoom:%0.2fx  Drag:Pan  Wheel:Zoom  RMB:Place  Map:%s Regions:%s",
+					"Cell:(%d,%d) Zoom:%0.2fx  Drag:Pan  Wheel:Zoom  RMB:Place  Map:%s Regions:%s Markers:%d",
 					State->SelectedCellX,
 					State->SelectedCellY,
 					State->Zoom,
 					State->ShowMapOverlap ? "On" : "Off",
-					State->ShowRegions ? "On" : "Off");
+					State->ShowRegions ? "On" : "Off",
+					(int)State->ExistingMarkerCells.size());
 
 				SetTextColor(DC, RGB(235, 235, 235));
 				RECT TextRect = Rect;
@@ -851,7 +964,7 @@ namespace cse
 				return;
 			}
 
-			TESObject* MarkerBase = CS_CAST(TESForm::LookupByEditorID("MapMarker"), TESForm, TESObject);
+			TESObject* MarkerBase = MarkerPlacement_GetMapMarkerBase();
 			if (MarkerBase == nullptr)
 			{
 				BGSEEUI->MsgBoxE("Couldn't find the MapMarker base form.");
@@ -872,7 +985,10 @@ namespace cse
 			if (_TES->currentWorldSpace != Worldspace)
 				_TES->SetCurrentWorldspace(Worldspace);
 
-			Vector3 Position(MarkerX, MarkerY, 0.0f);
+			float TerrainZ = MarkerPlacement_GetTerrainZ(ExteriorCell);
+			if (!std::isfinite(TerrainZ))
+				TerrainZ = 0.0f;
+			Vector3 Position(MarkerX, MarkerY, TerrainZ + 32.0f);
 			Vector3 Rotation(0.0f, 0.0f, 0.0f);
 			TESObjectREFR* PlacedRef = _DATAHANDLER->PlaceObjectRef(MarkerBase, &Position, &Rotation, ExteriorCell, Worldspace, nullptr);
 			if (PlacedRef == nullptr)
@@ -881,16 +997,18 @@ namespace cse
 				return;
 			}
 
+			MarkerPlacement_RefreshExistingMarkers(hWnd, State, Worldspace);
 			TESRenderWindow::Redraw();
 
 			char Buffer[0x200] = { 0 };
-			FORMAT_STR(Buffer, "Marker %03d | %s | %s | Cell (%d, %d) | Center (%0.1f, %0.1f)",
+			FORMAT_STR(Buffer, "Marker %03d | %s | %s | Cell (%d, %d) | Pos (%0.1f, %0.1f, %0.1f)",
 				State->NextMarkerIndex++,
 				MarkerPlacement_GetWorldspaceName(Worldspace),
 				MarkerType,
 				State->SelectedCellX, State->SelectedCellY,
 				MarkerX,
-				MarkerY);
+				MarkerY,
+				Position.z);
 
 			SendDlgItemMessage(hWnd, IDC_MARKERPLACEMENT_MARKERLIST, LB_ADDSTRING, 0, (LPARAM)Buffer);
 		}
