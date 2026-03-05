@@ -499,6 +499,8 @@ namespace cse
 			int NextMarkerIndex = 1;
 			int SelectedCellX = 0;
 			int SelectedCellY = 0;
+			bool ShowMapOverlap = true;
+			bool ShowRegions = true;
 		};
 
 		static const char* MarkerPlacement_GetWorldspaceName(TESWorldSpace* Worldspace)
@@ -544,6 +546,123 @@ namespace cse
 
 		static void MarkerPlacement_UpdateCellCaption(HWND hWnd, MarkerPlacementState* State);
 
+		static void MarkerPlacement_DrawGrid(HWND hWnd, const DRAWITEMSTRUCT* DrawInfo, const MarkerPlacementState* State)
+		{
+			SME_ASSERT(DrawInfo);
+
+			const RECT& Rect = DrawInfo->rcItem;
+			const int Width = Rect.right - Rect.left;
+			const int Height = Rect.bottom - Rect.top;
+			if (Width <= 0 || Height <= 0)
+				return;
+
+			HDC DC = DrawInfo->hDC;
+			int SavedDC = SaveDC(DC);
+			SetBkMode(DC, TRANSPARENT);
+
+			HBRUSH BackBrush = CreateSolidBrush(RGB(30, 35, 42));
+			FillRect(DC, &Rect, BackBrush);
+			DeleteObject(BackBrush);
+
+			if (State == nullptr || State->ShowMapOverlap)
+			{
+				for (int y = 0; y < Height; y += 12)
+				{
+					RECT Stripe = { Rect.left, Rect.top + y, Rect.right, (std::min)(Rect.top + y + 6, Rect.bottom) };
+					HBRUSH StripeBrush = CreateSolidBrush((y / 12) % 2 ? RGB(44, 53, 64) : RGB(38, 46, 56));
+					FillRect(DC, &Stripe, StripeBrush);
+					DeleteObject(StripeBrush);
+				}
+			}
+
+			const int GridCells = 16;
+			HPEN GridPen = CreatePen(PS_SOLID, 1, RGB(94, 120, 140));
+			HPEN AxisPen = CreatePen(PS_SOLID, 1, RGB(190, 150, 70));
+			HGDIOBJ OldPen = SelectObject(DC, GridPen);
+
+			for (int i = 0; i <= GridCells; i++)
+			{
+				const int X = Rect.left + (i * Width) / GridCells;
+				const int Y = Rect.top + (i * Height) / GridCells;
+
+				if (i == GridCells / 2)
+					SelectObject(DC, AxisPen);
+
+				MoveToEx(DC, X, Rect.top, nullptr);
+				LineTo(DC, X, Rect.bottom);
+
+				MoveToEx(DC, Rect.left, Y, nullptr);
+				LineTo(DC, Rect.right, Y);
+
+				if (i == GridCells / 2)
+					SelectObject(DC, GridPen);
+			}
+
+			if (State)
+			{
+				if (State->ShowRegions)
+				{
+					const int RegionBands = 4;
+					for (int i = 0; i < RegionBands; i++)
+					{
+						RECT RegionRect = {
+							Rect.left + (i * Width) / RegionBands,
+							Rect.top + ((RegionBands - 1 - i) * Height) / RegionBands,
+							Rect.left + ((i + 1) * Width) / RegionBands,
+							Rect.top + ((RegionBands - i) * Height) / RegionBands
+						};
+
+						HBRUSH RegionBrush = CreateSolidBrush(i % 2 ? RGB(72, 98, 88) : RGB(90, 78, 106));
+						FrameRect(DC, &RegionRect, RegionBrush);
+						DeleteObject(RegionBrush);
+					}
+				}
+
+				const int CellW = Width / GridCells;
+				const int CellH = Height / GridCells;
+				const int SelCol = State->SelectedCellX + (GridCells / 2);
+				const int SelRow = (GridCells - 1) - (State->SelectedCellY + (GridCells / 2));
+
+				if (SelCol >= 0 && SelCol < GridCells && SelRow >= 0 && SelRow < GridCells)
+				{
+					RECT CellRect = {
+						Rect.left + SelCol * CellW,
+						Rect.top + SelRow * CellH,
+						Rect.left + (SelCol + 1) * CellW,
+						Rect.top + (SelRow + 1) * CellH
+					};
+
+					HBRUSH SelectionBrush = CreateSolidBrush(RGB(210, 110, 40));
+					FrameRect(DC, &CellRect, SelectionBrush);
+					InflateRect(&CellRect, -1, -1);
+					FrameRect(DC, &CellRect, SelectionBrush);
+					DeleteObject(SelectionBrush);
+				}
+
+				char OverlayText[0x100] = { 0 };
+				FORMAT_STR(OverlayText,
+					"Selected Cell: (%d, %d) | Right-click to place marker | Map:%s Regions:%s",
+					State->SelectedCellX,
+					State->SelectedCellY,
+					State->ShowMapOverlap ? "On" : "Off",
+					State->ShowRegions ? "On" : "Off");
+
+				SetTextColor(DC, RGB(235, 235, 235));
+				RECT TextRect = Rect;
+				InflateRect(&TextRect, -6, -6);
+				DrawTextA(DC, OverlayText, -1, &TextRect, DT_LEFT | DT_TOP | DT_END_ELLIPSIS);
+			}
+
+			HBRUSH BorderBrush = CreateSolidBrush(RGB(120, 140, 160));
+			FrameRect(DC, &Rect, BorderBrush);
+			DeleteObject(BorderBrush);
+
+			SelectObject(DC, OldPen);
+			DeleteObject(GridPen);
+			DeleteObject(AxisPen);
+			RestoreDC(DC, SavedDC);
+		}
+
 		static bool MarkerPlacement_SelectCellFromScreenPoint(HWND hWnd, MarkerPlacementState* State, POINT CursorPos)
 		{
 			SME_ASSERT(State);
@@ -574,12 +693,9 @@ namespace cse
 		{
 			SME_ASSERT(State);
 
-			char Buffer[0x100] = { 0 };
-			FORMAT_STR(Buffer,
-				"Selected Cell: (%d, %d)\r\nRight-click in this pane to place map marker at cell center.",
-				State->SelectedCellX,
-				State->SelectedCellY);
-			SetDlgItemText(hWnd, IDC_MARKERPLACEMENT_CELLGRID, Buffer);
+			HWND Grid = GetDlgItem(hWnd, IDC_MARKERPLACEMENT_CELLGRID);
+			if (Grid)
+				InvalidateRect(Grid, nullptr, FALSE);
 		}
 
 		static void MarkerPlacement_PopulateWorldspaces(HWND hWnd)
@@ -678,6 +794,10 @@ namespace cse
 
 					MarkerPlacement_PopulateWorldspaces(hWnd);
 					CheckDlgButton(hWnd, IDC_MARKERPLACEMENT_MARKERTYPE_CITY, BST_CHECKED);
+					CheckDlgButton(hWnd, IDC_MARKERPLACEMENT_SHOWMAPOVERLAP, BST_CHECKED);
+					CheckDlgButton(hWnd, IDC_MARKERPLACEMENT_SHOWREGIONS, BST_CHECKED);
+					NewState->ShowMapOverlap = true;
+					NewState->ShowRegions = true;
 					MarkerPlacement_UpdateCellCaption(hWnd, NewState);
 				}
 				return TRUE;
@@ -742,12 +862,35 @@ namespace cse
 						return TRUE;
 					}
 					break;
+				case IDC_MARKERPLACEMENT_SHOWMAPOVERLAP:
+					if (State && HIWORD(wParam) == BN_CLICKED)
+					{
+						State->ShowMapOverlap = (IsDlgButtonChecked(hWnd, IDC_MARKERPLACEMENT_SHOWMAPOVERLAP) == BST_CHECKED);
+						MarkerPlacement_UpdateCellCaption(hWnd, State);
+						return TRUE;
+					}
+					break;
+				case IDC_MARKERPLACEMENT_SHOWREGIONS:
+					if (State && HIWORD(wParam) == BN_CLICKED)
+					{
+						State->ShowRegions = (IsDlgButtonChecked(hWnd, IDC_MARKERPLACEMENT_SHOWREGIONS) == BST_CHECKED);
+						MarkerPlacement_UpdateCellCaption(hWnd, State);
+						return TRUE;
+					}
+					break;
 				case IDC_MARKERPLACEMENT_PLACEBTN:
 					if (State)
 						MarkerPlacement_AddPlacedMarker(hWnd, State);
 					return TRUE;
 				case IDC_MARKERPLACEMENT_CLOSEBTN:
 					DestroyWindow(hWnd);
+					return TRUE;
+				}
+				break;
+			case WM_DRAWITEM:
+				if (wParam == IDC_MARKERPLACEMENT_CELLGRID)
+				{
+					MarkerPlacement_DrawGrid(hWnd, (const DRAWITEMSTRUCT*)lParam, State);
 					return TRUE;
 				}
 				break;
