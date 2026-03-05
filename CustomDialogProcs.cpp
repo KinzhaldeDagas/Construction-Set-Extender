@@ -46,105 +46,8 @@ namespace cse
 					EndDialog(hWnd, hooks::e_ClearPath);
 
 					return TRUE;
-				case IDC_ASSETSELECTOR_ASSETEXTRACTOR:
-					achievements::kPowerUser->UnlockTool(achievements::AchievementPowerUser::kTool_AssetSelection);
-					EndDialog(hWnd, hooks::e_ExtractPath);
-
-					return TRUE;
-				case IDC_ASSETSELECTOR_OPENASSET:
-					EndDialog(hWnd, hooks::e_OpenPath);
-
-					return TRUE;
-				case IDC_CSE_CANCEL:
-					EndDialog(hWnd, hooks::e_Close);
-
-					return TRUE;
 				}
 
-				break;
-			}
-
-			return FALSE;
-		}
-
-		BOOL CALLBACK TextEditDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
-		{
-			switch (uMsg)
-			{
-			case WM_COMMAND:
-				{
-					InitDialogMessageParamT<UInt32>* InitParam = (InitDialogMessageParamT<UInt32>*)GetWindowLongPtr(hWnd, GWL_USERDATA);
-
-					switch (LOWORD(wParam))
-					{
-					case IDC_CSE_OK:
-						GetDlgItemText(hWnd, IDC_TEXTEDIT_TEXT, InitParam->Buffer, sizeof(InitParam->Buffer));
-						EndDialog(hWnd, 1);
-
-						return TRUE;
-					case IDC_CSE_CANCEL:
-						EndDialog(hWnd, NULL);
-
-						return TRUE;
-					}
-				}
-
-				break;
-			case WM_INITDIALOG:
-				SetWindowLongPtr(hWnd, GWL_USERDATA, (LONG_PTR)lParam);
-				SetDlgItemText(hWnd, IDC_TEXTEDIT_TEXT, ((InitDialogMessageParamT<UInt32>*)lParam)->Buffer);
-
-				break;
-			}
-
-			return FALSE;
-		}
-
-		BOOL CALLBACK TESFileSaveDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
-		{
-			switch (uMsg)
-			{
-			case WM_COMMAND:
-				switch (LOWORD(wParam))
-				{
-				case IDC_TESFILESAVE_SAVEESP:
-					EndDialog(hWnd, 0);
-
-					return TRUE;
-				case IDC_TESFILESAVE_SAVEESM:
-					achievements::kPowerUser->UnlockTool(achievements::AchievementPowerUser::kTool_SaveAsESM);
-					EndDialog(hWnd, 1);
-
-					return TRUE;
-				}
-
-				break;
-			}
-
-			return FALSE;
-		}
-
-		BOOL CALLBACK TESComboBoxDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
-		{
-			HWND ComboBox = GetDlgItem(hWnd, IDC_TESCOMBOBOX_FORMLIST);
-
-			switch (uMsg)
-			{
-			case WM_COMMAND:
-				switch (LOWORD(wParam))
-				{
-				case IDC_CSE_OK:
-					{
-						TESForm* SelectedForm = (TESForm*)TESComboBox::GetSelectedItemData(ComboBox);
-						EndDialog(hWnd, (INT_PTR)SelectedForm);
-
-						return TRUE;
-					}
-				case IDC_CSE_CANCEL:
-					EndDialog(hWnd, 0);
-
-					return TRUE;
-				}
 				break;
 			case WM_INITDIALOG:
 				TESComboBox::PopulateWithForms(ComboBox, lParam, true, false);
@@ -1173,9 +1076,9 @@ namespace cse
 					}
 				}
 
-				switch (LOWORD(wParam))
+				const int CommandID = (int)LOWORD(wParam);
+				if (CommandID == IDC_MARKERPLACEMENT_CELLGRID)
 				{
-				case IDC_MARKERPLACEMENT_CELLGRID:
 					if (HIWORD(wParam) == STN_CLICKED && State)
 					{
 						POINT Cursor = { 0 };
@@ -1183,8 +1086,9 @@ namespace cse
 						MarkerPlacement_SelectCellFromScreenPoint(hWnd, State, Cursor);
 						return TRUE;
 					}
-					break;
-				case IDC_MARKERPLACEMENT_WORLDSPACES:
+				}
+				else if (CommandID == IDC_MARKERPLACEMENT_WORLDSPACES)
+				{
 					if (HIWORD(wParam) == CBN_SELCHANGE)
 					{
 						TESWorldSpace* SelectedWorldspace = MarkerPlacement_GetSelectedWorldspace(hWnd);
@@ -1193,44 +1097,33 @@ namespace cse
 						MarkerPlacement_ResetViewForWorldspace(hWnd, State, SelectedWorldspace);
 						return TRUE;
 					}
-					break;
-				case IDC_MARKERPLACEMENT_SHOWMAPOVERLAP:
+				}
+				else if (CommandID == IDC_MARKERPLACEMENT_SHOWMAPOVERLAP)
+				{
 					if (State && HIWORD(wParam) == BN_CLICKED)
 					{
 						State->ShowMapOverlap = (IsDlgButtonChecked(hWnd, IDC_MARKERPLACEMENT_SHOWMAPOVERLAP) == BST_CHECKED);
 						MarkerPlacement_UpdateCellCaption(hWnd, State);
 						return TRUE;
 					}
-					break;
-				case IDC_MARKERPLACEMENT_SHOWREGIONS:
+				}
+				else if (CommandID == IDC_MARKERPLACEMENT_SHOWREGIONS)
+				{
 					if (State && HIWORD(wParam) == BN_CLICKED)
 					{
 						State->ShowRegions = (IsDlgButtonChecked(hWnd, IDC_MARKERPLACEMENT_SHOWREGIONS) == BST_CHECKED);
 						MarkerPlacement_UpdateCellCaption(hWnd, State);
 						return TRUE;
 					}
-					break;
-				case IDC_MARKERPLACEMENT_SHOWMAPOVERLAP:
-					if (State && HIWORD(wParam) == BN_CLICKED)
-					{
-						State->ShowMapOverlap = (IsDlgButtonChecked(hWnd, IDC_MARKERPLACEMENT_SHOWMAPOVERLAP) == BST_CHECKED);
-						MarkerPlacement_UpdateCellCaption(hWnd, State);
-						return TRUE;
-					}
-					break;
-				case IDC_MARKERPLACEMENT_SHOWREGIONS:
-					if (State && HIWORD(wParam) == BN_CLICKED)
-					{
-						State->ShowRegions = (IsDlgButtonChecked(hWnd, IDC_MARKERPLACEMENT_SHOWREGIONS) == BST_CHECKED);
-						MarkerPlacement_UpdateCellCaption(hWnd, State);
-						return TRUE;
-					}
-					break;
-				case IDC_MARKERPLACEMENT_PLACEBTN:
+				}
+				else if (CommandID == IDC_MARKERPLACEMENT_PLACEBTN)
+				{
 					if (State)
 						MarkerPlacement_AddPlacedMarker(hWnd, State);
 					return TRUE;
-				case IDC_MARKERPLACEMENT_CLOSEBTN:
+				}
+				else if (CommandID == IDC_MARKERPLACEMENT_CLOSEBTN)
+				{
 					DestroyWindow(hWnd);
 					return TRUE;
 				}
