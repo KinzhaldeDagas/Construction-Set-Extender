@@ -4,6 +4,8 @@
 #include "Achievements.h"
 #include "EditorAPI/Core.h"
 #include <algorithm>
+#include <cmath>
+#include <vector>
 
 namespace cse
 {
@@ -501,6 +503,12 @@ namespace cse
 			int SelectedCellY = 0;
 			bool ShowMapOverlap = true;
 			bool ShowRegions = true;
+			float Zoom = 1.0f;
+			float PanCellX = 0.0f;
+			float PanCellY = 0.0f;
+			bool Dragging = false;
+			POINT DragLastScreenPos = { 0, 0 };
+			std::vector<POINT> ExistingMarkerCells;
 		};
 
 		static const char* MarkerPlacement_GetWorldspaceName(TESWorldSpace* Worldspace)
@@ -546,6 +554,203 @@ namespace cse
 
 		static void MarkerPlacement_UpdateCellCaption(HWND hWnd, MarkerPlacementState* State);
 
+		struct MarkerPlacementWorldspaceBounds
+		{
+			float Left = -8.0f;
+			float Right = 8.0f;
+			float Bottom = -8.0f;
+			float Top = 8.0f;
+		};
+
+		static MarkerPlacementWorldspaceBounds MarkerPlacement_GetWorldspaceBounds(TESWorldSpace* Worldspace);
+
+		static TESObject* MarkerPlacement_GetMapMarkerBase()
+		{
+			return CS_CAST(TESForm::LookupByEditorID("MapMarker"), TESForm, TESObject);
+		}
+
+		static float MarkerPlacement_GetTerrainZ(TESObjectCELL* Cell)
+		{
+			if (Cell == nullptr || Cell->IsInterior())
+				return 0.0f;
+
+			TESObjectLAND* Land = Cell->GetLand();
+			if (Land && Land->landData && Land->landData->heightMap)
+			{
+				auto HeightMap = Land->landData->heightMap;
+				float Sum = 0.0f;
+				int Count = 0;
+				for (int q = 0; q < 4; q++)
+				{
+					auto Quad = HeightMap->quadrants[q];
+					if (Quad == nullptr)
+						continue;
+					Sum += Quad->verts[8][8].z;
+					Count++;
+				}
+				if (Count > 0)
+					return Sum / Count;
+			}
+
+			if (Land)
+			{
+				TESObjectLAND::LandHeightLimit Limits = { 0 };
+				if (Land->GetHeightLimits(&Limits))
+					return (Limits.minHeight + Limits.maxHeight) * 0.5f;
+			}
+
+			return 0.0f;
+		}
+
+		static void MarkerPlacement_RefreshExistingMarkers(HWND hWnd, MarkerPlacementState* State, TESWorldSpace* Worldspace)
+		{
+			if (State == nullptr)
+				return;
+			State->ExistingMarkerCells.clear();
+			if (Worldspace == nullptr)
+				return;
+
+			TESObject* MarkerBase = MarkerPlacement_GetMapMarkerBase();
+			if (MarkerBase == nullptr)
+				return;
+
+			auto Bounds = MarkerPlacement_GetWorldspaceBounds(Worldspace);
+			const int MinCellX = (int)floor(Bounds.Left);
+			const int MaxCellX = (int)ceil(Bounds.Right);
+			const int MinCellY = (int)floor(Bounds.Bottom);
+			const int MaxCellY = (int)ceil(Bounds.Top);
+
+			const int ScanWidth = MaxCellX - MinCellX + 1;
+			const int ScanHeight = MaxCellY - MinCellY + 1;
+			if ((long long)ScanWidth * (long long)ScanHeight > 4096)
+				return;
+
+			for (int cx = MinCellX; cx <= MaxCellX; cx++)
+			{
+				for (int cy = MinCellY; cy <= MaxCellY; cy++)
+				{
+					float X = (cx * 4096.0f) + 2048.0f;
+					float Y = (cy * 4096.0f) + 2048.0f;
+					TESObjectCELL* Cell = _DATAHANDLER->GetExteriorCell(X, Y, Worldspace, false);
+					if (Cell == nullptr)
+						continue;
+
+					for (auto RefItr = Cell->objectList.Begin(); !RefItr.End(); ++RefItr)
+					{
+						TESObjectREFR* Ref = RefItr.Get();
+						if (Ref && Ref->baseForm == MarkerBase)
+						{
+							POINT MarkerCell = { cx, cy };
+							State->ExistingMarkerCells.push_back(MarkerCell);
+							break;
+						}
+					}
+				}
+			}
+
+			MarkerPlacement_UpdateCellCaption(hWnd, State);
+		}
+
+		static MarkerPlacementWorldspaceBounds MarkerPlacement_GetWorldspaceBounds(TESWorldSpace* Worldspace)
+		{
+			MarkerPlacementWorldspaceBounds Result;
+			if (Worldspace == nullptr)
+				return Result;
+
+			float LeftCell = (float)Worldspace->northWestCoordX;
+			float TopCell = (float)Worldspace->northWestCoordY;
+			float RightCell = (float)Worldspace->southEastCoordX;
+			float BottomCell = (float)Worldspace->southEastCoordY;
+			if (RightCell < LeftCell)
+				std::swap(RightCell, LeftCell);
+			if (TopCell < BottomCell)
+				std::swap(TopCell, BottomCell);
+
+			if ((RightCell - LeftCell) < 1.0f || (TopCell - BottomCell) < 1.0f)
+			{
+				const float HalfX = (std::max)(1.0f, Worldspace->usableDimensionsX * 0.5f);
+				const float HalfY = (std::max)(1.0f, Worldspace->usableDimensionsY * 0.5f);
+				LeftCell = -HalfX;
+				RightCell = HalfX;
+				BottomCell = -HalfY;
+				TopCell = HalfY;
+			}
+
+			Result.Left = LeftCell;
+			Result.Right = RightCell;
+			Result.Bottom = BottomCell;
+			Result.Top = TopCell;
+			return Result;
+		}
+
+		static void MarkerPlacement_ResetViewForWorldspace(HWND hWnd, MarkerPlacementState* State, TESWorldSpace* Worldspace)
+		{
+			if (State == nullptr)
+				return;
+
+			auto Bounds = MarkerPlacement_GetWorldspaceBounds(Worldspace);
+			State->PanCellX = (Bounds.Left + Bounds.Right) * 0.5f;
+			State->PanCellY = (Bounds.Bottom + Bounds.Top) * 0.5f;
+			const float SpanX = (std::max)(1.0f, Bounds.Right - Bounds.Left);
+			const float SpanY = (std::max)(1.0f, Bounds.Top - Bounds.Bottom);
+			const float Span = (std::max)(SpanX, SpanY) + 2.0f;
+			State->Zoom = (std::max)(0.25f, (std::min)(8.0f, 16.0f / Span));
+			MarkerPlacement_RefreshExistingMarkers(hWnd, State, Worldspace);
+
+			MarkerPlacement_UpdateCellCaption(hWnd, State);
+		}
+
+		static bool MarkerPlacement_TryGetGridRect(HWND hWnd, RECT& OutRect)
+		{
+			HWND Grid = GetDlgItem(hWnd, IDC_MARKERPLACEMENT_CELLGRID);
+			if (Grid == nullptr || GetWindowRect(Grid, &OutRect) == FALSE)
+				return false;
+
+			const int Width = OutRect.right - OutRect.left;
+			const int Height = OutRect.bottom - OutRect.top;
+			return Width > 4 && Height > 4;
+		}
+
+		static bool MarkerPlacement_ScreenToCell(HWND hWnd, const MarkerPlacementState* State, POINT CursorPos, float& OutCellX, float& OutCellY)
+		{
+			SME_ASSERT(State);
+			RECT GridRect = { 0 };
+			if (!MarkerPlacement_TryGetGridRect(hWnd, GridRect))
+				return false;
+
+			const int Width = GridRect.right - GridRect.left;
+			const int Height = GridRect.bottom - GridRect.top;
+			const int Side = (std::min)(Width, Height);
+			const int OriginX = GridRect.left + (Width - Side) / 2;
+			const int OriginY = GridRect.top + (Height - Side) / 2;
+
+			const int LocalX = CursorPos.x - OriginX;
+			const int LocalY = CursorPos.y - OriginY;
+			if (LocalX < 0 || LocalY < 0 || LocalX >= Side || LocalY >= Side)
+				return false;
+
+			const float HalfCellsVisible = 8.0f / State->Zoom;
+			const float CellsPerPixel = (HalfCellsVisible * 2.0f) / Side;
+
+			OutCellX = (LocalX * CellsPerPixel) - HalfCellsVisible + State->PanCellX;
+			OutCellY = ((Side - LocalY) * CellsPerPixel) - HalfCellsVisible + State->PanCellY;
+			return true;
+		}
+
+		static bool MarkerPlacement_SelectCellFromScreenPoint(HWND hWnd, MarkerPlacementState* State, POINT CursorPos)
+		{
+			SME_ASSERT(State);
+
+			float CellX = 0, CellY = 0;
+			if (!MarkerPlacement_ScreenToCell(hWnd, State, CursorPos, CellX, CellY))
+				return false;
+
+			State->SelectedCellX = (int)floor(CellX);
+			State->SelectedCellY = (int)floor(CellY);
+			MarkerPlacement_UpdateCellCaption(hWnd, State);
+			return true;
+		}
+
 		static void MarkerPlacement_DrawGrid(HWND hWnd, const DRAWITEMSTRUCT* DrawInfo, const MarkerPlacementState* State)
 		{
 			SME_ASSERT(DrawInfo);
@@ -560,92 +765,141 @@ namespace cse
 			int SavedDC = SaveDC(DC);
 			SetBkMode(DC, TRANSPARENT);
 
-			HBRUSH BackBrush = CreateSolidBrush(RGB(30, 35, 42));
+			const int Side = (std::min)(Width, Height);
+			const int OriginX = Rect.left + (Width - Side) / 2;
+			const int OriginY = Rect.top + (Height - Side) / 2;
+			RECT SquareRect = { OriginX, OriginY, OriginX + Side, OriginY + Side };
+
+			HBRUSH BackBrush = CreateSolidBrush(RGB(24, 28, 34));
 			FillRect(DC, &Rect, BackBrush);
 			DeleteObject(BackBrush);
 
+			HBRUSH PaneBrush = CreateSolidBrush(RGB(30, 35, 42));
+			FillRect(DC, &SquareRect, PaneBrush);
+			DeleteObject(PaneBrush);
+			IntersectClipRect(DC, SquareRect.left, SquareRect.top, SquareRect.right, SquareRect.bottom);
+
+			const float Zoom = State ? State->Zoom : 1.0f;
+			const float PanX = State ? State->PanCellX : 0.0f;
+			const float PanY = State ? State->PanCellY : 0.0f;
+			const float HalfCellsVisible = 8.0f / Zoom;
+			const float PixelsPerCell = Side / (HalfCellsVisible * 2.0f);
+
 			if (State == nullptr || State->ShowMapOverlap)
 			{
-				for (int y = 0; y < Height; y += 12)
-				{
-					RECT Stripe = { Rect.left, Rect.top + y, Rect.right, (std::min)(Rect.top + y + 6, Rect.bottom) };
-					HBRUSH StripeBrush = CreateSolidBrush((y / 12) % 2 ? RGB(44, 53, 64) : RGB(38, 46, 56));
-					FillRect(DC, &Stripe, StripeBrush);
-					DeleteObject(StripeBrush);
-				}
+				auto Bounds = MarkerPlacement_GetWorldspaceBounds(MarkerPlacement_GetSelectedWorldspace(hWnd));
+				RECT OverlayRect = {
+					(int)(OriginX + (Bounds.Left - (PanX - HalfCellsVisible)) * PixelsPerCell),
+					(int)(OriginY + (PanY + HalfCellsVisible - Bounds.Top) * PixelsPerCell),
+					(int)(OriginX + (Bounds.Right - (PanX - HalfCellsVisible)) * PixelsPerCell),
+					(int)(OriginY + (PanY + HalfCellsVisible - Bounds.Bottom) * PixelsPerCell)
+				};
+
+				if (OverlayRect.left > OverlayRect.right)
+					std::swap(OverlayRect.left, OverlayRect.right);
+				if (OverlayRect.top > OverlayRect.bottom)
+					std::swap(OverlayRect.top, OverlayRect.bottom);
+
+				HBRUSH OverlayBrush = CreateSolidBrush(RGB(48, 68, 88));
+				FillRect(DC, &OverlayRect, OverlayBrush);
+				DeleteObject(OverlayBrush);
+
+				HBRUSH OverlayBorder = CreateSolidBrush(RGB(86, 130, 168));
+				FrameRect(DC, &OverlayRect, OverlayBorder);
+				DeleteObject(OverlayBorder);
 			}
 
-			const int GridCells = 16;
-			HPEN GridPen = CreatePen(PS_SOLID, 1, RGB(94, 120, 140));
-			HPEN AxisPen = CreatePen(PS_SOLID, 1, RGB(190, 150, 70));
+			HPEN GridPen = CreatePen(PS_SOLID, 1, RGB(82, 106, 128));
+			HPEN AxisPen = CreatePen(PS_SOLID, 1, RGB(194, 158, 74));
 			HGDIOBJ OldPen = SelectObject(DC, GridPen);
 
-			for (int i = 0; i <= GridCells; i++)
+			const int GridLineCount = (int)(HalfCellsVisible * 2.0f) + 2;
+			for (int i = -GridLineCount; i <= GridLineCount; i++)
 			{
-				const int X = Rect.left + (i * Width) / GridCells;
-				const int Y = Rect.top + (i * Height) / GridCells;
+				const float CellX = floor(PanX) + i;
+				const float CellY = floor(PanY) + i;
+				const int X = (int)(OriginX + ((CellX - (PanX - HalfCellsVisible)) * PixelsPerCell));
+				const int Y = (int)(OriginY + ((PanY + HalfCellsVisible - CellY) * PixelsPerCell));
 
-				if (i == GridCells / 2)
+				if ((int)CellX == 0 || (int)CellY == 0)
 					SelectObject(DC, AxisPen);
-
-				MoveToEx(DC, X, Rect.top, nullptr);
-				LineTo(DC, X, Rect.bottom);
-
-				MoveToEx(DC, Rect.left, Y, nullptr);
-				LineTo(DC, Rect.right, Y);
-
-				if (i == GridCells / 2)
+				else
 					SelectObject(DC, GridPen);
+
+				MoveToEx(DC, X, SquareRect.top, nullptr);
+				LineTo(DC, X, SquareRect.bottom);
+				MoveToEx(DC, SquareRect.left, Y, nullptr);
+				LineTo(DC, SquareRect.right, Y);
+			}
+
+			if (State && State->ShowRegions)
+			{
+				HPEN RegionPen = CreatePen(PS_SOLID, 1, RGB(152, 106, 178));
+				SelectObject(DC, RegionPen);
+				const int RegionStartX = ((int)floor(PanX - HalfCellsVisible) / 8) * 8;
+				const int RegionEndX = ((int)ceil(PanX + HalfCellsVisible) / 8) * 8;
+				const int RegionStartY = ((int)floor(PanY - HalfCellsVisible) / 8) * 8;
+				const int RegionEndY = ((int)ceil(PanY + HalfCellsVisible) / 8) * 8;
+				for (int x = RegionStartX; x <= RegionEndX; x += 8)
+				{
+					int Px = (int)(OriginX + ((x - (PanX - HalfCellsVisible)) * PixelsPerCell));
+					MoveToEx(DC, Px, SquareRect.top, nullptr);
+					LineTo(DC, Px, SquareRect.bottom);
+				}
+				for (int y = RegionStartY; y <= RegionEndY; y += 8)
+				{
+					int Py = (int)(OriginY + ((PanY + HalfCellsVisible - y) * PixelsPerCell));
+					MoveToEx(DC, SquareRect.left, Py, nullptr);
+					LineTo(DC, SquareRect.right, Py);
+				}
+				SelectObject(DC, GridPen);
+				DeleteObject(RegionPen);
 			}
 
 			if (State)
 			{
-				if (State->ShowRegions)
+				HPEN MarkerPen = CreatePen(PS_SOLID, 2, RGB(255, 235, 64));
+				SelectObject(DC, MarkerPen);
+				for (auto& MarkerCell : State->ExistingMarkerCells)
 				{
-					const int RegionBands = 4;
-					for (int i = 0; i < RegionBands; i++)
-					{
-						RECT RegionRect = {
-							Rect.left + (i * Width) / RegionBands,
-							Rect.top + ((RegionBands - 1 - i) * Height) / RegionBands,
-							Rect.left + ((i + 1) * Width) / RegionBands,
-							Rect.top + ((RegionBands - i) * Height) / RegionBands
-						};
-
-						HBRUSH RegionBrush = CreateSolidBrush(i % 2 ? RGB(72, 98, 88) : RGB(90, 78, 106));
-						FrameRect(DC, &RegionRect, RegionBrush);
-						DeleteObject(RegionBrush);
-					}
+					int CellX = MarkerCell.x;
+					int CellY = MarkerCell.y;
+					const int CenterX = (int)(OriginX + (((CellX + 0.5f) - (PanX - HalfCellsVisible)) * PixelsPerCell));
+					const int CenterY = (int)(OriginY + ((PanY + HalfCellsVisible - (CellY + 0.5f)) * PixelsPerCell));
+					const int Radius = (std::max)(3, (int)(PixelsPerCell * 0.35f));
+					MoveToEx(DC, CenterX - Radius, CenterY - Radius, nullptr);
+					LineTo(DC, CenterX + Radius, CenterY + Radius);
+					MoveToEx(DC, CenterX - Radius, CenterY + Radius, nullptr);
+					LineTo(DC, CenterX + Radius, CenterY - Radius);
 				}
+				SelectObject(DC, GridPen);
+				DeleteObject(MarkerPen);
+			}
 
-				const int CellW = Width / GridCells;
-				const int CellH = Height / GridCells;
-				const int SelCol = State->SelectedCellX + (GridCells / 2);
-				const int SelRow = (GridCells - 1) - (State->SelectedCellY + (GridCells / 2));
+			if (State)
+			{
+				RECT CellRect = {
+					(int)(OriginX + ((State->SelectedCellX - (PanX - HalfCellsVisible)) * PixelsPerCell)),
+					(int)(OriginY + ((PanY + HalfCellsVisible - (State->SelectedCellY + 1)) * PixelsPerCell)),
+					(int)(OriginX + (((State->SelectedCellX + 1) - (PanX - HalfCellsVisible)) * PixelsPerCell)),
+					(int)(OriginY + ((PanY + HalfCellsVisible - State->SelectedCellY) * PixelsPerCell))
+				};
 
-				if (SelCol >= 0 && SelCol < GridCells && SelRow >= 0 && SelRow < GridCells)
-				{
-					RECT CellRect = {
-						Rect.left + SelCol * CellW,
-						Rect.top + SelRow * CellH,
-						Rect.left + (SelCol + 1) * CellW,
-						Rect.top + (SelRow + 1) * CellH
-					};
+				HBRUSH SelectionBrush = CreateSolidBrush(RGB(225, 120, 36));
+				FrameRect(DC, &CellRect, SelectionBrush);
+				InflateRect(&CellRect, -1, -1);
+				FrameRect(DC, &CellRect, SelectionBrush);
+				DeleteObject(SelectionBrush);
 
-					HBRUSH SelectionBrush = CreateSolidBrush(RGB(210, 110, 40));
-					FrameRect(DC, &CellRect, SelectionBrush);
-					InflateRect(&CellRect, -1, -1);
-					FrameRect(DC, &CellRect, SelectionBrush);
-					DeleteObject(SelectionBrush);
-				}
-
-				char OverlayText[0x100] = { 0 };
+				char OverlayText[0x120] = { 0 };
 				FORMAT_STR(OverlayText,
-					"Selected Cell: (%d, %d) | Right-click to place marker | Map:%s Regions:%s",
+					"Cell:(%d,%d) Zoom:%0.2fx  Drag:Pan  Wheel:Zoom  RMB:Place  Map:%s Regions:%s Markers:%d",
 					State->SelectedCellX,
 					State->SelectedCellY,
+					State->Zoom,
 					State->ShowMapOverlap ? "On" : "Off",
-					State->ShowRegions ? "On" : "Off");
+					State->ShowRegions ? "On" : "Off",
+					(int)State->ExistingMarkerCells.size());
 
 				SetTextColor(DC, RGB(235, 235, 235));
 				RECT TextRect = Rect;
@@ -654,7 +908,7 @@ namespace cse
 			}
 
 			HBRUSH BorderBrush = CreateSolidBrush(RGB(120, 140, 160));
-			FrameRect(DC, &Rect, BorderBrush);
+			FrameRect(DC, &SquareRect, BorderBrush);
 			DeleteObject(BorderBrush);
 
 			SelectObject(DC, OldPen);
@@ -663,36 +917,9 @@ namespace cse
 			RestoreDC(DC, SavedDC);
 		}
 
-		static bool MarkerPlacement_SelectCellFromScreenPoint(HWND hWnd, MarkerPlacementState* State, POINT CursorPos)
-		{
-			SME_ASSERT(State);
-
-			RECT GridRect = { 0 };
-			HWND Grid = GetDlgItem(hWnd, IDC_MARKERPLACEMENT_CELLGRID);
-			if (Grid == nullptr || GetWindowRect(Grid, &GridRect) == FALSE)
-				return false;
-
-			int Width = (GridRect.right - GridRect.left);
-			int Height = (GridRect.bottom - GridRect.top);
-			if (Width <= 0 || Height <= 0)
-				return false;
-
-			int LocalX = CursorPos.x - GridRect.left;
-			int LocalY = CursorPos.y - GridRect.top;
-			if (LocalX < 0 || LocalY < 0 || LocalX >= Width || LocalY >= Height)
-				return false;
-
-			const int GridCells = 16;
-			State->SelectedCellX = (LocalX * GridCells) / Width - (GridCells / 2);
-			State->SelectedCellY = ((Height - 1 - LocalY) * GridCells) / Height - (GridCells / 2);
-			MarkerPlacement_UpdateCellCaption(hWnd, State);
-			return true;
-		}
-
 		static void MarkerPlacement_UpdateCellCaption(HWND hWnd, MarkerPlacementState* State)
 		{
 			SME_ASSERT(State);
-
 			HWND Grid = GetDlgItem(hWnd, IDC_MARKERPLACEMENT_CELLGRID);
 			if (Grid)
 				InvalidateRect(Grid, nullptr, FALSE);
@@ -737,7 +964,7 @@ namespace cse
 				return;
 			}
 
-			TESObject* MarkerBase = CS_CAST(TESForm::LookupByEditorID("MapMarker"), TESForm, TESObject);
+			TESObject* MarkerBase = MarkerPlacement_GetMapMarkerBase();
 			if (MarkerBase == nullptr)
 			{
 				BGSEEUI->MsgBoxE("Couldn't find the MapMarker base form.");
@@ -758,7 +985,10 @@ namespace cse
 			if (_TES->currentWorldSpace != Worldspace)
 				_TES->SetCurrentWorldspace(Worldspace);
 
-			Vector3 Position(MarkerX, MarkerY, 0.0f);
+			float TerrainZ = MarkerPlacement_GetTerrainZ(ExteriorCell);
+			if (!std::isfinite(TerrainZ))
+				TerrainZ = 0.0f;
+			Vector3 Position(MarkerX, MarkerY, TerrainZ + 32.0f);
 			Vector3 Rotation(0.0f, 0.0f, 0.0f);
 			TESObjectREFR* PlacedRef = _DATAHANDLER->PlaceObjectRef(MarkerBase, &Position, &Rotation, ExteriorCell, Worldspace, nullptr);
 			if (PlacedRef == nullptr)
@@ -767,16 +997,18 @@ namespace cse
 				return;
 			}
 
+			MarkerPlacement_RefreshExistingMarkers(hWnd, State, Worldspace);
 			TESRenderWindow::Redraw();
 
 			char Buffer[0x200] = { 0 };
-			FORMAT_STR(Buffer, "Marker %03d | %s | %s | Cell (%d, %d) | Center (%0.1f, %0.1f)",
+			FORMAT_STR(Buffer, "Marker %03d | %s | %s | Cell (%d, %d) | Pos (%0.1f, %0.1f, %0.1f)",
 				State->NextMarkerIndex++,
 				MarkerPlacement_GetWorldspaceName(Worldspace),
 				MarkerType,
 				State->SelectedCellX, State->SelectedCellY,
 				MarkerX,
-				MarkerY);
+				MarkerY,
+				Position.z);
 
 			SendDlgItemMessage(hWnd, IDC_MARKERPLACEMENT_MARKERLIST, LB_ADDSTRING, 0, (LPARAM)Buffer);
 		}
@@ -798,10 +1030,17 @@ namespace cse
 					CheckDlgButton(hWnd, IDC_MARKERPLACEMENT_SHOWREGIONS, BST_CHECKED);
 					NewState->ShowMapOverlap = true;
 					NewState->ShowRegions = true;
+					MarkerPlacement_ResetViewForWorldspace(hWnd, NewState, MarkerPlacement_GetSelectedWorldspace(hWnd));
 					MarkerPlacement_UpdateCellCaption(hWnd, NewState);
 				}
 				return TRUE;
 			case WM_NCDESTROY:
+				if (State && State->Dragging)
+				{
+					State->Dragging = false;
+					if (GetCapture() == hWnd)
+						ReleaseCapture();
+				}
 				if (State)
 					delete State;
 				SetWindowLongPtr(hWnd, GWLP_USERDATA, 0);
@@ -818,6 +1057,98 @@ namespace cse
 						MarkerPlacement_AddPlacedMarker(hWnd, State);
 
 					return TRUE;
+				}
+				break;
+			case WM_LBUTTONDOWN:
+				if (State)
+				{
+					POINT Cursor = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+					ClientToScreen(hWnd, &Cursor);
+					RECT GridRect = { 0 };
+					if (MarkerPlacement_TryGetGridRect(hWnd, GridRect) && PtInRect(&GridRect, Cursor))
+					{
+						State->Dragging = true;
+						State->DragLastScreenPos = Cursor;
+						SetCapture(hWnd);
+						MarkerPlacement_SelectCellFromScreenPoint(hWnd, State, Cursor);
+						return TRUE;
+					}
+				}
+				break;
+			case WM_MOUSEMOVE:
+				if (State)
+				{
+					POINT Cursor = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+					ClientToScreen(hWnd, &Cursor);
+					RECT GridRect = { 0 };
+					if ((wParam & MK_LBUTTON) && MarkerPlacement_TryGetGridRect(hWnd, GridRect) && PtInRect(&GridRect, Cursor))
+					{
+						if (State->Dragging == false)
+						{
+							State->Dragging = true;
+							State->DragLastScreenPos = Cursor;
+							SetCapture(hWnd);
+						}
+					}
+					if (State->Dragging && MarkerPlacement_TryGetGridRect(hWnd, GridRect))
+					{
+						const int Width = GridRect.right - GridRect.left;
+						const int Height = GridRect.bottom - GridRect.top;
+						const int Side = (std::min)(Width, Height);
+						if (Side > 0)
+						{
+							const float HalfCellsVisible = 8.0f / State->Zoom;
+							const float CellsPerPixel = (HalfCellsVisible * 2.0f) / Side;
+							const int DeltaX = Cursor.x - State->DragLastScreenPos.x;
+							const int DeltaY = Cursor.y - State->DragLastScreenPos.y;
+							State->PanCellX -= DeltaX * CellsPerPixel;
+							State->PanCellY += DeltaY * CellsPerPixel;
+							State->DragLastScreenPos = Cursor;
+							MarkerPlacement_UpdateCellCaption(hWnd, State);
+							return TRUE;
+						}
+					}
+				}
+				break;
+			case WM_LBUTTONUP:
+				if (State && State->Dragging)
+				{
+					State->Dragging = false;
+					if (GetCapture() == hWnd)
+						ReleaseCapture();
+					return TRUE;
+				}
+				break;
+			case WM_MOUSEWHEEL:
+				if (State)
+				{
+					POINT Cursor = { GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam) };
+					RECT GridRect = { 0 };
+					if (MarkerPlacement_TryGetGridRect(hWnd, GridRect) && PtInRect(&GridRect, Cursor))
+					{
+						float FocusCellX = 0.0f, FocusCellY = 0.0f;
+						bool HasFocusCell = MarkerPlacement_ScreenToCell(hWnd, State, Cursor, FocusCellX, FocusCellY);
+
+						const short Delta = GET_WHEEL_DELTA_WPARAM(wParam);
+						if (Delta > 0)
+							State->Zoom *= 1.1f;
+						else if (Delta < 0)
+							State->Zoom *= 0.9f;
+						State->Zoom = (std::max)(0.25f, (std::min)(State->Zoom, 8.0f));
+
+						if (HasFocusCell)
+						{
+							float NewFocusCellX = 0.0f, NewFocusCellY = 0.0f;
+							if (MarkerPlacement_ScreenToCell(hWnd, State, Cursor, NewFocusCellX, NewFocusCellY))
+							{
+								State->PanCellX += FocusCellX - NewFocusCellX;
+								State->PanCellY += FocusCellY - NewFocusCellY;
+							}
+						}
+
+						MarkerPlacement_UpdateCellCaption(hWnd, State);
+						return TRUE;
+					}
 				}
 				break;
 			case WM_COMMAND:
@@ -859,6 +1190,23 @@ namespace cse
 						TESWorldSpace* SelectedWorldspace = MarkerPlacement_GetSelectedWorldspace(hWnd);
 						if (SelectedWorldspace)
 							_TES->SetCurrentWorldspace(SelectedWorldspace);
+						MarkerPlacement_ResetViewForWorldspace(hWnd, State, SelectedWorldspace);
+						return TRUE;
+					}
+					break;
+				case IDC_MARKERPLACEMENT_SHOWMAPOVERLAP:
+					if (State && HIWORD(wParam) == BN_CLICKED)
+					{
+						State->ShowMapOverlap = (IsDlgButtonChecked(hWnd, IDC_MARKERPLACEMENT_SHOWMAPOVERLAP) == BST_CHECKED);
+						MarkerPlacement_UpdateCellCaption(hWnd, State);
+						return TRUE;
+					}
+					break;
+				case IDC_MARKERPLACEMENT_SHOWREGIONS:
+					if (State && HIWORD(wParam) == BN_CLICKED)
+					{
+						State->ShowRegions = (IsDlgButtonChecked(hWnd, IDC_MARKERPLACEMENT_SHOWREGIONS) == BST_CHECKED);
+						MarkerPlacement_UpdateCellCaption(hWnd, State);
 						return TRUE;
 					}
 					break;
