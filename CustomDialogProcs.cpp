@@ -56,6 +56,84 @@ namespace cse
 			return FALSE;
 		}
 
+
+		BOOL CALLBACK TextEditDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+		{
+			switch (uMsg)
+			{
+			case WM_INITDIALOG:
+				SetWindowLongPtr(hWnd, GWLP_USERDATA, lParam);
+				if (lParam)
+				{
+					SetDlgItemText(hWnd, IDC_TEXTEDIT_TEXT, (const char*)lParam);
+					SendDlgItemMessage(hWnd, IDC_TEXTEDIT_TEXT, EM_SETSEL, 0, -1);
+				}
+				return TRUE;
+			case WM_COMMAND:
+				switch (LOWORD(wParam))
+				{
+				case IDC_CSE_OK:
+					if (char* Buffer = reinterpret_cast<char*>(GetWindowLongPtr(hWnd, GWLP_USERDATA)))
+						GetDlgItemText(hWnd, IDC_TEXTEDIT_TEXT, Buffer, 0x400);
+					EndDialog(hWnd, 1);
+					return TRUE;
+				case IDC_CSE_CANCEL:
+					EndDialog(hWnd, 0);
+					return TRUE;
+				}
+				break;
+			}
+
+			return FALSE;
+		}
+
+		BOOL CALLBACK TESFileSaveDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+		{
+			switch (uMsg)
+			{
+			case WM_COMMAND:
+				switch (LOWORD(wParam))
+				{
+				case IDC_TESFILESAVE_SAVEESP:
+					EndDialog(hWnd, 0);
+					return TRUE;
+				case IDC_TESFILESAVE_SAVEESM:
+					EndDialog(hWnd, 1);
+					return TRUE;
+				}
+				break;
+			}
+
+			return FALSE;
+		}
+
+		BOOL CALLBACK TESComboBoxDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+		{
+			HWND ComboBox = GetDlgItem(hWnd, IDC_TESCOMBOBOX_FORMLIST);
+
+			switch (uMsg)
+			{
+			case WM_INITDIALOG:
+				SetWindowLongPtr(hWnd, GWLP_USERDATA, lParam);
+				TESComboBox::PopulateWithForms(ComboBox, static_cast<UInt8>(lParam), true, false);
+				TESComboBox::SetSelectedItemByIndex(ComboBox, 0);
+				return TRUE;
+			case WM_COMMAND:
+				switch (LOWORD(wParam))
+				{
+				case IDC_CSE_OK:
+					EndDialog(hWnd, (INT_PTR)TESComboBox::GetSelectedItemData(ComboBox));
+					return TRUE;
+				case IDC_CSE_CANCEL:
+					EndDialog(hWnd, 0);
+					return TRUE;
+				}
+				break;
+			}
+
+			return FALSE;
+		}
+
 		LRESULT CALLBACK CreateGlobalScriptDlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		{
 			switch (uMsg)
