@@ -50,10 +50,6 @@ namespace cse
 
 				break;
 			case WM_INITDIALOG:
-				HWND ComboBox = GetDlgItem(hWnd, IDC_ASSETSELECTOR_FORMLIST);
-				TESComboBox::PopulateWithForms(ComboBox, lParam, true, false);
-				TESComboBox::SetSelectedItemByIndex(ComboBox, 0);
-
 				break;
 			}
 
