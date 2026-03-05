@@ -2322,6 +2322,7 @@ namespace cse
 				case IDC_MAINMENU_MARKERPLACEMENT:
 					if (g_MarkerPlacementDialog && IsWindow(g_MarkerPlacementDialog))
 					{
+						ShowWindow(g_MarkerPlacementDialog, SW_RESTORE);
 						SetForegroundWindow(g_MarkerPlacementDialog);
 						break;
 					}
@@ -2332,7 +2333,21 @@ namespace cse
 						(DLGPROC)MarkerPlacementDlgProc);
 
 					if (g_MarkerPlacementDialog == nullptr)
+					{
+						g_MarkerPlacementDialog = CreateDialogParam(BGSEEMAIN->GetExtenderHandle(),
+							MAKEINTRESOURCE(IDD_MARKERPLACEMENT),
+							hWnd,
+							(DLGPROC)MarkerPlacementDlgProc,
+							0);
+					}
+
+					if (g_MarkerPlacementDialog == nullptr)
 						BGSEECONSOLE_ERROR("Couldn't create marker placement dialog");
+					else
+					{
+						ShowWindow(g_MarkerPlacementDialog, SW_SHOW);
+						SetForegroundWindow(g_MarkerPlacementDialog);
+					}
 
 					break;
 
