@@ -3,6 +3,7 @@
 #include "Hooks\Hooks-AssetSelector.h"
 #include "Achievements.h"
 #include "EditorAPI/Core.h"
+#include <algorithm>
 
 namespace cse
 {
@@ -571,7 +572,7 @@ namespace cse
 			}
 
 			if (SendMessage(WorldspaceCombo, CB_GETCOUNT, 0, 0) > 0)
-				SendMessage(WorldspaceCombo, CB_SETCURSEL, max(0, CurrentWorldspaceSelection), 0);
+				SendMessage(WorldspaceCombo, CB_SETCURSEL, (WPARAM)(std::max)(0, CurrentWorldspaceSelection), 0);
 		}
 
 		static void MarkerPlacement_AddPlacedMarker(HWND hWnd, MarkerPlacementState* State)
