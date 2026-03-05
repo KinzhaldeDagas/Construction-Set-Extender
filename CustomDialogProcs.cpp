@@ -499,6 +499,8 @@ namespace cse
 			int NextMarkerIndex = 1;
 			int SelectedCellX = 0;
 			int SelectedCellY = 0;
+			bool ShowMapOverlap = true;
+			bool ShowRegions = true;
 		};
 
 		static const char* MarkerPlacement_GetWorldspaceName(TESWorldSpace* Worldspace)
@@ -555,20 +557,22 @@ namespace cse
 				return;
 
 			HDC DC = DrawInfo->hDC;
+			int SavedDC = SaveDC(DC);
 			SetBkMode(DC, TRANSPARENT);
 
-			// Base tint used as a low-contrast map overlay backdrop.
 			HBRUSH BackBrush = CreateSolidBrush(RGB(30, 35, 42));
 			FillRect(DC, &Rect, BackBrush);
 			DeleteObject(BackBrush);
 
-			// Draw a subtle checker/stripe overlay so the pane doesn't appear blank.
-			for (int y = 0; y < Height; y += 12)
+			if (State == nullptr || State->ShowMapOverlap)
 			{
-				RECT Stripe = { Rect.left, Rect.top + y, Rect.right, (std::min)(Rect.top + y + 6, Rect.bottom) };
-				HBRUSH StripeBrush = CreateSolidBrush((y / 12) % 2 ? RGB(44, 53, 64) : RGB(38, 46, 56));
-				FillRect(DC, &Stripe, StripeBrush);
-				DeleteObject(StripeBrush);
+				for (int y = 0; y < Height; y += 12)
+				{
+					RECT Stripe = { Rect.left, Rect.top + y, Rect.right, (std::min)(Rect.top + y + 6, Rect.bottom) };
+					HBRUSH StripeBrush = CreateSolidBrush((y / 12) % 2 ? RGB(44, 53, 64) : RGB(38, 46, 56));
+					FillRect(DC, &Stripe, StripeBrush);
+					DeleteObject(StripeBrush);
+				}
 			}
 
 			const int GridCells = 16;
@@ -596,6 +600,24 @@ namespace cse
 
 			if (State)
 			{
+				if (State->ShowRegions)
+				{
+					const int RegionBands = 4;
+					for (int i = 0; i < RegionBands; i++)
+					{
+						RECT RegionRect = {
+							Rect.left + (i * Width) / RegionBands,
+							Rect.top + ((RegionBands - 1 - i) * Height) / RegionBands,
+							Rect.left + ((i + 1) * Width) / RegionBands,
+							Rect.top + ((RegionBands - i) * Height) / RegionBands
+						};
+
+						HBRUSH RegionBrush = CreateSolidBrush(i % 2 ? RGB(72, 98, 88) : RGB(90, 78, 106));
+						FrameRect(DC, &RegionRect, RegionBrush);
+						DeleteObject(RegionBrush);
+					}
+				}
+
 				const int CellW = Width / GridCells;
 				const int CellH = Height / GridCells;
 				const int SelCol = State->SelectedCellX + (GridCells / 2);
@@ -619,9 +641,11 @@ namespace cse
 
 				char OverlayText[0x100] = { 0 };
 				FORMAT_STR(OverlayText,
-					"Selected Cell: (%d, %d)  |  Right-click to place marker",
+					"Selected Cell: (%d, %d) | Right-click to place marker | Map:%s Regions:%s",
 					State->SelectedCellX,
-					State->SelectedCellY);
+					State->SelectedCellY,
+					State->ShowMapOverlap ? "On" : "Off",
+					State->ShowRegions ? "On" : "Off");
 
 				SetTextColor(DC, RGB(235, 235, 235));
 				RECT TextRect = Rect;
@@ -629,9 +653,14 @@ namespace cse
 				DrawTextA(DC, OverlayText, -1, &TextRect, DT_LEFT | DT_TOP | DT_END_ELLIPSIS);
 			}
 
+			HBRUSH BorderBrush = CreateSolidBrush(RGB(120, 140, 160));
+			FrameRect(DC, &Rect, BorderBrush);
+			DeleteObject(BorderBrush);
+
 			SelectObject(DC, OldPen);
 			DeleteObject(GridPen);
 			DeleteObject(AxisPen);
+			RestoreDC(DC, SavedDC);
 		}
 
 		static bool MarkerPlacement_SelectCellFromScreenPoint(HWND hWnd, MarkerPlacementState* State, POINT CursorPos)
@@ -765,6 +794,10 @@ namespace cse
 
 					MarkerPlacement_PopulateWorldspaces(hWnd);
 					CheckDlgButton(hWnd, IDC_MARKERPLACEMENT_MARKERTYPE_CITY, BST_CHECKED);
+					CheckDlgButton(hWnd, IDC_MARKERPLACEMENT_SHOWMAPOVERLAP, BST_CHECKED);
+					CheckDlgButton(hWnd, IDC_MARKERPLACEMENT_SHOWREGIONS, BST_CHECKED);
+					NewState->ShowMapOverlap = true;
+					NewState->ShowRegions = true;
 					MarkerPlacement_UpdateCellCaption(hWnd, NewState);
 				}
 				return TRUE;
@@ -826,6 +859,22 @@ namespace cse
 						TESWorldSpace* SelectedWorldspace = MarkerPlacement_GetSelectedWorldspace(hWnd);
 						if (SelectedWorldspace)
 							_TES->SetCurrentWorldspace(SelectedWorldspace);
+						return TRUE;
+					}
+					break;
+				case IDC_MARKERPLACEMENT_SHOWMAPOVERLAP:
+					if (State && HIWORD(wParam) == BN_CLICKED)
+					{
+						State->ShowMapOverlap = (IsDlgButtonChecked(hWnd, IDC_MARKERPLACEMENT_SHOWMAPOVERLAP) == BST_CHECKED);
+						MarkerPlacement_UpdateCellCaption(hWnd, State);
+						return TRUE;
+					}
+					break;
+				case IDC_MARKERPLACEMENT_SHOWREGIONS:
+					if (State && HIWORD(wParam) == BN_CLICKED)
+					{
+						State->ShowRegions = (IsDlgButtonChecked(hWnd, IDC_MARKERPLACEMENT_SHOWREGIONS) == BST_CHECKED);
+						MarkerPlacement_UpdateCellCaption(hWnd, State);
 						return TRUE;
 					}
 					break;
