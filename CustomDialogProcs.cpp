@@ -763,24 +763,28 @@ namespace cse
 			const float HalfCellsVisible = 8.0f / Zoom;
 			const float PixelsPerCell = Side / (HalfCellsVisible * 2.0f);
 
-			RECT MapOverlayRect = { 0 };
-			bool DrawMapOverlay = (State == nullptr || State->ShowMapOverlap);
-			TESWorldSpace* OverlayWorldspace = MarkerPlacement_GetSelectedWorldspace(hWnd);
-			bool HasWorldMapTexture = OverlayWorldspace && OverlayWorldspace->texturePath.c_str() && strlen(OverlayWorldspace->texturePath.c_str()) > 0;
-			if (DrawMapOverlay)
+			if (State == nullptr || State->ShowMapOverlap)
 			{
-				auto Bounds = MarkerPlacement_GetWorldspaceBounds(OverlayWorldspace);
-				MapOverlayRect = {
+				auto Bounds = MarkerPlacement_GetWorldspaceBounds(MarkerPlacement_GetSelectedWorldspace(hWnd));
+				RECT OverlayRect = {
 					(int)(OriginX + (Bounds.Left - (PanX - HalfCellsVisible)) * PixelsPerCell),
 					(int)(OriginY + (PanY + HalfCellsVisible - Bounds.Top) * PixelsPerCell),
 					(int)(OriginX + (Bounds.Right - (PanX - HalfCellsVisible)) * PixelsPerCell),
 					(int)(OriginY + (PanY + HalfCellsVisible - Bounds.Bottom) * PixelsPerCell)
 				};
 
-				if (MapOverlayRect.left > MapOverlayRect.right)
-					std::swap(MapOverlayRect.left, MapOverlayRect.right);
-				if (MapOverlayRect.top > MapOverlayRect.bottom)
-					std::swap(MapOverlayRect.top, MapOverlayRect.bottom);
+				if (OverlayRect.left > OverlayRect.right)
+					std::swap(OverlayRect.left, OverlayRect.right);
+				if (OverlayRect.top > OverlayRect.bottom)
+					std::swap(OverlayRect.top, OverlayRect.bottom);
+
+				HBRUSH OverlayBrush = CreateSolidBrush(RGB(48, 68, 88));
+				FillRect(DC, &OverlayRect, OverlayBrush);
+				DeleteObject(OverlayBrush);
+
+				HBRUSH OverlayBorder = CreateSolidBrush(RGB(86, 130, 168));
+				FrameRect(DC, &OverlayRect, OverlayBorder);
+				DeleteObject(OverlayBorder);
 			}
 
 			HPEN GridPen = CreatePen(PS_SOLID, 1, RGB(82, 106, 128));
@@ -850,25 +854,6 @@ namespace cse
 				DeleteObject(MarkerPen);
 			}
 
-			if (DrawMapOverlay)
-			{
-				HBRUSH Hatch = CreateHatchBrush(HasWorldMapTexture ? HS_DIAGCROSS : HS_BDIAGONAL,
-					HasWorldMapTexture ? RGB(70, 120, 170) : RGB(95, 95, 95));
-				SetBkColor(DC, HasWorldMapTexture ? RGB(36, 52, 70) : RGB(48, 48, 48));
-				FillRect(DC, &MapOverlayRect, Hatch);
-				DeleteObject(Hatch);
-
-				HPEN OverlayPen = CreatePen(PS_SOLID, 2, RGB(120, 180, 230));
-				SelectObject(DC, OverlayPen);
-				MoveToEx(DC, MapOverlayRect.left, MapOverlayRect.top, nullptr);
-				LineTo(DC, MapOverlayRect.right, MapOverlayRect.top);
-				LineTo(DC, MapOverlayRect.right, MapOverlayRect.bottom);
-				LineTo(DC, MapOverlayRect.left, MapOverlayRect.bottom);
-				LineTo(DC, MapOverlayRect.left, MapOverlayRect.top);
-				SelectObject(DC, GridPen);
-				DeleteObject(OverlayPen);
-			}
-
 			if (State)
 			{
 				RECT CellRect = {
@@ -886,14 +871,13 @@ namespace cse
 
 				char OverlayText[0x120] = { 0 };
 				FORMAT_STR(OverlayText,
-					"Cell:(%d,%d) Zoom:%0.2fx  Drag:Pan  Wheel:Zoom  RMB:Place  Map:%s Regions:%s Markers:%d MapTex:%s",
+					"Cell:(%d,%d) Zoom:%0.2fx  Drag:Pan  Wheel:Zoom  RMB:Place  Map:%s Regions:%s Markers:%d",
 					State->SelectedCellX,
 					State->SelectedCellY,
 					State->Zoom,
 					State->ShowMapOverlap ? "On" : "Off",
 					State->ShowRegions ? "On" : "Off",
-					(int)State->ExistingMarkerCells.size(),
-					HasWorldMapTexture ? "Yes" : "No");
+					(int)State->ExistingMarkerCells.size());
 
 				SetTextColor(DC, RGB(235, 235, 235));
 				RECT TextRect = Rect;
