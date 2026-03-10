@@ -35,3 +35,25 @@ Run these checks against known-problem topics (e.g., "Latest Rumor"):
 - [ ] Verify shared-NPC lines are all present.
 - [ ] Confirm `_1/_2/_3` rows remain grouped under the same base line but exported as separate rows.
 - [ ] Confirm no cross-quest or cross-topic merge occurs for same visible text.
+
+
+## Patch plan
+1. **Stop bucketing by `voiceid` in output paths.**
+   - Current behavior to avoid: `.../<voiceid>/...` directory partitioning.
+   - Required behavior: `.../<race>/...` directory partitioning.
+   - Rationale: shared lines across NPCs/voice IDs should still collate under race-level output, which is how downstream processing expects paths.
+2. Keep the CSV row identity strict (plugin + quest + topic + INFO/form + response index) so path changes do not reintroduce dedup loss.
+3. Add a regression check with known lines (e.g., "Latest Rumor") across NPCs sharing content to ensure no row drops when race-bucket output is used.
+
+## Proposed path rule
+- Replace path builder logic from:
+  - `output_root/<voiceid>/<topic_or_line>.csv`
+- To:
+  - `output_root/<race>/<topic_or_line>.csv`
+
+Where `race` should be a stable, sanitized race key (EditorID preferred; fallback to FormID string).
+
+## Acceptance criteria
+- [ ] Exported files are written under race directories, not voice-id directories.
+- [ ] Shared-topic lines are preserved even when NPC voice IDs differ.
+- [ ] "Latest Rumor" and similar `_1/_2/_3` families export fully for affected NPCs.
