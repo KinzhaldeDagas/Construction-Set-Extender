@@ -1823,11 +1823,9 @@ namespace cse
 							continue;
 
 						TESFile* SourceFile = Info->GetOverrideFile(-1);
-						if (ShouldExportDialogueFromFile(SourceFile, ExportMode, AllowedParentMasters) == false)
-						{
+						const bool IsOutOfScope = ShouldExportDialogueFromFile(SourceFile, ExportMode, AllowedParentMasters) == false;
+						if (IsOutOfScope)
 							SkippedOutOfScope++;
-							continue;
-						}
 
 						RevoiceSpeakerContext SpeakerContext = GetSpeakerContextFromTopicInfo(Info);
 						TESNPC* Speaker = SpeakerContext.Speaker;
@@ -1845,20 +1843,25 @@ namespace cse
 								IsFemale = SpeakerContext.IsFemale;
 						}
 						if (SpeakerRace == nullptr)
-						{
 							SkippedMissingRace++;
-							continue;
-						}
 
 						const char* SexToken = IsFemale ? "F" : "M";
-						TESRace* VoiceRace = IsFemale ? SpeakerRace->femaleVoiceRace : SpeakerRace->maleVoiceRace;
-						if (VoiceRace == nullptr)
-							VoiceRace = SpeakerRace;
+						TESRace* VoiceRace = nullptr;
+						if (SpeakerRace)
+						{
+							VoiceRace = IsFemale ? SpeakerRace->femaleVoiceRace : SpeakerRace->maleVoiceRace;
+							if (VoiceRace == nullptr)
+								VoiceRace = SpeakerRace;
+						}
 
-						const char* VoiceID = ResolveRevoiceVoiceID(VoiceRace, IsFemale);
-						const char* RaceName = SpeakerRace->name.c_str();
-						if (RaceName == nullptr || strlen(RaceName) == 0)
-							RaceName = "Unknown";
+						const char* VoiceID = VoiceRace ? ResolveRevoiceVoiceID(VoiceRace, IsFemale) : "Unknown";
+						const char* RaceName = "Unknown";
+						if (SpeakerRace)
+						{
+							RaceName = SpeakerRace->name.c_str();
+							if (RaceName == nullptr || strlen(RaceName) == 0)
+								RaceName = "Unknown";
+						}
 
 						std::string SpeakerInfo = std::string(RaceName) + "\\" + SexToken;
 
@@ -1892,8 +1895,10 @@ namespace cse
 							const char* QuestToken = GetNonEmptyToken(Quest->editorID.c_str(), "Quest");
 							const char* TopicToken = GetNonEmptyToken(Topic->editorID.c_str(), "Topic");
 
+							const char* SourcePlugin = SourceFile ? SourceFile->fileName : (_DATAHANDLER->activeFile ? _DATAHANDLER->activeFile->fileName : "ActivePlugin.esp");
+
 							FORMAT_STR(OutPath, "Sound\\Voice\\%s\\%s\\%s\\%s_%s_%08X_%u.mp3",
-								SourceFile->fileName,
+								SourcePlugin,
 								VoiceFolder,
 								SexToken,
 								QuestToken,
