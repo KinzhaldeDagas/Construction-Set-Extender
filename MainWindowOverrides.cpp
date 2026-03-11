@@ -429,6 +429,38 @@ namespace cse
 			return Base + Suffix;
 		}
 
+		static std::string BuildRevoiceCategoryFilePath(const std::string& FilePath, const char* CategoryFolder)
+		{
+			if (CategoryFolder == nullptr || CategoryFolder[0] == 0)
+				return FilePath;
+
+			size_t LastSlash = FilePath.find_last_of("\\/");
+			if (LastSlash == std::string::npos)
+				return std::string(CategoryFolder) + "\\" + FilePath;
+
+			std::string Directory = FilePath.substr(0, LastSlash);
+			std::string FileName = FilePath.substr(LastSlash + 1);
+			if (Directory.empty())
+				return std::string(CategoryFolder) + "\\" + FileName;
+
+			return Directory + "\\" + CategoryFolder + "\\" + FileName;
+		}
+
+		static bool EnsureRevoiceCategoryDirectory(const std::string& FilePath, const char* CategoryFolder)
+		{
+			if (CategoryFolder == nullptr || CategoryFolder[0] == 0)
+				return true;
+
+			size_t LastSlash = FilePath.find_last_of("\\/");
+			std::string Directory = (LastSlash == std::string::npos) ? "" : FilePath.substr(0, LastSlash);
+			std::string CategoryPath = Directory.empty() ? std::string(CategoryFolder) : (Directory + "\\" + CategoryFolder);
+			if (CreateDirectoryA(CategoryPath.c_str(), nullptr) != 0)
+				return true;
+
+			const DWORD LastError = GetLastError();
+			return LastError == ERROR_ALREADY_EXISTS;
+		}
+
 		enum class RevoiceParentMasterExportMode
 		{
 			IncludeAll,
@@ -1801,8 +1833,12 @@ namespace cse
 			UInt32 SkippedOutOfScope = 0;
 			UInt32 SkippedMissingRace = 0;
 			UInt32 SkippedEmptyText = 0;
-			std::vector<std::string> CSVRows;
-			CSVRows.reserve(512);
+			std::vector<std::string> ExportedRows;
+			std::vector<std::string> OutOfScopeRows;
+			std::vector<std::string> MissingRaceRows;
+			ExportedRows.reserve(512);
+			OutOfScopeRows.reserve(512);
+			MissingRaceRows.reserve(512);
 			for (tList<TESTopic>::Iterator ItrTopic = _DATAHANDLER->topics.Begin(); ItrTopic.End() == false && ItrTopic.Get(); ++ItrTopic)
 			{
 				TESTopic* Topic = ItrTopic.Get();
@@ -1842,7 +1878,8 @@ namespace cse
 							if (SpeakerContext.HasSexHint)
 								IsFemale = SpeakerContext.IsFemale;
 						}
-						if (SpeakerRace == nullptr)
+						const bool IsMissingRace = SpeakerRace == nullptr;
+						if (IsMissingRace)
 							SkippedMissingRace++;
 
 						const char* SexToken = IsFemale ? "F" : "M";
@@ -1936,7 +1973,12 @@ namespace cse
 							Row += EscapedOutPath;
 							Row += ",";
 							Row += EscapedResponseText;
-							CSVRows.push_back(Row);
+							if (IsOutOfScope)
+								OutOfScopeRows.push_back(Row);
+							if (IsMissingRace)
+								MissingRaceRows.push_back(Row);
+							if (IsOutOfScope == false && IsMissingRace == false)
+								ExportedRows.push_back(Row);
 							Rows++;
 						}
 					}
@@ -1945,49 +1987,74 @@ namespace cse
 
 			SkippedResponses = SkippedOutOfScope + SkippedMissingRace + SkippedEmptyText;
 
-			if (SplitIntoParts)
+			auto WriteCategoryRows = [&](const char* CategoryFolder,
+				const std::vector<std::string>& CategoryRows,
+				UInt32& OutWrittenFiles,
+				std::string& OutFirstFile) -> bool
 			{
-				const size_t kPartSize = 24;
-				const size_t PartCount = std::max<size_t>(1, (CSVRows.size() + kPartSize - 1) / kPartSize);
-				for (size_t Part = 0; Part < PartCount; Part++)
+				if (EnsureRevoiceCategoryDirectory(FilePath, CategoryFolder) == false)
 				{
-					const size_t StartIndex = Part * kPartSize;
-					const size_t EndIndex = std::min(CSVRows.size(), StartIndex + kPartSize);
-					std::string PartFilePath = BuildRevoicePartFilePath(FilePath, static_cast<UInt32>(Part + 1));
-					if (WriteRevoiceCSVFile(PartFilePath, CSVRows, StartIndex, EndIndex) == false)
+					BGSEEUI->MsgBoxE("Couldn't create output folder:\n%s", CategoryFolder);
+					return false;
+				}
+
+				std::string CategoryPath = BuildRevoiceCategoryFilePath(FilePath, CategoryFolder);
+				if (SplitIntoParts)
+				{
+					const size_t kPartSize = 24;
+					const size_t PartCount = std::max<size_t>(1, (CategoryRows.size() + kPartSize - 1) / kPartSize);
+					for (size_t Part = 0; Part < PartCount; Part++)
 					{
-						BGSEEUI->MsgBoxE("Couldn't open output file for writing:\n%s", PartFilePath.c_str());
-						return;
+						const size_t StartIndex = Part * kPartSize;
+						const size_t EndIndex = std::min(CategoryRows.size(), StartIndex + kPartSize);
+						std::string PartFilePath = BuildRevoicePartFilePath(CategoryPath, static_cast<UInt32>(Part + 1));
+						if (WriteRevoiceCSVFile(PartFilePath, CategoryRows, StartIndex, EndIndex) == false)
+						{
+							BGSEEUI->MsgBoxE("Couldn't open output file for writing:\n%s", PartFilePath.c_str());
+							return false;
+						}
 					}
+					OutWrittenFiles += static_cast<UInt32>(PartCount);
+					OutFirstFile = BuildRevoicePartFilePath(CategoryPath, 1);
 				}
-
-				BGSEEUI->MsgBoxI("reVoice CSV export complete.\nFound: %u dialogue responses\nExported: %u dialogue rows\nSkipped: %u responses\n  - Out of scope: %u\n  - Missing race data: %u\n  - Empty response text: %u\n\nWrote %u files.\nFirst file:\n%s",
-					FoundResponses,
-					Rows,
-					SkippedResponses,
-					SkippedOutOfScope,
-					SkippedMissingRace,
-					SkippedEmptyText,
-					static_cast<UInt32>(PartCount),
-					BuildRevoicePartFilePath(FilePath, 1).c_str());
-			}
-			else
-			{
-				if (WriteRevoiceCSVFile(FilePath, CSVRows, 0, CSVRows.size()) == false)
+				else
 				{
-					BGSEEUI->MsgBoxE("Couldn't open output file for writing:\n%s", FilePath.c_str());
-					return;
+					if (WriteRevoiceCSVFile(CategoryPath, CategoryRows, 0, CategoryRows.size()) == false)
+					{
+						BGSEEUI->MsgBoxE("Couldn't open output file for writing:\n%s", CategoryPath.c_str());
+						return false;
+					}
+					OutWrittenFiles += 1;
+					OutFirstFile = CategoryPath;
 				}
 
-				BGSEEUI->MsgBoxI("reVoice CSV export complete.\nFound: %u dialogue responses\nExported: %u dialogue rows\nSkipped: %u responses\n  - Out of scope: %u\n  - Missing race data: %u\n  - Empty response text: %u\n\nOutput:\n%s",
+				return true;
+			};
+
+			UInt32 TotalWrittenFiles = 0;
+			std::string ExportedFirstFile;
+			if (WriteCategoryRows("Exported", ExportedRows, TotalWrittenFiles, ExportedFirstFile) == false)
+				return;
+
+			std::string OutOfScopeFirstFile;
+			if (WriteCategoryRows("Out of scope", OutOfScopeRows, TotalWrittenFiles, OutOfScopeFirstFile) == false)
+				return;
+
+			std::string MissingRaceFirstFile;
+			if (WriteCategoryRows("Missing race data", MissingRaceRows, TotalWrittenFiles, MissingRaceFirstFile) == false)
+				return;
+
+			BGSEEUI->MsgBoxI("reVoice CSV export complete.\nFound: %u dialogue responses\nExported: %u dialogue rows\nSkipped: %u responses\n  - Out of scope: %u\n  - Missing race data: %u\n  - Empty response text: %u\n\nWrote %u files across folders:\n  - Exported\n  - Out of scope\n  - Missing race data\n\nExample files:\n%s\n%s\n%s",
 					FoundResponses,
 					Rows,
 					SkippedResponses,
 					SkippedOutOfScope,
 					SkippedMissingRace,
 					SkippedEmptyText,
-					FilePath.c_str());
-			}
+					TotalWrittenFiles,
+					ExportedFirstFile.c_str(),
+					OutOfScopeFirstFile.c_str(),
+					MissingRaceFirstFile.c_str());
 		}
 
 
