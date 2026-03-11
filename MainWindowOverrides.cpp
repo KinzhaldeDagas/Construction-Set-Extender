@@ -1796,6 +1796,11 @@ namespace cse
 			}
 
 			UInt32 Rows = 0;
+			UInt32 FoundResponses = 0;
+			UInt32 SkippedResponses = 0;
+			UInt32 SkippedOutOfScope = 0;
+			UInt32 SkippedMissingRace = 0;
+			UInt32 SkippedEmptyText = 0;
 			std::vector<std::string> CSVRows;
 			CSVRows.reserve(512);
 			for (tList<TESTopic>::Iterator ItrTopic = _DATAHANDLER->topics.Begin(); ItrTopic.End() == false && ItrTopic.Get(); ++ItrTopic)
@@ -1819,7 +1824,10 @@ namespace cse
 
 						TESFile* SourceFile = Info->GetOverrideFile(-1);
 						if (ShouldExportDialogueFromFile(SourceFile, ExportMode, AllowedParentMasters) == false)
+						{
+							SkippedOutOfScope++;
 							continue;
+						}
 
 						RevoiceSpeakerContext SpeakerContext = GetSpeakerContextFromTopicInfo(Info);
 						TESNPC* Speaker = SpeakerContext.Speaker;
@@ -1837,7 +1845,10 @@ namespace cse
 								IsFemale = SpeakerContext.IsFemale;
 						}
 						if (SpeakerRace == nullptr)
+						{
+							SkippedMissingRace++;
 							continue;
+						}
 
 						const char* SexToken = IsFemale ? "F" : "M";
 						TESRace* VoiceRace = IsFemale ? SpeakerRace->femaleVoiceRace : SpeakerRace->maleVoiceRace;
@@ -1859,9 +1870,14 @@ namespace cse
 							if (Response == nullptr)
 								continue;
 
+							FoundResponses++;
+
 							const char* ResponseText = Response->responseText.c_str();
 							if (ResponseText == nullptr || strlen(ResponseText) == 0)
+							{
+								SkippedEmptyText++;
 								continue;
+							}
 
 							char Emotion[64] = { 0 };
 							FORMAT_STR(Emotion, "%s:%u",
@@ -1922,6 +1938,8 @@ namespace cse
 				}
 			}
 
+			SkippedResponses = SkippedOutOfScope + SkippedMissingRace + SkippedEmptyText;
+
 			if (SplitIntoParts)
 			{
 				const size_t kPartSize = 24;
@@ -1938,8 +1956,13 @@ namespace cse
 					}
 				}
 
-				BGSEEUI->MsgBoxI("reVoice CSV export complete. Wrote %u dialogue rows across %u files.\nFirst file:\n%s",
+				BGSEEUI->MsgBoxI("reVoice CSV export complete.\nFound: %u dialogue responses\nExported: %u dialogue rows\nSkipped: %u responses\n  - Out of scope: %u\n  - Missing race data: %u\n  - Empty response text: %u\n\nWrote %u files.\nFirst file:\n%s",
+					FoundResponses,
 					Rows,
+					SkippedResponses,
+					SkippedOutOfScope,
+					SkippedMissingRace,
+					SkippedEmptyText,
 					static_cast<UInt32>(PartCount),
 					BuildRevoicePartFilePath(FilePath, 1).c_str());
 			}
@@ -1951,7 +1974,14 @@ namespace cse
 					return;
 				}
 
-				BGSEEUI->MsgBoxI("reVoice CSV export complete. Wrote %u dialogue rows to:\n%s", Rows, FilePath.c_str());
+				BGSEEUI->MsgBoxI("reVoice CSV export complete.\nFound: %u dialogue responses\nExported: %u dialogue rows\nSkipped: %u responses\n  - Out of scope: %u\n  - Missing race data: %u\n  - Empty response text: %u\n\nOutput:\n%s",
+					FoundResponses,
+					Rows,
+					SkippedResponses,
+					SkippedOutOfScope,
+					SkippedMissingRace,
+					SkippedEmptyText,
+					FilePath.c_str());
 			}
 		}
 
