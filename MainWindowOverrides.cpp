@@ -14,13 +14,45 @@
 #include "Render Window\RenderWindowManager.h"
 #include "CustomDialogProcs.h"
 
-#include <algorithm>
-#include <cctype>
-#include <fstream>
-#include <iterator>
-#include <map>
 #include <set>
-#include <vector>
+#include <cctype>
+#include <unordered_map>
+
+namespace
+{
+	std::string SanitizePathComponent(const std::string& Input)
+	{
+		std::string Out = Input;
+		for (size_t i = 0; i < Out.size(); i++)
+		{
+			char& Ch = Out[i];
+			if (Ch == '<' || Ch == '>' || Ch == ':' || Ch == '"' || Ch == '/' || Ch == '\\' || Ch == '|' || Ch == '?' || Ch == '*')
+				Ch = '_';
+		}
+
+		if (Out.empty())
+			Out = "Unknown";
+
+		return Out;
+	}
+
+	std::string MakeFallbackEditorID(const char* Prefix, UInt32 FormID)
+	{
+		char Buffer[0x40] = { 0 };
+		FORMAT_STR(Buffer, "%s_%08X", Prefix, FormID);
+		return Buffer;
+	}
+
+	bool HasNonWhitespaceText(const std::string& Input)
+	{
+		for (size_t i = 0; i < Input.size(); i++)
+		{
+			if (isspace(static_cast<unsigned char>(Input[i])) == 0)
+				return true;
+		}
+		return false;
+	}
+}
 
 #include "[BGSEEBase]\ToolBox.h"
 #include "[BGSEEBase]\Script\CodaVM.h"
@@ -103,6 +135,7 @@ namespace cse
 					: Path(Path), ResponseText(Text) {}
 			};
 			std::vector<LipGenInput> CandidateInputs;
+			std::unordered_map<std::string, std::string> CandidateInputResponses;
 
 			for (tList<TESTopic>::Iterator ItrTopic = _DATAHANDLER->topics.Begin(); ItrTopic.End() == false && ItrTopic.Get(); ++ItrTopic)
 			{
@@ -126,9 +159,14 @@ namespace cse
 						SME_ASSERT(Info);
 
 						TESFile* OverrideFile = Info->GetOverrideFile(-1);
+						if (OverrideFile == nullptr)
+							OverrideFile = Info->GetOverrideFile(0);
 
 						if (OverrideFile)
 						{
+							if (Info->formFlags & TESForm::kFormFlags_Deleted)
+								continue;
+
 							if (SkipInactiveTopicInfos == false || (Info->formFlags & TESForm::kFormFlags_FromActiveFile))
 							{
 								for (tList<TESRace>::Iterator ItrRace = _DATAHANDLER->races.Begin();
@@ -146,28 +184,56 @@ namespace cse
 										SME_ASSERT(Response);
 
 										char VoiceFilePath[MAX_PATH] = { 0 };
+										std::string RaceID = Race->editorID.c_str();
+										if (RaceID.empty())
+											RaceID = MakeFallbackEditorID("Race", Race->formID);
+
+										std::string QuestID = Quest->editorID.c_str();
+										if (QuestID.empty())
+											QuestID = MakeFallbackEditorID("Quest", Quest->formID);
+
+										std::string TopicID = Topic->editorID.c_str();
+										if (TopicID.empty())
+											TopicID = MakeFallbackEditorID("Topic", Topic->formID);
+
+										RaceID = SanitizePathComponent(RaceID);
+										QuestID = SanitizePathComponent(QuestID);
+										TopicID = SanitizePathComponent(TopicID);
+
+										std::string ResponseText = Response->responseText.c_str();
+										if (HasNonWhitespaceText(ResponseText) == false)
+											continue;
 
 										for (int j = 0; j < 2; j++)
 										{
-											const char* Sex = "M";
-											if (j)
-												Sex = "F";
+											const char* Sex = j ? "F" : "M";
 
 											FORMAT_STR(VoiceFilePath, "Data\\Sound\\Voice\\%s\\%s\\%s\\%s_%s_%08X_%u",
 												OverrideFile->fileName,
-												Race->name.c_str(),
+												RaceID.c_str(),
 												Sex,
-												Quest->editorID.c_str(),
-												Topic->editorID.c_str(),
+												QuestID.c_str(),
+												TopicID.c_str(),
 												(Info->formID & 0xFFFFFF),
 												Response->responseNumber);
 
-											CandidateInputs.emplace_back(VoiceFilePath, Response->responseText.c_str());
+											auto Existing = CandidateInputResponses.find(VoiceFilePath);
+											if (Existing == CandidateInputResponses.end())
+											{
+												CandidateInputResponses.emplace(VoiceFilePath, ResponseText);
+												CandidateInputs.emplace_back(VoiceFilePath, ResponseText.c_str());
+											}
+											else if (Existing->second != ResponseText)
+											{
+												BGSEECONSOLE_MESSAGE("Voice path collision for %s; keeping first response text", VoiceFilePath);
+											}
 										}
 									}
 								}
 							}
 						}
+						else
+							BGSEECONSOLE_MESSAGE("Topic info %08X has no override/source file; skipping", Info->formID);
 					}
 				}
 			}
@@ -177,7 +243,7 @@ namespace cse
 			int Processed = 0;
 			for (const auto& Input : CandidateInputs)
 			{
-				FORMAT_STR(Buffer, "Please Wait\nProcessing response %d/%d", Processed, CandidateInputs.size());
+				FORMAT_STR(Buffer, "Please Wait\nProcessing response %d/%d", Processed + 1, CandidateInputs.size());
 				Static_SetText(GetDlgItem(IdleWindow, -1), Buffer);
 
 				std::string MP3Path(Input.Path); MP3Path += ".mp3";
