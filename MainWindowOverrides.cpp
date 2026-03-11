@@ -14,6 +14,34 @@
 #include "Render Window\RenderWindowManager.h"
 #include "CustomDialogProcs.h"
 
+#include <set>
+
+namespace
+{
+	std::string SanitizePathComponent(const std::string& Input)
+	{
+		std::string Out = Input;
+		for (size_t i = 0; i < Out.size(); i++)
+		{
+			char& Ch = Out[i];
+			if (Ch == '<' || Ch == '>' || Ch == ':' || Ch == '"' || Ch == '/' || Ch == '\\' || Ch == '|' || Ch == '?' || Ch == '*')
+				Ch = '_';
+		}
+
+		if (Out.empty())
+			Out = "Unknown";
+
+		return Out;
+	}
+
+	std::string MakeFallbackEditorID(const char* Prefix, UInt32 FormID)
+	{
+		char Buffer[0x40] = { 0 };
+		FORMAT_STR(Buffer, "%s_%08X", Prefix, FormID);
+		return Buffer;
+	}
+}
+
 #include "[BGSEEBase]\ToolBox.h"
 #include "[BGSEEBase]\Script\CodaVM.h"
 
@@ -89,6 +117,7 @@ namespace cse
 					: Path(Path), ResponseText(Text) {}
 			};
 			std::vector<LipGenInput> CandidateInputs;
+			std::set<std::string> CandidateInputPaths;
 
 			for (tList<TESTopic>::Iterator ItrTopic = _DATAHANDLER->topics.Begin(); ItrTopic.End() == false && ItrTopic.Get(); ++ItrTopic)
 			{
@@ -112,6 +141,8 @@ namespace cse
 						SME_ASSERT(Info);
 
 						TESFile* OverrideFile = Info->GetOverrideFile(-1);
+						if (OverrideFile == nullptr)
+							OverrideFile = Info->GetOverrideFile(0);
 
 						if (OverrideFile)
 						{
@@ -132,28 +163,44 @@ namespace cse
 										SME_ASSERT(Response);
 
 										char VoiceFilePath[MAX_PATH] = { 0 };
+										std::string RaceID = Race->editorID.c_str();
+										if (RaceID.empty())
+											RaceID = MakeFallbackEditorID("Race", Race->formID);
+
+										std::string QuestID = Quest->editorID.c_str();
+										if (QuestID.empty())
+											QuestID = MakeFallbackEditorID("Quest", Quest->formID);
+
+										std::string TopicID = Topic->editorID.c_str();
+										if (TopicID.empty())
+											TopicID = MakeFallbackEditorID("Topic", Topic->formID);
+
+										RaceID = SanitizePathComponent(RaceID);
+										QuestID = SanitizePathComponent(QuestID);
+										TopicID = SanitizePathComponent(TopicID);
 
 										for (int j = 0; j < 2; j++)
 										{
-											const char* Sex = "M";
-											if (j)
-												Sex = "F";
+											const char* Sex = j ? "F" : "M";
 
 											FORMAT_STR(VoiceFilePath, "Data\\Sound\\Voice\\%s\\%s\\%s\\%s_%s_%08X_%u",
 												OverrideFile->fileName,
-												Race->name.c_str(),
+												RaceID.c_str(),
 												Sex,
-												Quest->editorID.c_str(),
-												Topic->editorID.c_str(),
+												QuestID.c_str(),
+												TopicID.c_str(),
 												(Info->formID & 0xFFFFFF),
 												Response->responseNumber);
 
-											CandidateInputs.emplace_back(VoiceFilePath, Response->responseText.c_str());														
+											if (CandidateInputPaths.insert(VoiceFilePath).second)
+												CandidateInputs.emplace_back(VoiceFilePath, Response->responseText.c_str());
 										}
 									}
 								}
 							}
 						}
+						else
+							BGSEECONSOLE_MESSAGE("Topic info %08X has no override/source file; skipping", Info->formID);
 					}
 				}
 			}
