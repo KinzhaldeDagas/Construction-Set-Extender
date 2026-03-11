@@ -15,6 +15,8 @@
 #include "CustomDialogProcs.h"
 
 #include <set>
+#include <cctype>
+#include <unordered_map>
 
 namespace
 {
@@ -39,6 +41,16 @@ namespace
 		char Buffer[0x40] = { 0 };
 		FORMAT_STR(Buffer, "%s_%08X", Prefix, FormID);
 		return Buffer;
+	}
+
+	bool HasNonWhitespaceText(const std::string& Input)
+	{
+		for (size_t i = 0; i < Input.size(); i++)
+		{
+			if (isspace(static_cast<unsigned char>(Input[i])) == 0)
+				return true;
+		}
+		return false;
 	}
 }
 
@@ -117,7 +129,7 @@ namespace cse
 					: Path(Path), ResponseText(Text) {}
 			};
 			std::vector<LipGenInput> CandidateInputs;
-			std::set<std::string> CandidateInputPaths;
+			std::unordered_map<std::string, std::string> CandidateInputResponses;
 
 			for (tList<TESTopic>::Iterator ItrTopic = _DATAHANDLER->topics.Begin(); ItrTopic.End() == false && ItrTopic.Get(); ++ItrTopic)
 			{
@@ -146,6 +158,9 @@ namespace cse
 
 						if (OverrideFile)
 						{
+							if (Info->formFlags & TESForm::kFormFlags_Deleted)
+								continue;
+
 							if (SkipInactiveTopicInfos == false || (Info->formFlags & TESForm::kFormFlags_FromActiveFile))
 							{
 								for (tList<TESRace>::Iterator ItrRace = _DATAHANDLER->races.Begin();
@@ -179,6 +194,10 @@ namespace cse
 										QuestID = SanitizePathComponent(QuestID);
 										TopicID = SanitizePathComponent(TopicID);
 
+										std::string ResponseText = Response->responseText.c_str();
+										if (HasNonWhitespaceText(ResponseText) == false)
+											continue;
+
 										for (int j = 0; j < 2; j++)
 										{
 											const char* Sex = j ? "F" : "M";
@@ -192,8 +211,16 @@ namespace cse
 												(Info->formID & 0xFFFFFF),
 												Response->responseNumber);
 
-											if (CandidateInputPaths.insert(VoiceFilePath).second)
-												CandidateInputs.emplace_back(VoiceFilePath, Response->responseText.c_str());
+											auto Existing = CandidateInputResponses.find(VoiceFilePath);
+											if (Existing == CandidateInputResponses.end())
+											{
+												CandidateInputResponses.emplace(VoiceFilePath, ResponseText);
+												CandidateInputs.emplace_back(VoiceFilePath, ResponseText.c_str());
+											}
+											else if (Existing->second != ResponseText)
+											{
+												BGSEECONSOLE_MESSAGE("Voice path collision for %s; keeping first response text", VoiceFilePath);
+											}
 										}
 									}
 								}
@@ -210,7 +237,7 @@ namespace cse
 			int Processed = 0;
 			for (const auto& Input : CandidateInputs)
 			{
-				FORMAT_STR(Buffer, "Please Wait\nProcessing response %d/%d", Processed, CandidateInputs.size());
+				FORMAT_STR(Buffer, "Please Wait\nProcessing response %d/%d", Processed + 1, CandidateInputs.size());
 				Static_SetText(GetDlgItem(IdleWindow, -1), Buffer);
 
 				std::string MP3Path(Input.Path); MP3Path += ".mp3";
