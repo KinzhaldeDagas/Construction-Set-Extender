@@ -277,10 +277,25 @@ namespace cse
 				BGSEEUI->MsgBoxI("Batch generation completed successfully!\n\nGenerated: %d files.", BatchGenCounter);
 		}
 
-		static TESNPC* GetSpeakerFromTopicInfo(TESTopicInfo* Info)
+		struct RevoiceSpeakerContext
 		{
+			TESNPC* Speaker = nullptr;
+			TESRace* RaceHint = nullptr;
+			bool HasSexHint = false;
+			bool IsFemale = false;
+		};
+
+		static RevoiceSpeakerContext
+		GetSpeakerContextFromTopicInfo(TESTopicInfo* Info)
+		{
+			RevoiceSpeakerContext Result;
 			if (Info == nullptr)
-				return nullptr;
+				return Result;
+
+			constexpr UInt16 kFunction_GetIsRace = 69;
+			constexpr UInt16 kFunction_GetIsSex = 70;
+			constexpr UInt16 kFunction_GetIsID = 72;
+			constexpr UInt16 kFunction_CSEGetIsID = 224;
 
 			for (ConditionListT::Iterator Itr = Info->conditions.Begin(); Itr.End() == false && Itr.Get(); ++Itr)
 			{
@@ -288,15 +303,33 @@ namespace cse
 				SME_ASSERT(Condition);
 
 				const UInt16 FunctionIndex = Condition->functionIndex & 0x0FFF;
-				if (FunctionIndex == 72 || FunctionIndex == 224)
+				if (FunctionIndex == kFunction_GetIsID || FunctionIndex == kFunction_CSEGetIsID)
 				{
 					TESNPC* Speaker = CS_CAST(Condition->param1.form, TESForm, TESNPC);
 					if (Speaker)
-						return Speaker;
+					{
+						Result.Speaker = Speaker;
+						return Result;
+					}
+				}
+				else if (FunctionIndex == kFunction_GetIsRace)
+				{
+					TESRace* Race = CS_CAST(Condition->param1.form, TESForm, TESRace);
+					if (Race)
+						Result.RaceHint = Race;
+				}
+				else if (FunctionIndex == kFunction_GetIsSex)
+				{
+					int Sex = static_cast<int>(Condition->comparisonValue);
+					if (Sex == 0 || Sex == 1)
+					{
+						Result.HasSexHint = true;
+						Result.IsFemale = Sex != 0;
+					}
 				}
 			}
 
-			return nullptr;
+			return Result;
 		}
 
 
@@ -1788,13 +1821,25 @@ namespace cse
 						if (ShouldExportDialogueFromFile(SourceFile, ExportMode, AllowedParentMasters) == false)
 							continue;
 
-						TESNPC* Speaker = GetSpeakerFromTopicInfo(Info);
-						if (Speaker == nullptr || Speaker->race == nullptr)
+						RevoiceSpeakerContext SpeakerContext = GetSpeakerContextFromTopicInfo(Info);
+						TESNPC* Speaker = SpeakerContext.Speaker;
+						bool IsFemale = false;
+						TESRace* SpeakerRace = nullptr;
+						if (Speaker)
+						{
+							SpeakerRace = Speaker->race;
+							IsFemale = (Speaker->actorFlags & TESActorBaseData::kNPCFlag_Female) != 0;
+						}
+						else
+						{
+							SpeakerRace = SpeakerContext.RaceHint;
+							if (SpeakerContext.HasSexHint)
+								IsFemale = SpeakerContext.IsFemale;
+						}
+						if (SpeakerRace == nullptr)
 							continue;
 
-						const bool IsFemale = (Speaker->actorFlags & TESActorBaseData::kNPCFlag_Female) != 0;
 						const char* SexToken = IsFemale ? "F" : "M";
-						TESRace* SpeakerRace = Speaker->race;
 						TESRace* VoiceRace = IsFemale ? SpeakerRace->femaleVoiceRace : SpeakerRace->maleVoiceRace;
 						if (VoiceRace == nullptr)
 							VoiceRace = SpeakerRace;
