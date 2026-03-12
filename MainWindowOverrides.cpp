@@ -1803,6 +1803,12 @@ namespace cse
 			if (FilePath.size() < 4 || _stricmp(FilePath.c_str() + FilePath.size() - 4, ".csv"))
 				FilePath += ".csv";
 
+			const bool BlastMode = BGSEEUI->MsgBoxI(hWnd,
+				MB_YESNO,
+				"Blast?\n\n"
+				"Yes = export all dialogue lines/topics from selected plugins (no row filtering)\n"
+				"No = keep normal filtering") == IDYES;
+
 			const bool SplitIntoParts = BGSEEUI->MsgBoxI(hWnd,
 				MB_YESNO,
 				"Split the export into multiple reVoice CSV files?\n\n(24 dialogue rows per file)") == IDYES;
@@ -1932,11 +1938,13 @@ namespace cse
 							FoundResponses++;
 
 							const char* ResponseText = Response->responseText.c_str();
-							if (ResponseText == nullptr || strlen(ResponseText) == 0)
+							if ((ResponseText == nullptr || strlen(ResponseText) == 0) && BlastMode == false)
 							{
 								SkippedEmptyText++;
 								continue;
 							}
+							if (ResponseText == nullptr)
+								ResponseText = "";
 
 							char Emotion[64] = { 0 };
 							FORMAT_STR(Emotion, "%s:%u",
@@ -1996,7 +2004,7 @@ namespace cse
 								OutOfScopeRows.push_back(Row);
 							if (IsMissingRace)
 								MissingRaceRows.push_back(Row);
-							if (IsOutOfScope == false && IsMissingRace == false)
+							if (BlastMode || (IsOutOfScope == false && IsMissingRace == false))
 								ExportedRows.push_back(Row);
 							Rows++;
 						}
