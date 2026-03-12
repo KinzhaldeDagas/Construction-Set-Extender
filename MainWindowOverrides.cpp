@@ -285,6 +285,21 @@ namespace cse
 			bool IsFemale = false;
 		};
 
+		static TESNPC* ResolveSpeakerNPCFromConditionParam(TESForm* CandidateForm)
+		{
+			if (CandidateForm == nullptr)
+				return nullptr;
+
+			if (TESNPC* NPC = CS_CAST(CandidateForm, TESForm, TESNPC))
+				return NPC;
+
+			TESObjectREFR* Ref = CS_CAST(CandidateForm, TESForm, TESObjectREFR);
+			if (Ref && Ref->baseForm)
+				return CS_CAST(Ref->baseForm, TESForm, TESNPC);
+
+			return nullptr;
+		}
+
 		static RevoiceSpeakerContext
 		GetSpeakerContextFromTopicInfo(TESTopicInfo* Info)
 		{
@@ -305,11 +320,11 @@ namespace cse
 				const UInt16 FunctionIndex = Condition->functionIndex & 0x0FFF;
 				if (FunctionIndex == kFunction_GetIsID || FunctionIndex == kFunction_CSEGetIsID)
 				{
-					TESNPC* Speaker = CS_CAST(Condition->param1.form, TESForm, TESNPC);
-					if (Speaker)
+					if (Result.Speaker == nullptr)
 					{
-						Result.Speaker = Speaker;
-						return Result;
+						Result.Speaker = ResolveSpeakerNPCFromConditionParam(Condition->param1.form);
+						if (Result.Speaker == nullptr)
+							Result.Speaker = ResolveSpeakerNPCFromConditionParam(Condition->param2.form);
 					}
 				}
 				else if (FunctionIndex == kFunction_GetIsRace)
