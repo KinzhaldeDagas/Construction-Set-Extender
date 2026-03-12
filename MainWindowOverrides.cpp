@@ -285,6 +285,21 @@ namespace cse
 			bool IsFemale = false;
 		};
 
+		static TESNPC* ResolveSpeakerNPCFromConditionParam(TESForm* CandidateForm)
+		{
+			if (CandidateForm == nullptr || CandidateForm->formID == 0)
+				return nullptr;
+
+			if (TESNPC* NPC = CS_CAST(CandidateForm, TESForm, TESNPC))
+				return NPC;
+
+			TESObjectREFR* Ref = CS_CAST(CandidateForm, TESForm, TESObjectREFR);
+			if (Ref == nullptr || Ref->baseForm == nullptr || Ref->baseForm->formID == 0)
+				return nullptr;
+
+			return CS_CAST(Ref->baseForm, TESForm, TESNPC);
+		}
+
 		static RevoiceSpeakerContext
 		GetSpeakerContextFromTopicInfo(TESTopicInfo* Info)
 		{
@@ -305,26 +320,30 @@ namespace cse
 				const UInt16 FunctionIndex = Condition->functionIndex & 0x0FFF;
 				if (FunctionIndex == kFunction_GetIsID || FunctionIndex == kFunction_CSEGetIsID)
 				{
-					TESNPC* Speaker = CS_CAST(Condition->param1.form, TESForm, TESNPC);
-					if (Speaker)
+					if (Result.Speaker == nullptr)
 					{
-						Result.Speaker = Speaker;
-						return Result;
+						Result.Speaker = ResolveSpeakerNPCFromConditionParam(Condition->param1.form);
 					}
 				}
 				else if (FunctionIndex == kFunction_GetIsRace)
 				{
-					TESRace* Race = CS_CAST(Condition->param1.form, TESForm, TESRace);
-					if (Race)
-						Result.RaceHint = Race;
+					if (Result.RaceHint == nullptr)
+					{
+						TESRace* Race = CS_CAST(Condition->param1.form, TESForm, TESRace);
+						if (Race)
+							Result.RaceHint = Race;
+					}
 				}
 				else if (FunctionIndex == kFunction_GetIsSex)
 				{
-					int Sex = static_cast<int>(Condition->comparisonValue);
-					if (Sex == 0 || Sex == 1)
+					if (Result.HasSexHint == false)
 					{
-						Result.HasSexHint = true;
-						Result.IsFemale = Sex != 0;
+						int Sex = static_cast<int>(Condition->comparisonValue);
+						if (Sex == 0 || Sex == 1)
+						{
+							Result.HasSexHint = true;
+							Result.IsFemale = Sex != 0;
+						}
 					}
 				}
 			}
