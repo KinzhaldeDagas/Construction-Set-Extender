@@ -500,9 +500,12 @@ namespace cse
 			std::string Dialogue;
 		};
 
+		static bool StringContainsCaseInsensitive(const char* Haystack, const char* Needle);
+
 		static std::string BuildRevoiceCSVRow(const RevoiceCSVRowData& Row)
 		{
-			std::string EscapedFormID = EscapeCSVField(Row.FormID.c_str());
+			std::string FormIDText = "=\"" + Row.FormID + "\"";
+			std::string EscapedFormID = EscapeCSVField(FormIDText.c_str());
 			std::string EscapedVoiceID = EscapeCSVField(Row.VoiceID.c_str());
 			std::string EscapedRace = EscapeCSVField(Row.Race.c_str());
 			std::string EscapedGender = EscapeCSVField(Row.Gender.c_str());
@@ -530,6 +533,48 @@ namespace cse
 			Result += ",";
 			Result += EscapedDialogue;
 			return Result;
+		}
+
+		static const char* GetRevoiceSexToken(bool IsFemale)
+		{
+			return IsFemale ? "F" : "M";
+		}
+
+		static bool IsRevoiceFemaleToken(const char* Gender)
+		{
+			return Gender && _stricmp(Gender, "F") == 0;
+		}
+
+		static std::string GetRevoiceSpeakerRaceToken(const std::string& SpeakerInfo)
+		{
+			std::string SpeakerRaceToken = SpeakerInfo;
+			size_t SeparatorIndex = SpeakerRaceToken.find('\\');
+			if (SeparatorIndex != std::string::npos)
+				SpeakerRaceToken.erase(SeparatorIndex);
+			return SpeakerRaceToken;
+		}
+
+		static void ApplyRevoiceVampireRaceFallbackFromOutputPath(RevoiceCSVRowData& Row)
+		{
+			if (StringContainsCaseInsensitive(Row.OutputPath.c_str(), "VampireRace") == false)
+				return;
+
+			if (IsUnknownLikeToken(Row.Race.c_str()))
+				Row.Race = "VampireRace";
+
+			if (IsUnknownLikeToken(GetRevoiceSpeakerRaceToken(Row.SpeakerInfo).c_str()))
+				Row.SpeakerInfo = std::string("VampireRace\\") + (IsRevoiceFemaleToken(Row.Gender.c_str()) ? "F" : "M");
+		}
+
+		static bool ShouldSkipRevoiceCSVRow(const RevoiceCSVRowData& Row)
+		{
+			if (IsRevoiceFemaleToken(Row.Gender.c_str()) == false)
+				return false;
+
+			return StringContainsCaseInsensitive(Row.VoiceID.c_str(), "Sheogorath") ||
+				StringContainsCaseInsensitive(Row.Race.c_str(), "Sheogorath") ||
+				StringContainsCaseInsensitive(Row.SpeakerInfo.c_str(), "Sheogorath") ||
+				StringContainsCaseInsensitive(Row.OutputPath.c_str(), "Sheogorath");
 		}
 
 		static bool WriteRevoiceCSVFile(const std::string& FilePath,
@@ -1351,6 +1396,18 @@ namespace cse
 			const char* RaceName = VoiceRace->name.c_str();
 			std::string ProbeText = std::string(EditorID) + " " + (RaceName ? RaceName : "");
 
+			if (StringContainsTokenCaseInsensitive(ProbeText, "DARKSEDUCER") ||
+				(StringContainsTokenCaseInsensitive(ProbeText, "DARK") && StringContainsTokenCaseInsensitive(ProbeText, "SEDUCER")))
+			{
+				return IsFemale ? "F-DarkSeducer" : "M-DarkSeducer";
+			}
+			if (StringContainsTokenCaseInsensitive(ProbeText, "GOLDENSAINT") ||
+				(StringContainsTokenCaseInsensitive(ProbeText, "GOLDEN") && StringContainsTokenCaseInsensitive(ProbeText, "SAINT")))
+			{
+				return IsFemale ? "F-GoldenSaint" : "M-GoldenSaint";
+			}
+			if (StringContainsTokenCaseInsensitive(ProbeText, "SHEOGORATH"))
+				return "M-Sheogorath";
 			if (StringContainsTokenCaseInsensitive(ProbeText, "DREMORA"))
 				return IsFemale ? "F-Dremora" : "M-Dremora";
 			if (StringContainsTokenCaseInsensitive(ProbeText, "KHAJIIT") ||
@@ -2133,6 +2190,9 @@ namespace cse
 							BaseRow.Emotion = Emotion;
 							BaseRow.OutputPath = OutPath;
 							BaseRow.Dialogue = ResponseText;
+							ApplyRevoiceVampireRaceFallbackFromOutputPath(BaseRow);
+							if (ShouldSkipRevoiceCSVRow(BaseRow))
+								continue;
 
 							std::string Row = BuildRevoiceCSVRow(BaseRow);
 							if (IsOutOfScope)
@@ -2140,6 +2200,7 @@ namespace cse
 							if (IsMissingRace && IsOutOfScope == false)
 							{
 								MissingRaceRows.push_back(Row);
+
 								for (auto* LoadedRace : AutoFixRaces)
 								{
 									if (LoadedRace == nullptr)
@@ -2149,36 +2210,47 @@ namespace cse
 									if (FixedRaceName == nullptr || strlen(FixedRaceName) == 0)
 										FixedRaceName = "Unknown";
 
-									TESRace* FixedVoiceRace = IsFemale ? LoadedRace->femaleVoiceRace : LoadedRace->maleVoiceRace;
-									if (FixedVoiceRace == nullptr)
-										FixedVoiceRace = LoadedRace;
-									const char* FixedVoiceID = ResolveRevoiceVoiceID(FixedVoiceRace, IsFemale);
-									if (FixedVoiceID == nullptr || strlen(FixedVoiceID) == 0)
-										FixedVoiceID = FixedRaceName;
-
-									std::string FixedVoiceFolder = ResolveRevoiceVoiceFolderFromEngine(FixedVoiceRace, FixedRaceName, FixedVoiceID);
-									char FixedOutPath[MAX_PATH] = { 0 };
-									FORMAT_STR(FixedOutPath, "Sound\\Voice\\%s\\%s\\%s\\%s_%s_%08X_%u.mp3",
-										SourcePlugin,
-										FixedVoiceFolder.c_str(),
-										SexToken,
-										QuestToken,
-										TopicToken,
-										OutputPathFormID,
-										Response->responseNumber);
-
-									if (SeenFixedOutputPaths.insert(FixedOutPath).second == false)
+									for (int SexIndex = 0; SexIndex < 2; SexIndex++)
 									{
-										SkippedFixedPathCollisions++;
-										continue;
-									}
+										const bool FixedIsFemale = SexIndex == 1;
+										const char* FixedSexToken = GetRevoiceSexToken(FixedIsFemale);
+										TESRace* FixedVoiceRace = FixedIsFemale ? LoadedRace->femaleVoiceRace : LoadedRace->maleVoiceRace;
+										if (FixedVoiceRace == nullptr)
+											FixedVoiceRace = LoadedRace;
 
-									RevoiceCSVRowData FixedRow = BaseRow;
-									FixedRow.VoiceID = FixedVoiceID;
-									FixedRow.Race = FixedRaceName;
-									FixedRow.SpeakerInfo = std::string(FixedRaceName) + "\\" + SexToken;
-									FixedRow.OutputPath = FixedOutPath;
-									FixedRows.push_back(BuildRevoiceCSVRow(FixedRow));
+										const char* FixedVoiceID = ResolveRevoiceVoiceID(FixedVoiceRace, FixedIsFemale);
+										if (FixedVoiceID == nullptr || strlen(FixedVoiceID) == 0)
+											FixedVoiceID = FixedRaceName;
+
+										std::string FixedVoiceFolder = ResolveRevoiceVoiceFolderFromEngine(FixedVoiceRace, FixedRaceName, FixedVoiceID);
+										char FixedOutPath[MAX_PATH] = { 0 };
+										FORMAT_STR(FixedOutPath, "Sound\\Voice\\%s\\%s\\%s\\%s_%s_%08X_%u.mp3",
+											SourcePlugin,
+											FixedVoiceFolder.c_str(),
+											FixedSexToken,
+											QuestToken,
+											TopicToken,
+											OutputPathFormID,
+											Response->responseNumber);
+
+										if (SeenFixedOutputPaths.insert(FixedOutPath).second == false)
+										{
+											SkippedFixedPathCollisions++;
+											continue;
+										}
+
+										RevoiceCSVRowData FixedRow = BaseRow;
+										FixedRow.Gender = FixedSexToken;
+										FixedRow.VoiceID = FixedVoiceID;
+										FixedRow.Race = FixedRaceName;
+										FixedRow.SpeakerInfo = std::string(FixedRaceName) + "\\" + FixedSexToken;
+										FixedRow.OutputPath = FixedOutPath;
+										ApplyRevoiceVampireRaceFallbackFromOutputPath(FixedRow);
+										if (ShouldSkipRevoiceCSVRow(FixedRow))
+											continue;
+
+										FixedRows.push_back(BuildRevoiceCSVRow(FixedRow));
+									}
 								}
 							}
 							if (BlastMode || (IsOutOfScope == false && IsMissingRace == false))
