@@ -500,9 +500,12 @@ namespace cse
 			std::string Dialogue;
 		};
 
+		static bool StringContainsCaseInsensitive(const char* Haystack, const char* Needle);
+
 		static std::string BuildRevoiceCSVRow(const RevoiceCSVRowData& Row)
 		{
-			std::string EscapedFormID = EscapeCSVField(Row.FormID.c_str());
+			std::string FormIDText = "=\"" + Row.FormID + "\"";
+			std::string EscapedFormID = EscapeCSVField(FormIDText.c_str());
 			std::string EscapedVoiceID = EscapeCSVField(Row.VoiceID.c_str());
 			std::string EscapedRace = EscapeCSVField(Row.Race.c_str());
 			std::string EscapedGender = EscapeCSVField(Row.Gender.c_str());
