@@ -555,22 +555,6 @@ namespace cse
 			}
 		}
 
-		static void ApplyRevoiceVoiceIDFallbacks(RevoiceCSVRowData& Row)
-		{
-			std::string SpeakerRaceToken = Row.SpeakerInfo;
-			size_t SeparatorIndex = SpeakerRaceToken.find('\\');
-			if (SeparatorIndex != std::string::npos)
-				SpeakerRaceToken.erase(SeparatorIndex);
-
-			const bool IsVampireRaceRow = _stricmp(Row.Race.c_str(), "VampireRace") == 0 ||
-				_stricmp(SpeakerRaceToken.c_str(), "VampireRace") == 0;
-			if (IsVampireRaceRow == false)
-				return;
-
-			const bool IsFemale = _stricmp(Row.Gender.c_str(), "F") == 0;
-			Row.VoiceID = IsFemale ? "F-VampireRace" : "M-VampireRace";
-		}
-
 		static bool ShouldSkipRevoiceCSVRow(const RevoiceCSVRowData& Row)
 		{
 			if (_stricmp(Row.Gender.c_str(), "F") != 0)
@@ -2196,7 +2180,6 @@ namespace cse
 							BaseRow.OutputPath = OutPath;
 							BaseRow.Dialogue = ResponseText;
 							ApplyRevoiceVampireRaceFallbackFromOutputPath(BaseRow);
-							ApplyRevoiceVoiceIDFallbacks(BaseRow);
 							if (ShouldSkipRevoiceCSVRow(BaseRow))
 								continue;
 
@@ -2243,18 +2226,15 @@ namespace cse
 											continue;
 										}
 
-										RevoiceCSVRowData FixedRow = BaseRow;
-										FixedRow.Gender = FixedSexToken;
-										FixedRow.VoiceID = FixedVoiceID;
-										FixedRow.Race = FixedRaceName;
-										FixedRow.SpeakerInfo = std::string(FixedRaceName) + "\\" + FixedSexToken;
-										FixedRow.OutputPath = FixedOutPath;
-										ApplyRevoiceVampireRaceFallbackFromOutputPath(FixedRow);
-										ApplyRevoiceVoiceIDFallbacks(FixedRow);
-										if (ShouldSkipRevoiceCSVRow(FixedRow))
-											continue;
-										FixedRows.push_back(BuildRevoiceCSVRow(FixedRow));
-									}
+									RevoiceCSVRowData FixedRow = BaseRow;
+									FixedRow.VoiceID = FixedVoiceID;
+									FixedRow.Race = FixedRaceName;
+									FixedRow.SpeakerInfo = std::string(FixedRaceName) + "\\" + SexToken;
+									FixedRow.OutputPath = FixedOutPath;
+									ApplyRevoiceVampireRaceFallbackFromOutputPath(FixedRow);
+									if (ShouldSkipRevoiceCSVRow(FixedRow))
+										continue;
+									FixedRows.push_back(BuildRevoiceCSVRow(FixedRow));
 								}
 							}
 							if (BlastMode || (IsOutOfScope == false && IsMissingRace == false))
