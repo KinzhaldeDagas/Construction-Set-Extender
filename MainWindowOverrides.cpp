@@ -419,6 +419,50 @@ namespace cse
 			return Fallback;
 		}
 
+		struct RevoiceCSVRowData
+		{
+			std::string FormID;
+			std::string VoiceID;
+			std::string Race;
+			std::string Gender;
+			std::string SpeakerInfo;
+			std::string Emotion;
+			std::string OutputPath;
+			std::string Dialogue;
+		};
+
+		static std::string BuildRevoiceCSVRow(const RevoiceCSVRowData& Row)
+		{
+			std::string EscapedFormID = EscapeCSVField(Row.FormID.c_str());
+			std::string EscapedVoiceID = EscapeCSVField(Row.VoiceID.c_str());
+			std::string EscapedRace = EscapeCSVField(Row.Race.c_str());
+			std::string EscapedGender = EscapeCSVField(Row.Gender.c_str());
+			std::string EscapedSpeakerInfo = EscapeCSVField(Row.SpeakerInfo.c_str());
+			std::string EscapedEmotion = EscapeCSVField(Row.Emotion.c_str());
+			std::string EscapedOutputPath = EscapeCSVField(Row.OutputPath.c_str());
+			std::string EscapedDialogue = EscapeCSVField(Row.Dialogue.c_str());
+
+			std::string Result;
+			Result.reserve(EscapedFormID.size() + EscapedVoiceID.size() + EscapedRace.size() + EscapedGender.size() + EscapedSpeakerInfo.size() +
+				EscapedEmotion.size() + EscapedOutputPath.size() + EscapedDialogue.size() + 7);
+			Result += EscapedFormID;
+			Result += ",";
+			Result += EscapedVoiceID;
+			Result += ",";
+			Result += EscapedRace;
+			Result += ",";
+			Result += EscapedGender;
+			Result += ",";
+			Result += EscapedSpeakerInfo;
+			Result += ",";
+			Result += EscapedEmotion;
+			Result += ",";
+			Result += EscapedOutputPath;
+			Result += ",";
+			Result += EscapedDialogue;
+			return Result;
+		}
+
 		static bool WriteRevoiceCSVFile(const std::string& FilePath,
 			const std::vector<std::string>& Rows,
 			size_t StartIndex,
@@ -1852,6 +1896,14 @@ namespace cse
 				AllowedParentMasters.push_back(MasterFile);
 			}
 
+			std::vector<TESRace*> LoadedRaces;
+			for (tList<TESRace>::Iterator ItrRace = _DATAHANDLER->races.Begin(); ItrRace.End() == false && ItrRace.Get(); ++ItrRace)
+			{
+				TESRace* Race = ItrRace.Get();
+				if (Race)
+					LoadedRaces.push_back(Race);
+			}
+
 			UInt32 Rows = 0;
 			UInt32 FoundResponses = 0;
 			UInt32 SkippedResponses = 0;
@@ -1861,9 +1913,11 @@ namespace cse
 			std::vector<std::string> ExportedRows;
 			std::vector<std::string> OutOfScopeRows;
 			std::vector<std::string> MissingRaceRows;
+			std::vector<std::string> FixedRows;
 			ExportedRows.reserve(512);
 			OutOfScopeRows.reserve(512);
 			MissingRaceRows.reserve(512);
+			FixedRows.reserve(512);
 			for (tList<TESTopic>::Iterator ItrTopic = _DATAHANDLER->topics.Begin(); ItrTopic.End() == false && ItrTopic.Get(); ++ItrTopic)
 			{
 				TESTopic* Topic = ItrTopic.Get();
@@ -1973,37 +2027,56 @@ namespace cse
 							char FormID[9] = { 0 };
 							FORMAT_STR(FormID, "%08X", Info->formID);
 
-							std::string EscapedFormID = EscapeCSVField(FormID);
-							std::string EscapedVoiceID = EscapeCSVField(VoiceID);
-							std::string EscapedRace = EscapeCSVField(RaceName);
-							std::string EscapedGender = EscapeCSVField(SexToken);
-							std::string EscapedSpeakerInfo = EscapeCSVField(SpeakerInfo.c_str());
-							std::string EscapedEmotion = EscapeCSVField(Emotion);
-							std::string EscapedOutPath = EscapeCSVField(OutPath);
-							std::string EscapedResponseText = EscapeCSVField(ResponseText);
+							RevoiceCSVRowData BaseRow;
+							BaseRow.FormID = FormID;
+							BaseRow.VoiceID = VoiceID;
+							BaseRow.Race = RaceName;
+							BaseRow.Gender = SexToken;
+							BaseRow.SpeakerInfo = SpeakerInfo;
+							BaseRow.Emotion = Emotion;
+							BaseRow.OutputPath = OutPath;
+							BaseRow.Dialogue = ResponseText;
 
-							std::string Row;
-							Row.reserve(EscapedFormID.size() + EscapedVoiceID.size() + EscapedRace.size() + EscapedGender.size() + EscapedSpeakerInfo.size() +
-								EscapedEmotion.size() + EscapedOutPath.size() + EscapedResponseText.size() + 7);
-							Row += EscapedFormID;
-							Row += ",";
-							Row += EscapedVoiceID;
-							Row += ",";
-							Row += EscapedRace;
-							Row += ",";
-							Row += EscapedGender;
-							Row += ",";
-							Row += EscapedSpeakerInfo;
-							Row += ",";
-							Row += EscapedEmotion;
-							Row += ",";
-							Row += EscapedOutPath;
-							Row += ",";
-							Row += EscapedResponseText;
+							std::string Row = BuildRevoiceCSVRow(BaseRow);
 							if (IsOutOfScope)
 								OutOfScopeRows.push_back(Row);
 							if (IsMissingRace)
+							{
 								MissingRaceRows.push_back(Row);
+								for (auto* LoadedRace : LoadedRaces)
+								{
+									if (LoadedRace == nullptr)
+										continue;
+
+									const char* FixedRaceName = LoadedRace->name.c_str();
+									if (FixedRaceName == nullptr || strlen(FixedRaceName) == 0)
+										FixedRaceName = "Unknown";
+
+									TESRace* FixedVoiceRace = IsFemale ? LoadedRace->femaleVoiceRace : LoadedRace->maleVoiceRace;
+									if (FixedVoiceRace == nullptr)
+										FixedVoiceRace = LoadedRace;
+									const char* FixedVoiceID = ResolveRevoiceVoiceID(FixedVoiceRace, IsFemale);
+									if (FixedVoiceID == nullptr || strlen(FixedVoiceID) == 0)
+										FixedVoiceID = FixedRaceName;
+
+									char FixedOutPath[MAX_PATH] = { 0 };
+									FORMAT_STR(FixedOutPath, "Sound\\Voice\\%s\\%s\\%s\\%s_%s_%08X_%u.mp3",
+										SourcePlugin,
+										FixedVoiceID,
+										SexToken,
+										QuestToken,
+										TopicToken,
+										Info->formID,
+										Response->responseNumber);
+
+									RevoiceCSVRowData FixedRow = BaseRow;
+									FixedRow.VoiceID = FixedVoiceID;
+									FixedRow.Race = FixedRaceName;
+									FixedRow.SpeakerInfo = std::string(FixedRaceName) + "\\" + SexToken;
+									FixedRow.OutputPath = FixedOutPath;
+									FixedRows.push_back(BuildRevoiceCSVRow(FixedRow));
+								}
+							}
 							if (BlastMode || (IsOutOfScope == false && IsMissingRace == false))
 								ExportedRows.push_back(Row);
 							Rows++;
@@ -2071,17 +2144,24 @@ namespace cse
 			if (WriteCategoryRows("Missing race data", MissingRaceRows, TotalWrittenFiles, MissingRaceFirstFile) == false)
 				return;
 
-			BGSEEUI->MsgBoxI("reVoice CSV export complete.\nFound: %u dialogue responses\nExported: %u dialogue rows\nSkipped: %u responses\n  - Out of scope: %u\n  - Missing race data: %u\n  - Empty response text: %u\n\nWrote %u files across folders:\n  - Exported\n  - Out of scope\n  - Missing race data\n\nExample files:\n%s\n%s\n%s",
+			std::string FixedFirstFile;
+			if (WriteCategoryRows("Fixed", FixedRows, TotalWrittenFiles, FixedFirstFile) == false)
+				return;
+
+			BGSEEUI->MsgBoxI("reVoice CSV export complete.\nFound: %u dialogue responses\nExported: %u dialogue rows\nSkipped: %u responses\n  - Out of scope: %u\n  - Missing race data: %u\n  - Empty response text: %u\n\nAuto-fix from missing race data:\n  - Loaded races used: %u\n  - Fixed rows generated: %u\n\nWrote %u files across folders:\n  - Exported\n  - Out of scope\n  - Missing race data\n  - Fixed\n\nExample files:\n%s\n%s\n%s\n%s",
 					FoundResponses,
 					Rows,
 					SkippedResponses,
 					SkippedOutOfScope,
 					SkippedMissingRace,
 					SkippedEmptyText,
+					static_cast<UInt32>(LoadedRaces.size()),
+					static_cast<UInt32>(FixedRows.size()),
 					TotalWrittenFiles,
 					ExportedFirstFile.c_str(),
 					OutOfScopeFirstFile.c_str(),
-					MissingRaceFirstFile.c_str());
+					MissingRaceFirstFile.c_str(),
+					FixedFirstFile.c_str());
 		}
 
 
