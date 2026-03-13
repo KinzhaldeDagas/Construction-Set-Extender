@@ -1897,12 +1897,27 @@ namespace cse
 			}
 
 			std::vector<TESRace*> LoadedRaces;
+			std::vector<TESRace*> OblivionDefaultRaces;
 			for (tList<TESRace>::Iterator ItrRace = _DATAHANDLER->races.Begin(); ItrRace.End() == false && ItrRace.Get(); ++ItrRace)
 			{
 				TESRace* Race = ItrRace.Get();
 				if (Race)
+				{
 					LoadedRaces.push_back(Race);
+
+					TESFile* RaceSource = Race->GetOverrideFile(-1);
+					if (RaceSource && _stricmp(RaceSource->fileName, "Oblivion.esm") == 0)
+						OblivionDefaultRaces.push_back(Race);
+				}
 			}
+
+			const bool IncludeOblivionOnlyRaces = BGSEEUI->MsgBoxI(hWnd,
+				MB_YESNO,
+				"Include Races from Oblivion.esm?\n\n"
+				"Yes = Use only Oblivion.esm races for missing-race auto-fix\n"
+				"No = Use all loaded races for missing-race auto-fix") == IDYES;
+
+			const std::vector<TESRace*>& AutoFixRaces = IncludeOblivionOnlyRaces ? OblivionDefaultRaces : LoadedRaces;
 
 			UInt32 Rows = 0;
 			UInt32 FoundResponses = 0;
@@ -2045,7 +2060,7 @@ namespace cse
 							if (IsMissingRace)
 							{
 								MissingRaceRows.push_back(Row);
-								for (auto* LoadedRace : LoadedRaces)
+								for (auto* LoadedRace : AutoFixRaces)
 								{
 									if (LoadedRace == nullptr)
 										continue;
@@ -2163,7 +2178,7 @@ namespace cse
 					SkippedOutOfScope,
 					SkippedMissingRace,
 					SkippedEmptyText,
-					static_cast<UInt32>(LoadedRaces.size()),
+					static_cast<UInt32>(AutoFixRaces.size()),
 					static_cast<UInt32>(FixedRows.size()),
 					SkippedFixedPathCollisions,
 					TotalWrittenFiles,
@@ -2171,6 +2186,40 @@ namespace cse
 					OutOfScopeFirstFile.c_str(),
 					MissingRaceFirstFile.c_str(),
 					FixedFirstFile.c_str());
+
+
+			std::string RaceListReport = "Auto-fix race pool:\n";
+			if (AutoFixRaces.empty())
+			{
+				RaceListReport += "(none)";
+			}
+			else
+			{
+				for (auto* AutoFixRace : AutoFixRaces)
+				{
+					if (AutoFixRace == nullptr)
+						continue;
+
+					const char* RaceName = AutoFixRace->name.c_str();
+					if (RaceName == nullptr || strlen(RaceName) == 0)
+						RaceName = "Unknown";
+
+					RaceListReport += "- ";
+					RaceListReport += RaceName;
+
+					TESFile* RaceSource = AutoFixRace->GetOverrideFile(-1);
+					if (RaceSource && RaceSource->fileName)
+					{
+						RaceListReport += " (";
+						RaceListReport += RaceSource->fileName;
+						RaceListReport += ")";
+					}
+
+					RaceListReport += "\n";
+				}
+			}
+
+			BGSEEUI->MsgBoxI("%s", RaceListReport.c_str());
 		}
 
 
