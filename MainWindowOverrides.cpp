@@ -535,6 +535,25 @@ namespace cse
 			return Result;
 		}
 
+		static const char* GetRevoiceSexToken(bool IsFemale)
+		{
+			return IsFemale ? "F" : "M";
+		}
+
+		static bool IsRevoiceFemaleToken(const char* Gender)
+		{
+			return Gender && _stricmp(Gender, "F") == 0;
+		}
+
+		static std::string GetRevoiceSpeakerRaceToken(const std::string& SpeakerInfo)
+		{
+			std::string SpeakerRaceToken = SpeakerInfo;
+			size_t SeparatorIndex = SpeakerRaceToken.find('\\');
+			if (SeparatorIndex != std::string::npos)
+				SpeakerRaceToken.erase(SeparatorIndex);
+			return SpeakerRaceToken;
+		}
+
 		static void ApplyRevoiceVampireRaceFallbackFromOutputPath(RevoiceCSVRowData& Row)
 		{
 			if (StringContainsCaseInsensitive(Row.OutputPath.c_str(), "VampireRace") == false)
@@ -543,37 +562,13 @@ namespace cse
 			if (IsUnknownLikeToken(Row.Race.c_str()))
 				Row.Race = "VampireRace";
 
-			std::string SpeakerRaceToken = Row.SpeakerInfo;
-			size_t SeparatorIndex = SpeakerRaceToken.find('\\');
-			if (SeparatorIndex != std::string::npos)
-				SpeakerRaceToken.erase(SeparatorIndex);
-
-			if (IsUnknownLikeToken(SpeakerRaceToken.c_str()))
-			{
-				const bool IsFemale = _stricmp(Row.Gender.c_str(), "F") == 0;
-				Row.SpeakerInfo = std::string("VampireRace\\") + (IsFemale ? "F" : "M");
-			}
-		}
-
-		static void ApplyRevoiceVoiceIDFallbacks(RevoiceCSVRowData& Row)
-		{
-			std::string SpeakerRaceToken = Row.SpeakerInfo;
-			size_t SeparatorIndex = SpeakerRaceToken.find('\\');
-			if (SeparatorIndex != std::string::npos)
-				SpeakerRaceToken.erase(SeparatorIndex);
-
-			const bool IsVampireRaceRow = _stricmp(Row.Race.c_str(), "VampireRace") == 0 ||
-				_stricmp(SpeakerRaceToken.c_str(), "VampireRace") == 0;
-			if (IsVampireRaceRow == false)
-				return;
-
-			const bool IsFemale = _stricmp(Row.Gender.c_str(), "F") == 0;
-			Row.VoiceID = IsFemale ? "F-VampireRace" : "M-VampireRace";
+			if (IsUnknownLikeToken(GetRevoiceSpeakerRaceToken(Row.SpeakerInfo).c_str()))
+				Row.SpeakerInfo = std::string("VampireRace\\") + (IsRevoiceFemaleToken(Row.Gender.c_str()) ? "F" : "M");
 		}
 
 		static bool ShouldSkipRevoiceCSVRow(const RevoiceCSVRowData& Row)
 		{
-			if (_stricmp(Row.Gender.c_str(), "F") != 0)
+			if (IsRevoiceFemaleToken(Row.Gender.c_str()) == false)
 				return false;
 
 			return StringContainsCaseInsensitive(Row.VoiceID.c_str(), "Sheogorath") ||
@@ -2196,7 +2191,6 @@ namespace cse
 							BaseRow.OutputPath = OutPath;
 							BaseRow.Dialogue = ResponseText;
 							ApplyRevoiceVampireRaceFallbackFromOutputPath(BaseRow);
-							ApplyRevoiceVoiceIDFallbacks(BaseRow);
 							if (ShouldSkipRevoiceCSVRow(BaseRow))
 								continue;
 
@@ -2207,8 +2201,7 @@ namespace cse
 							{
 								MissingRaceRows.push_back(Row);
 
-								{
-									for (auto* LoadedRace : AutoFixRaces)
+								for (auto* LoadedRace : AutoFixRaces)
 								{
 									if (LoadedRace == nullptr)
 										continue;
@@ -2220,7 +2213,7 @@ namespace cse
 									for (int SexIndex = 0; SexIndex < 2; SexIndex++)
 									{
 										const bool FixedIsFemale = SexIndex == 1;
-										const char* FixedSexToken = FixedIsFemale ? "F" : "M";
+										const char* FixedSexToken = GetRevoiceSexToken(FixedIsFemale);
 										TESRace* FixedVoiceRace = FixedIsFemale ? LoadedRace->femaleVoiceRace : LoadedRace->maleVoiceRace;
 										if (FixedVoiceRace == nullptr)
 											FixedVoiceRace = LoadedRace;
@@ -2253,13 +2246,11 @@ namespace cse
 										FixedRow.SpeakerInfo = std::string(FixedRaceName) + "\\" + FixedSexToken;
 										FixedRow.OutputPath = FixedOutPath;
 										ApplyRevoiceVampireRaceFallbackFromOutputPath(FixedRow);
-										ApplyRevoiceVoiceIDFallbacks(FixedRow);
 										if (ShouldSkipRevoiceCSVRow(FixedRow))
 											continue;
 
 										FixedRows.push_back(BuildRevoiceCSVRow(FixedRow));
 									}
-								}
 								}
 							}
 							if (BlastMode || (IsOutOfScope == false && IsMissingRace == false))
