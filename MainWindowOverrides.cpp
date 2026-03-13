@@ -532,6 +532,37 @@ namespace cse
 			return Result;
 		}
 
+		static void ApplyRevoiceVampireRaceFallbackFromOutputPath(RevoiceCSVRowData& Row)
+		{
+			if (StringContainsCaseInsensitive(Row.OutputPath.c_str(), "VampireRace") == false)
+				return;
+
+			if (IsUnknownLikeToken(Row.Race.c_str()))
+				Row.Race = "VampireRace";
+
+			std::string SpeakerRaceToken = Row.SpeakerInfo;
+			size_t SeparatorIndex = SpeakerRaceToken.find('\\');
+			if (SeparatorIndex != std::string::npos)
+				SpeakerRaceToken.erase(SeparatorIndex);
+
+			if (IsUnknownLikeToken(SpeakerRaceToken.c_str()))
+			{
+				const bool IsFemale = _stricmp(Row.Gender.c_str(), "F") == 0;
+				Row.SpeakerInfo = std::string("VampireRace\\") + (IsFemale ? "F" : "M");
+			}
+		}
+
+		static bool ShouldSkipRevoiceCSVRow(const RevoiceCSVRowData& Row)
+		{
+			if (_stricmp(Row.Gender.c_str(), "F") != 0)
+				return false;
+
+			return StringContainsCaseInsensitive(Row.VoiceID.c_str(), "Sheogorath") ||
+				StringContainsCaseInsensitive(Row.Race.c_str(), "Sheogorath") ||
+				StringContainsCaseInsensitive(Row.SpeakerInfo.c_str(), "Sheogorath") ||
+				StringContainsCaseInsensitive(Row.OutputPath.c_str(), "Sheogorath");
+		}
+
 		static bool WriteRevoiceCSVFile(const std::string& FilePath,
 			const std::vector<std::string>& Rows,
 			size_t StartIndex,
@@ -1351,6 +1382,18 @@ namespace cse
 			const char* RaceName = VoiceRace->name.c_str();
 			std::string ProbeText = std::string(EditorID) + " " + (RaceName ? RaceName : "");
 
+			if (StringContainsTokenCaseInsensitive(ProbeText, "DARKSEDUCER") ||
+				(StringContainsTokenCaseInsensitive(ProbeText, "DARK") && StringContainsTokenCaseInsensitive(ProbeText, "SEDUCER")))
+			{
+				return IsFemale ? "F-DarkSeducer" : "M-DarkSeducer";
+			}
+			if (StringContainsTokenCaseInsensitive(ProbeText, "GOLDENSAINT") ||
+				(StringContainsTokenCaseInsensitive(ProbeText, "GOLDEN") && StringContainsTokenCaseInsensitive(ProbeText, "SAINT")))
+			{
+				return IsFemale ? "F-GoldenSaint" : "M-GoldenSaint";
+			}
+			if (StringContainsTokenCaseInsensitive(ProbeText, "SHEOGORATH"))
+				return "M-Sheogorath";
 			if (StringContainsTokenCaseInsensitive(ProbeText, "DREMORA"))
 				return IsFemale ? "F-Dremora" : "M-Dremora";
 			if (StringContainsTokenCaseInsensitive(ProbeText, "KHAJIIT") ||
@@ -2133,6 +2176,9 @@ namespace cse
 							BaseRow.Emotion = Emotion;
 							BaseRow.OutputPath = OutPath;
 							BaseRow.Dialogue = ResponseText;
+							ApplyRevoiceVampireRaceFallbackFromOutputPath(BaseRow);
+							if (ShouldSkipRevoiceCSVRow(BaseRow))
+								continue;
 
 							std::string Row = BuildRevoiceCSVRow(BaseRow);
 							if (IsOutOfScope)
@@ -2178,6 +2224,9 @@ namespace cse
 									FixedRow.Race = FixedRaceName;
 									FixedRow.SpeakerInfo = std::string(FixedRaceName) + "\\" + SexToken;
 									FixedRow.OutputPath = FixedOutPath;
+									ApplyRevoiceVampireRaceFallbackFromOutputPath(FixedRow);
+									if (ShouldSkipRevoiceCSVRow(FixedRow))
+										continue;
 									FixedRows.push_back(BuildRevoiceCSVRow(FixedRow));
 								}
 							}
