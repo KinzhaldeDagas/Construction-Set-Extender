@@ -2198,29 +2198,33 @@ namespace cse
 									if (FixedRaceName == nullptr || strlen(FixedRaceName) == 0)
 										FixedRaceName = "Unknown";
 
-									TESRace* FixedVoiceRace = IsFemale ? LoadedRace->femaleVoiceRace : LoadedRace->maleVoiceRace;
-									if (FixedVoiceRace == nullptr)
-										FixedVoiceRace = LoadedRace;
-									const char* FixedVoiceID = ResolveRevoiceVoiceID(FixedVoiceRace, IsFemale);
-									if (FixedVoiceID == nullptr || strlen(FixedVoiceID) == 0)
-										FixedVoiceID = FixedRaceName;
-
-									std::string FixedVoiceFolder = ResolveRevoiceVoiceFolderFromEngine(FixedVoiceRace, FixedRaceName, FixedVoiceID);
-									char FixedOutPath[MAX_PATH] = { 0 };
-									FORMAT_STR(FixedOutPath, "Sound\\Voice\\%s\\%s\\%s\\%s_%s_%08X_%u.mp3",
-										SourcePlugin,
-										FixedVoiceFolder.c_str(),
-										SexToken,
-										QuestToken,
-										TopicToken,
-										OutputPathFormID,
-										Response->responseNumber);
-
-									if (SeenFixedOutputPaths.insert(FixedOutPath).second == false)
+									for (int SexIndex = 0; SexIndex < 2; SexIndex++)
 									{
-										SkippedFixedPathCollisions++;
-										continue;
-									}
+										const bool FixedIsFemale = SexIndex == 1;
+										const char* FixedSexToken = FixedIsFemale ? "F" : "M";
+										TESRace* FixedVoiceRace = FixedIsFemale ? LoadedRace->femaleVoiceRace : LoadedRace->maleVoiceRace;
+										if (FixedVoiceRace == nullptr)
+											FixedVoiceRace = LoadedRace;
+										const char* FixedVoiceID = ResolveRevoiceVoiceID(FixedVoiceRace, FixedIsFemale);
+										if (FixedVoiceID == nullptr || strlen(FixedVoiceID) == 0)
+											FixedVoiceID = FixedRaceName;
+
+										std::string FixedVoiceFolder = ResolveRevoiceVoiceFolderFromEngine(FixedVoiceRace, FixedRaceName, FixedVoiceID);
+										char FixedOutPath[MAX_PATH] = { 0 };
+										FORMAT_STR(FixedOutPath, "Sound\\Voice\\%s\\%s\\%s\\%s_%s_%08X_%u.mp3",
+											SourcePlugin,
+											FixedVoiceFolder.c_str(),
+											FixedSexToken,
+											QuestToken,
+											TopicToken,
+											OutputPathFormID,
+											Response->responseNumber);
+
+										if (SeenFixedOutputPaths.insert(FixedOutPath).second == false)
+										{
+											SkippedFixedPathCollisions++;
+											continue;
+										}
 
 									RevoiceCSVRowData FixedRow = BaseRow;
 									FixedRow.VoiceID = FixedVoiceID;
