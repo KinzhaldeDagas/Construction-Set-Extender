@@ -419,9 +419,44 @@ namespace cse
 			return Fallback;
 		}
 
+		static bool IsUnknownLikeToken(const char* Value)
+		{
+			if (Value == nullptr || Value[0] == 0)
+				return true;
+
+			while (*Value == ' ' || *Value == '	')
+				++Value;
+
+			if (*Value == 0)
+				return true;
+
+			return _stricmp(Value, "Unknown") == 0;
+		}
+
+		static std::string SanitizeRevoicePathToken(const char* Value)
+		{
+			std::string Result = Value ? Value : "";
+			if (Result.empty())
+				return "Unknown";
+
+			for (size_t i = 0; i < Result.size(); i++)
+			{
+				char& Ch = Result[i];
+				if (Ch == '\\' || Ch == '/' || Ch == ':' || Ch == '*' || Ch == '?' || Ch == '"' || Ch == '<' || Ch == '>' || Ch == '|')
+					Ch = '_';
+			}
+
+			while (Result.empty() == false && (Result.back() == ' ' || Result.back() == '.'))
+				Result.pop_back();
+
+			if (Result.empty())
+				return "Unknown";
+			return Result;
+		}
+
 		static std::string ResolveRevoiceRaceLabel(const char* RaceName, const char* VoiceID, bool IsFemale)
 		{
-			if (RaceName && RaceName[0] && _stricmp(RaceName, "Unknown") != 0)
+			if (IsUnknownLikeToken(RaceName) == false)
 				return RaceName;
 
 			if (VoiceID && _stricmp(VoiceID, "M-Imperials") == 0)
@@ -430,7 +465,27 @@ namespace cse
 			if (VoiceID && _stricmp(VoiceID, "F-Imperial-Breton") == 0)
 				return IsFemale ? "Imperial" : "Breton";
 
-			return RaceName ? RaceName : "Unknown";
+			return "Unknown";
+		}
+
+		static std::string ResolveRevoiceVoiceFolderFromEngine(TESRace* VoiceRace, const char* FallbackRaceName, const char* FallbackVoiceID)
+		{
+			const char* VoiceFolder = nullptr;
+			if (VoiceRace)
+			{
+				VoiceFolder = VoiceRace->name.c_str();
+				if (IsUnknownLikeToken(VoiceFolder))
+					VoiceFolder = VoiceRace->GetEditorID();
+			}
+
+			if (IsUnknownLikeToken(VoiceFolder))
+				VoiceFolder = FallbackRaceName;
+			if (IsUnknownLikeToken(VoiceFolder))
+				VoiceFolder = FallbackVoiceID;
+			if (IsUnknownLikeToken(VoiceFolder))
+				VoiceFolder = "Unknown";
+
+			return SanitizeRevoicePathToken(VoiceFolder);
 		}
 
 		struct RevoiceCSVRowData
@@ -2049,9 +2104,7 @@ namespace cse
 								Response->emotionValue);
 
 							char OutPath[MAX_PATH] = { 0 };
-							const char* VoiceFolder = NormalizedRaceName.c_str();
-							if (VoiceFolder == nullptr || strlen(VoiceFolder) == 0)
-								VoiceFolder = RaceName;
+							std::string VoiceFolder = ResolveRevoiceVoiceFolderFromEngine(VoiceRace, NormalizedRaceName.c_str(), VoiceID);
 
 							const char* QuestToken = GetNonEmptyToken(Quest->editorID.c_str(), "Quest");
 							const char* TopicToken = GetNonEmptyToken(Topic->editorID.c_str(), "Topic");
@@ -2061,7 +2114,7 @@ namespace cse
 
 							FORMAT_STR(OutPath, "Sound\\Voice\\%s\\%s\\%s\\%s_%s_%08X_%u.mp3",
 								SourcePlugin,
-								VoiceFolder,
+								VoiceFolder.c_str(),
 								SexToken,
 								QuestToken,
 								TopicToken,
@@ -2103,10 +2156,11 @@ namespace cse
 									if (FixedVoiceID == nullptr || strlen(FixedVoiceID) == 0)
 										FixedVoiceID = FixedRaceName;
 
+									std::string FixedVoiceFolder = ResolveRevoiceVoiceFolderFromEngine(FixedVoiceRace, FixedRaceName, FixedVoiceID);
 									char FixedOutPath[MAX_PATH] = { 0 };
 									FORMAT_STR(FixedOutPath, "Sound\\Voice\\%s\\%s\\%s\\%s_%s_%08X_%u.mp3",
 										SourcePlugin,
-										FixedRaceName,
+										FixedVoiceFolder.c_str(),
 										SexToken,
 										QuestToken,
 										TopicToken,
