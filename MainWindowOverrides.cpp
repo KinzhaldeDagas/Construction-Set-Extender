@@ -1918,6 +1918,9 @@ namespace cse
 				"No = Use all loaded races for missing-race auto-fix") == IDYES;
 
 			const std::vector<TESRace*>& AutoFixRaces = IncludeOblivionOnlyRaces ? OblivionDefaultRaces : LoadedRaces;
+			const char* FixedRowScopeNote = (ExportMode == RevoiceParentMasterExportMode::IgnoreOblivion)
+				? "In-scope plugin dialogue only (Oblivion.esm excluded)"
+				: "In-scope dialogue from selected plugin scope";
 
 			UInt32 Rows = 0;
 			UInt32 FoundResponses = 0;
@@ -2171,7 +2174,7 @@ namespace cse
 			if (WriteCategoryRows("Fixed", FixedRows, TotalWrittenFiles, FixedFirstFile) == false)
 				return;
 
-			BGSEEUI->MsgBoxI("reVoice CSV export complete.\nFound: %u dialogue responses\nExported: %u dialogue rows\nSkipped: %u responses\n  - Out of scope: %u\n  - Missing race data: %u\n  - Empty response text: %u\n\nAuto-fix from missing race data:\n  - Loaded races used: %u\n  - Fixed rows generated: %u\n  - Fixed rows skipped (path collisions): %u\n\nWrote %u files across folders:\n  - Exported\n  - Out of scope\n  - Missing race data\n  - Fixed\n\nExample files:\n%s\n%s\n%s\n%s",
+			BGSEEUI->MsgBoxI("reVoice CSV export complete.\nFound: %u dialogue responses\nExported: %u dialogue rows\nSkipped: %u responses\n  - Out of scope: %u\n  - Missing race data: %u\n  - Empty response text: %u\n\nAuto-fix from missing race data:\n  - Loaded races used: %u\n  - Fixed row scope: %s\n  - Fixed rows generated: %u\n  - Fixed rows skipped (path collisions): %u\n\nWrote %u files across folders:\n  - Exported\n  - Out of scope\n  - Missing race data\n  - Fixed\n\nExample files:\n%s\n%s\n%s\n%s",
 					FoundResponses,
 					Rows,
 					SkippedResponses,
@@ -2179,6 +2182,7 @@ namespace cse
 					SkippedMissingRace,
 					SkippedEmptyText,
 					static_cast<UInt32>(AutoFixRaces.size()),
+					FixedRowScopeNote,
 					static_cast<UInt32>(FixedRows.size()),
 					SkippedFixedPathCollisions,
 					TotalWrittenFiles,
@@ -2188,7 +2192,7 @@ namespace cse
 					FixedFirstFile.c_str());
 
 
-			std::string RaceListReport = "Auto-fix race pool:\n";
+			std::string RaceListReport = "Auto-fix race pool (used only for in-scope missing-race rows):\n";
 			if (AutoFixRaces.empty())
 			{
 				RaceListReport += "(none)";
