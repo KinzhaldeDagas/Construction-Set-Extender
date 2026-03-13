@@ -1910,10 +1910,12 @@ namespace cse
 			UInt32 SkippedOutOfScope = 0;
 			UInt32 SkippedMissingRace = 0;
 			UInt32 SkippedEmptyText = 0;
+			UInt32 SkippedFixedPathCollisions = 0;
 			std::vector<std::string> ExportedRows;
 			std::vector<std::string> OutOfScopeRows;
 			std::vector<std::string> MissingRaceRows;
 			std::vector<std::string> FixedRows;
+			std::set<std::string> SeenFixedOutputPaths;
 			ExportedRows.reserve(512);
 			OutOfScopeRows.reserve(512);
 			MissingRaceRows.reserve(512);
@@ -2069,6 +2071,12 @@ namespace cse
 										Info->formID,
 										Response->responseNumber);
 
+									if (SeenFixedOutputPaths.insert(FixedOutPath).second == false)
+									{
+										SkippedFixedPathCollisions++;
+										continue;
+									}
+
 									RevoiceCSVRowData FixedRow = BaseRow;
 									FixedRow.VoiceID = FixedVoiceID;
 									FixedRow.Race = FixedRaceName;
@@ -2148,7 +2156,7 @@ namespace cse
 			if (WriteCategoryRows("Fixed", FixedRows, TotalWrittenFiles, FixedFirstFile) == false)
 				return;
 
-			BGSEEUI->MsgBoxI("reVoice CSV export complete.\nFound: %u dialogue responses\nExported: %u dialogue rows\nSkipped: %u responses\n  - Out of scope: %u\n  - Missing race data: %u\n  - Empty response text: %u\n\nAuto-fix from missing race data:\n  - Loaded races used: %u\n  - Fixed rows generated: %u\n\nWrote %u files across folders:\n  - Exported\n  - Out of scope\n  - Missing race data\n  - Fixed\n\nExample files:\n%s\n%s\n%s\n%s",
+			BGSEEUI->MsgBoxI("reVoice CSV export complete.\nFound: %u dialogue responses\nExported: %u dialogue rows\nSkipped: %u responses\n  - Out of scope: %u\n  - Missing race data: %u\n  - Empty response text: %u\n\nAuto-fix from missing race data:\n  - Loaded races used: %u\n  - Fixed rows generated: %u\n  - Fixed rows skipped (path collisions): %u\n\nWrote %u files across folders:\n  - Exported\n  - Out of scope\n  - Missing race data\n  - Fixed\n\nExample files:\n%s\n%s\n%s\n%s",
 					FoundResponses,
 					Rows,
 					SkippedResponses,
@@ -2157,6 +2165,7 @@ namespace cse
 					SkippedEmptyText,
 					static_cast<UInt32>(LoadedRaces.size()),
 					static_cast<UInt32>(FixedRows.size()),
+					SkippedFixedPathCollisions,
 					TotalWrittenFiles,
 					ExportedFirstFile.c_str(),
 					OutOfScopeFirstFile.c_str(),
