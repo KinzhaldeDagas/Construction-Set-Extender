@@ -14,12 +14,29 @@ That can remove legitimate lines when:
 ## Recommended export key
 To avoid accidental deduplication, use a stable per-response identity, not only display text or normalized topic text.
 
+### Chosen direction (Option B)
+Use a **string signature with explicit schema versioning** and include the **spoken race** in the signature so Revoice can reliably detect/export rows without inferring from paths or display text.
+
+Recommended fields:
+- `revoice_signature` (string)
+- `revoice_signature_version` (integer, start at `1`)
+- `spoken_race` (stable sanitized key, EditorID preferred; fallback FormID)
+
+Suggested signature template (`v1`):
+`rvx:v1|plugin=<plugin>|quest=<quest>|topic=<topic>|info=<info>|response=<index>|race=<spoken_race>`
+
+Notes:
+- Keep `spoken_race` explicit in a CSV column even if it is also encoded inside `revoice_signature`.
+- Treat the full `revoice_signature` as the dedupe key; never dedupe by visible line text alone.
+- Bump `revoice_signature_version` when composition rules change.
+
 A safe identity should include at least:
 - plugin/source file,
 - quest identifier,
 - topic identifier,
 - INFO/form identifier (or equivalent unique response id),
-- response index/number.
+- response index/number,
+- spoken race.
 
 ## Filtering guidance
 If you need to hide obvious junk rows, avoid dropping entire `_N` families by text alone.
@@ -42,8 +59,9 @@ Run these checks against known-problem topics (e.g., "Latest Rumor"):
    - Current behavior to avoid: `.../<voiceid>/...` directory partitioning.
    - Required behavior: `.../<race>/...` directory partitioning.
    - Rationale: shared lines across NPCs/voice IDs should still collate under race-level output, which is how downstream processing expects paths.
-2. Keep the CSV row identity strict (plugin + quest + topic + INFO/form + response index) so path changes do not reintroduce dedup loss.
+2. Keep the CSV row identity strict (plugin + quest + topic + INFO/form + response index + spoken race), represented by `revoice_signature`, so path changes do not reintroduce dedup loss.
 3. Add a regression check with known lines (e.g., "Latest Rumor") across NPCs sharing content to ensure no row drops when race-bucket output is used.
+4. Add CSV columns `revoice_signature`, `revoice_signature_version`, and `spoken_race`, and validate that every exported row has non-empty values.
 
 ## Proposed path rule
 - Replace path builder logic from:

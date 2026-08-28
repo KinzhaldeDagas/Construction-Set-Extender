@@ -43,6 +43,22 @@ namespace
 		return Buffer;
 	}
 
+	std::string MakeSignatureToken(const std::string& Input)
+	{
+		std::string Out = SanitizePathComponent(Input);
+		for (size_t i = 0; i < Out.size(); i++)
+		{
+			char& Ch = Out[i];
+			if (Ch == '|' || Ch == '=')
+				Ch = '_';
+		}
+
+		if (Out.empty())
+			Out = "Unknown";
+
+		return Out;
+	}
+
 	bool HasNonWhitespaceText(const std::string& Input)
 	{
 		for (size_t i = 0; i < Input.size(); i++)
@@ -428,7 +444,7 @@ namespace cse
 			if (Output.good() == false)
 				return false;
 
-			Output << "FormID,VoiceID,Race,Gender,SpeakerInfo,Emotion,OutputPath,Dialogue\n";
+			Output << "FormID,VoiceID,Race,Gender,SpeakerInfo,Emotion,OutputPath,Dialogue,revoice_signature_version,revoice_signature,spoken_race\n";
 			for (size_t i = StartIndex; i < EndIndexExclusive; i++)
 				Output << Rows[i] << "\n";
 
@@ -1803,6 +1819,12 @@ namespace cse
 			if (FilePath.size() < 4 || _stricmp(FilePath.c_str() + FilePath.size() - 4, ".csv"))
 				FilePath += ".csv";
 
+			const bool BlastMode = BGSEEUI->MsgBoxI(hWnd,
+				MB_YESNO,
+				"Blast?\n\n"
+				"Yes = export all discovered dialogue rows in the selected plugin scope, including rows with missing race data\n"
+				"No = keep strict spoken-only filtering") == IDYES;
+
 			const bool SplitIntoParts = BGSEEUI->MsgBoxI(hWnd,
 				MB_YESNO,
 				"Split the export into multiple reVoice CSV files?\n\n(24 dialogue rows per file)") == IDYES;
@@ -1846,7 +1868,6 @@ namespace cse
 				AllowedParentMasters.push_back(MasterFile);
 			}
 
-			UInt32 Rows = 0;
 			UInt32 FoundResponses = 0;
 			UInt32 SkippedResponses = 0;
 			UInt32 SkippedOutOfScope = 0;
@@ -1919,6 +1940,23 @@ namespace cse
 								RaceName = "Unknown";
 						}
 
+						std::string SpokenRaceKey;
+						if (SpeakerRace)
+						{
+							const char* RaceEditorID = SpeakerRace->GetEditorID();
+							if (RaceEditorID && RaceEditorID[0])
+								SpokenRaceKey = RaceEditorID;
+							else if (RaceName && RaceName[0])
+								SpokenRaceKey = RaceName;
+							else
+								SpokenRaceKey = MakeFallbackEditorID("Race", SpeakerRace->formID);
+						}
+						else
+						{
+							SpokenRaceKey = "UnknownRace";
+						}
+						SpokenRaceKey = SanitizePathComponent(SpokenRaceKey);
+
 						std::string SpeakerInfo = std::string(RaceName) + "\\" + SexToken;
 
 						for (TESTopicInfo::ResponseListT::Iterator ItrResponse = Info->responseList.Begin();
@@ -1944,14 +1982,15 @@ namespace cse
 								Response->emotionValue);
 
 							char OutPath[MAX_PATH] = { 0 };
-							const char* VoiceFolder = VoiceID;
-							if (VoiceFolder == nullptr || strlen(VoiceFolder) == 0)
-								VoiceFolder = RaceName;
+							const char* VoiceFolder = SpokenRaceKey.c_str();
 
 							const char* QuestToken = GetNonEmptyToken(Quest->editorID.c_str(), "Quest");
 							const char* TopicToken = GetNonEmptyToken(Topic->editorID.c_str(), "Topic");
 
 							const char* SourcePlugin = SourceFile ? SourceFile->fileName : (_DATAHANDLER->activeFile ? _DATAHANDLER->activeFile->fileName : "ActivePlugin.esp");
+							const std::string SignaturePlugin = MakeSignatureToken(SourcePlugin ? SourcePlugin : "ActivePlugin.esp");
+							const std::string SignatureQuest = MakeSignatureToken(QuestToken ? QuestToken : "Quest");
+							const std::string SignatureTopic = MakeSignatureToken(TopicToken ? TopicToken : "Topic");
 
 							FORMAT_STR(OutPath, "Sound\\Voice\\%s\\%s\\%s\\%s_%s_%08X_%u.mp3",
 								SourcePlugin,
@@ -1974,9 +2013,26 @@ namespace cse
 							std::string EscapedOutPath = EscapeCSVField(OutPath);
 							std::string EscapedResponseText = EscapeCSVField(ResponseText);
 
+							char SignatureVersion[8] = { 0 };
+							FORMAT_STR(SignatureVersion, "%u", 1U);
+							char SignatureInfoFormID[9] = { 0 };
+							FORMAT_STR(SignatureInfoFormID, "%08X", Info->formID);
+							char SignatureResponseIndex[16] = { 0 };
+							FORMAT_STR(SignatureResponseIndex, "%u", Response->responseNumber);
+
+							std::string Signature = "rvx:v1|plugin=" + SignaturePlugin
+								+ "|quest=" + SignatureQuest
+								+ "|topic=" + SignatureTopic
+								+ "|info=" + SignatureInfoFormID
+								+ "|response=" + SignatureResponseIndex
+								+ "|race=" + MakeSignatureToken(SpokenRaceKey);
+							std::string EscapedSignatureVersion = EscapeCSVField(SignatureVersion);
+							std::string EscapedSignature = EscapeCSVField(Signature.c_str());
+							std::string EscapedSpokenRace = EscapeCSVField(SpokenRaceKey.c_str());
+
 							std::string Row;
 							Row.reserve(EscapedFormID.size() + EscapedVoiceID.size() + EscapedRace.size() + EscapedGender.size() + EscapedSpeakerInfo.size() +
-								EscapedEmotion.size() + EscapedOutPath.size() + EscapedResponseText.size() + 7);
+								EscapedEmotion.size() + EscapedOutPath.size() + EscapedResponseText.size() + EscapedSignatureVersion.size() + EscapedSignature.size() + EscapedSpokenRace.size() + 10);
 							Row += EscapedFormID;
 							Row += ",";
 							Row += EscapedVoiceID;
@@ -1992,19 +2048,24 @@ namespace cse
 							Row += EscapedOutPath;
 							Row += ",";
 							Row += EscapedResponseText;
+							Row += ",";
+							Row += EscapedSignatureVersion;
+							Row += ",";
+							Row += EscapedSignature;
+							Row += ",";
+							Row += EscapedSpokenRace;
 							if (IsOutOfScope)
 								OutOfScopeRows.push_back(Row);
 							if (IsMissingRace)
 								MissingRaceRows.push_back(Row);
-							if (IsOutOfScope == false && IsMissingRace == false)
+							if (BlastMode || (IsOutOfScope == false && IsMissingRace == false))
 								ExportedRows.push_back(Row);
-							Rows++;
 						}
 					}
 				}
 			}
 
-			SkippedResponses = SkippedOutOfScope + SkippedMissingRace + SkippedEmptyText;
+			SkippedResponses = BlastMode ? SkippedEmptyText : (SkippedOutOfScope + SkippedMissingRace + SkippedEmptyText);
 
 			auto WriteCategoryRows = [&](const char* CategoryFolder,
 				const std::vector<std::string>& CategoryRows,
@@ -2063,9 +2124,10 @@ namespace cse
 			if (WriteCategoryRows("Missing race data", MissingRaceRows, TotalWrittenFiles, MissingRaceFirstFile) == false)
 				return;
 
-			BGSEEUI->MsgBoxI("reVoice CSV export complete.\nFound: %u dialogue responses\nExported: %u dialogue rows\nSkipped: %u responses\n  - Out of scope: %u\n  - Missing race data: %u\n  - Empty response text: %u\n\nWrote %u files across folders:\n  - Exported\n  - Out of scope\n  - Missing race data\n\nExample files:\n%s\n%s\n%s",
+			BGSEEUI->MsgBoxI("reVoice CSV export complete.\nMode: %s\nFound: %u dialogue responses\nExported: %u dialogue rows\nSkipped: %u responses\n  - Out of scope: %u\n  - Missing race data: %u\n  - Empty response text: %u\n\nWrote %u files across folders:\n  - Exported\n  - Out of scope\n  - Missing race data\n\nExample files:\n%s\n%s\n%s",
+					BlastMode ? "Blast" : "Strict spoken-only",
 					FoundResponses,
-					Rows,
+					static_cast<UInt32>(ExportedRows.size()),
 					SkippedResponses,
 					SkippedOutOfScope,
 					SkippedMissingRace,
